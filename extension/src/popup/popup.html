@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { width: 320px; font-family: system-ui, sans-serif; margin: 0; padding: 14px; font-size: 14px; }
+    input, button { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 8px; font-size: 14px; }
+    button { cursor: pointer; }
+    #msg { margin-top: 10px; min-height: 18px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h3>🦉 Owlet</h3>
+  <div id="login" class="hidden">
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="loginBtn">Log in</button>
+  </div>
+  <div id="clipper" class="hidden">
+    <button id="clipBtn">Clip this page</button>
+    <button id="logoutBtn">Log out</button>
+  </div>
+  <div id="msg"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
