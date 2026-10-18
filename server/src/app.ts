@@ -5,7 +5,7 @@ import rateLimit from "express-rate-limit";
 import authRoutes from "./routes/authRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import researchRoutes from "./routes/researchRoutes.js";
-
+import workspaceRoutes from "./routes/workspaceRoutes.js";
 const app = express();
 
 
@@ -14,7 +14,7 @@ app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL }));
 app.use(express.json({ limit: "2mb" }));
 app.use("/api/auth", rateLimit({ windowMs: 15 * 60 * 1000, limit: 50 }));
-
+app.use("/api/workspaces", workspaceRoutes);
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
 

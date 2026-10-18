@@ -2,10 +2,13 @@ import { Schema, model } from "mongoose";
 
 const researchItemSchema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    projectId: { type: Schema.Types.ObjectId, ref: "Project", default: null },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true }, // who clipped it
+    workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
     source: {
-      url: { type: String, required: true },
+      kind: { type: String, enum: ["web", "pdf"], default: "web" },
+      url: String,
+      dedupeKey: String, // url for web pages, file hash for PDFs
+      fileName: String,
       domain: String,
       title: String,
       author: String,
@@ -26,6 +29,7 @@ const researchItemSchema = new Schema(
     comments: [
       {
         userId: { type: Schema.Types.ObjectId, ref: "User" },
+        authorEmail: String,
         text: String,
         highlightId: Schema.Types.ObjectId,
         createdAt: { type: Date, default: Date.now },
@@ -36,6 +40,11 @@ const researchItemSchema = new Schema(
   { timestamps: true }
 );
 
-researchItemSchema.index({ userId: 1, "source.url": 1 }, { unique: true });
+researchItemSchema.index({ workspaceId: 1, createdAt: -1 });
+// no duplicate clips inside one workspace (partial, so old unmigrated items don't collide)
+researchItemSchema.index(
+  { workspaceId: 1, "source.dedupeKey": 1 },
+  { unique: true, partialFilterExpression: { "source.dedupeKey": { $type: "string" } } }
+);
 
 export const ResearchItem = model("ResearchItem", researchItemSchema);

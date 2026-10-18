@@ -14,10 +14,14 @@ function parseDate(s?: string) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function splitName(author: string) {
-  const multi = /,| and | & /i.test(author);
-  const parts = author.trim().split(/\s+/);
-  if (multi || parts.length < 2) return { last: author.trim(), first: "", raw: true };
+const ORG = /\b(contributors?|team|staff|editors?|editorial|inc|llc|ltd|corp|university|institute|association|foundation|department|committee|council|society|group|board|agency)\b/i;
+
+export function splitName(author: string) {
+  const a = author.trim();
+  const parts = a.split(/\s+/);
+  const raw =
+    /,| and | & /i.test(a) || parts.length < 2 || parts.length > 4 || ORG.test(a) || /\d/.test(a);
+  if (raw) return { last: a, first: "", raw: true };
   return { last: parts[parts.length - 1], first: parts.slice(0, -1).join(" "), raw: false };
 }
 
@@ -28,7 +32,7 @@ export function buildCitations(m: Meta) {
 
   // APA
   const apaDate = d ? `${d.getFullYear()}, ${MONTHS[d.getMonth()]} ${d.getDate()}` : "n.d.";
-  const apaAuthor = a ? (a.raw ? a.last : `${a.last}, ${a.first.split(" ").map((n) => n[0] + ".").join(" ")}`) : null;
+const apaAuthor = a ? (a.raw ? a.last.replace(/\.?$/, ".") : `${a.last}, ${a.first.split(" ").map((n) => n[0] + ".").join(" ")}`) : null;
   const apa = apaAuthor
     ? `${apaAuthor} (${apaDate}). ${m.title}. ${site}. ${m.url}`
     : `${m.title}. (${apaDate}). ${site}. ${m.url}`;
