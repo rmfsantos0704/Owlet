@@ -24,26 +24,32 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-3 rounded-lg border bg-white p-6">
-        <h1 className="text-xl font-semibold">🦉 Owlet</h1>
-        <input
-          type="email" required placeholder="Email" value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded border px-3 py-2"
-        />
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
+      <form onSubmit={onSubmit} className="card w-full max-w-sm space-y-4 p-7">
+        <div className="relative flex size-11 items-center justify-center overflow-hidden rounded-xl bg-brand text-xl shadow-md shadow-blue-950/15">
+          🦉
+          <span className="absolute bottom-0 right-0 size-3.5 rounded-tl-lg bg-cyan-400" />
+        </div>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-ink">
+            {isLogin ? "Welcome back" : "Create your account"}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {isLogin ? "Log in to your Owlet library." : "Start clipping and organizing research."}
+          </p>
+        </div>
+        <input type="email" required placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="field" />
         <input
           type="password" required minLength={8} placeholder="Password (8+ characters)" value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded border px-3 py-2"
+          onChange={(e) => setPassword(e.target.value)} className="field"
         />
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button disabled={busy} className="w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50">
+        <button disabled={busy} className="btn-primary w-full">
           {busy ? "Please wait…" : isLogin ? "Log in" : "Create account"}
         </button>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-500">
           {isLogin ? "No account? " : "Have an account? "}
-          <Link to={isLogin ? "/register" : "/login"} className="underline">
+          <Link to={isLogin ? "/register" : "/login"} className="font-semibold text-blue-700 hover:underline">
             {isLogin ? "Register" : "Log in"}
           </Link>
         </p>
