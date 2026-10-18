@@ -7,9 +7,25 @@ function msg(text: string, error = false) {
   el.textContent = text;
   el.style.color = error ? "#b00020" : "#1b5e20";
 }
+type Ws = { id: string; name: string; role: string };
 
+async function loadWorkspaces() {
+  const r = await api("/workspaces");
+  if (!r.ok) return;
+  const { workspaceId } = await chrome.storage.local.get("workspaceId");
+  const list = (r.data.workspaces as Ws[]).filter((w) => w.role !== "viewer");
+  const sel = $<HTMLSelectElement>("workspace");
+  sel.innerHTML = "";
+  for (const w of list) sel.add(new Option(w.name, w.id));
+  if (typeof workspaceId === "string" && list.some((w) => w.id === workspaceId)) sel.value = workspaceId;
+}
+
+$("workspace").addEventListener("change", () =>
+  chrome.storage.local.set({ workspaceId: $<HTMLSelectElement>("workspace").value })
+);
 async function render() {
   const loggedIn = !!(await getToken());
+  if (loggedIn) await loadWorkspaces();
   $("login").classList.toggle("hidden", loggedIn);
   $("clipper").classList.toggle("hidden", !loggedIn);
 }
@@ -40,7 +56,10 @@ $("clipBtn").addEventListener("click", async () => {
     const page = await chrome.tabs.sendMessage(tab.id, { type: "OWLET_EXTRACT" });
     if (!page || page.rawText.length < 50) return msg("Not enough text on this page", true);
 
-    const r = await api("/research/clip", { method: "POST", body: page });
+    const r = await api("/research/clip", {
+  method: "POST",
+  body: { ...page, workspaceId: $<HTMLSelectElement>("workspace").value || undefined },
+});
     if (r.status === 401) {
       await clearToken();
       render();
