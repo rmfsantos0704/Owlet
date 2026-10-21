@@ -1,4 +1,5 @@
 export const API_URL = "http://localhost:4000/api";
+export const DASHBOARD_URL = "http://localhost:5173";
 
 export async function getToken(): Promise<string | null> {
   const { token } = await chrome.storage.local.get("token");
