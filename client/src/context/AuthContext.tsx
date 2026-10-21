@@ -2,11 +2,21 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { api } from "../services/api";
 
 type User = { id?: string; email: string };
+
+export type RegisterInput = {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  age: number;
+  occupation: string;
+};
+
 type AuthValue = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  // creating an account does NOT log you in: the user must confirm their email first
+  register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
 };
 
@@ -24,20 +34,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  async function authenticate(path: string, email: string, password: string) {
-    const r = await api<{ token: string; user: User }>(path, {
-      method: "POST",
-      body: { email, password },
-    });
-    localStorage.setItem("token", r.token);
-    setUser(r.user);
-  }
-
   const value: AuthValue = {
     user,
     loading,
-    login: (e, p) => authenticate("/auth/login", e, p),
-    register: (e, p) => authenticate("/auth/register", e, p),
+    login: async (email, password) => {
+      const r = await api<{ token: string; user: User }>("/auth/login", {
+        method: "POST",
+        body: { email, password },
+      });
+      localStorage.setItem("token", r.token);
+      setUser(r.user);
+    },
+    register: async (input) => {
+      await api("/auth/register", { method: "POST", body: input });
+    },
     logout: () => {
       localStorage.removeItem("token");
       setUser(null);
@@ -47,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");

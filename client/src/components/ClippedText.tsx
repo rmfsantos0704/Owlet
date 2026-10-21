@@ -3,10 +3,11 @@ import { COLORS } from "../utils/colors";
 
 type Props = {
   text: string;
+  readOnly?: boolean;
   onHighlight: (text: string, color: string, note?: string) => Promise<void>;
 };
 
-export default function ClippedText({ text, onHighlight }: Props) {
+export default function ClippedText({ text, readOnly, onHighlight }: Props) {
   const ref = useRef<HTMLParagraphElement>(null);
   const [selected, setSelected] = useState("");
   const [note, setNote] = useState("");
@@ -26,15 +27,15 @@ export default function ClippedText({ text, onHighlight }: Props) {
 
   return (
     <div>
-      <p className="mb-2 text-xs text-slate-400">Select text below to highlight it.</p>
+      {!readOnly && <p className="mb-2 text-xs text-slate-400">Select text below to highlight it.</p>}
       <p
         ref={ref}
-        onMouseUp={capture}
+        onMouseUp={readOnly ? undefined : capture}
         className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700"
       >
         {text}
       </p>
-      {selected && (
+      {!readOnly && selected && (
         <div className="mt-3 space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
           <p className="line-clamp-3 text-sm italic text-slate-700">&ldquo;{selected}&rdquo;</p>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional note" className="field" />

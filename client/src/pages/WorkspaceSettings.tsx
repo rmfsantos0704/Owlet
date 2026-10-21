@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Trash2 } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Check, ChevronLeft, FlaskConical, Trash2 } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useWorkspaces } from "../context/WorkspaceContext";
-import type { AiSettings, WorkspaceDetail } from "../types";
+import type { AiSettings, ResearchItem, WorkspaceDetail } from "../types";
 
 const FORMATS: { value: AiSettings["format"]; label: string; hint: string }[] = [
   { value: "paragraph", label: "Paragraph", hint: "One short, flowing paragraph" },
@@ -18,6 +18,33 @@ const LENGTHS: { value: AiSettings["length"]; label: string }[] = [
   { value: "detailed", label: "Detailed" },
 ];
 
+const PRESETS: { label: string; text: string }[] = [
+  {
+    label: "Literature review",
+    text: 'Focus on the research question, methodology, sample size, and main findings. Mention limitations when the text states them. Use neutral academic wording. Use only information from the text and write "not stated" for anything missing.',
+  },
+  {
+    label: "Study notes",
+    text: "Write for a first-year student. Define each technical term in a few words the first time it appears. Highlight cause-and-effect relationships. Skip background history unless it is needed to understand the main point.",
+  },
+  {
+    label: "Critical reading",
+    text: "State the author's main claim, the evidence used to support it, and any assumptions or missing perspectives. Keep a neutral tone and do not add opinions of your own.",
+  },
+  {
+    label: "News & policy",
+    text: "Separate facts from claims and say who said what. Include dates, numbers, and places that appear in the text. Do not guess at anything the text does not state.",
+  },
+  {
+    label: "Filipino",
+    text: "Write the summary and key arguments in Filipino. Keep technical terms and proper names in English. Keep the tags in English.",
+  },
+];
+
+type TestResult = { summary: string; paraphrase: string; tags: string[]; source: string };
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export default function WorkspaceSettings() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -29,8 +56,16 @@ export default function WorkspaceSettings() {
   const [ai, setAi] = useState<AiSettings>({ format: "paragraph", length: "medium", instructions: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"editor" | "viewer">("viewer");
+
+  const [clips, setClips] = useState<{ id: string; title: string }[]>([]);
+  const [testItem, setTestItem] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [testError, setTestError] = useState("");
 
   const fetchWs = useCallback(
     () => api<{ workspace: WorkspaceDetail }>(`/workspaces/${id}`).then((r) => r.workspace),
@@ -38,6 +73,11 @@ export default function WorkspaceSettings() {
   );
 
   useEffect(() => {
+    setWs(null);
+    setSaved(false);
+    setTestResult(null);
+    setTestError("");
+    setTestItem("");
     fetchWs()
       .then((w) => {
         setWs(w);
@@ -48,6 +88,18 @@ export default function WorkspaceSettings() {
       .catch((e) => setError(e.message));
   }, [fetchWs]);
 
+  // the owner can test on one of this workspace's own clips
+  const wsRole = ws?.role;
+  useEffect(() => {
+    if (wsRole !== "owner") return;
+    api<{ items: ResearchItem[] }>(`/research?workspaceId=${id}`)
+      .then((r) =>
+        setClips(r.items.map((i) => ({ id: i._id, title: i.source.title || i.source.fileName || "Untitled" })))
+      )
+      .catch(() => {});
+  }, [id, wsRole]);
+
+  // for the smaller actions (members, delete): shows a short notice or an error
   async function run(fn: () => Promise<unknown>, ok = "") {
     try {
       await fn();
@@ -64,13 +116,50 @@ export default function WorkspaceSettings() {
     await reload();
   };
 
-  const save = (e: FormEvent) => {
+  async function save(e: FormEvent) {
     e.preventDefault();
-    run(async () => {
-      await api(`/workspaces/${id}`, { method: "PATCH", body: { name, description, aiSettings: ai } });
-      await refresh();
-    }, "Saved");
-  };
+    if (saving) return;
+    setSaving(true);
+    setSaved(false);
+    setError("");
+    try {
+      // keep the spinner up for at least 0.4s so the save is always visible
+      await Promise.all([
+        (async () => {
+          await api(`/workspaces/${id}`, { method: "PATCH", body: { name, description, aiSettings: ai } });
+          await refresh();
+        })(),
+        wait(400),
+      ]);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save changes");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runTest() {
+    if (testing) return;
+    setTesting(true);
+    setTestError("");
+    try {
+      const [r] = await Promise.all([
+        api<TestResult>(`/workspaces/${id}/test-ai`, {
+          method: "POST",
+          body: { aiSettings: ai, itemId: testItem || undefined },
+        }),
+        wait(400),
+      ]);
+      setTestResult(r);
+    } catch (e) {
+      setTestResult(null);
+      setTestError(e instanceof Error ? e.message : "Test failed");
+    } finally {
+      setTesting(false);
+    }
+  }
 
   const addMember = (e: FormEvent) => {
     e.preventDefault();
@@ -116,17 +205,22 @@ export default function WorkspaceSettings() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <Link to="/" className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand">
+        <ChevronLeft className="size-4" /> Back to {ws.name}
+      </Link>
+
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Workspace settings</h1>
         <p className="mt-1 text-sm text-slate-500">
-          {isOwner ? "You own this workspace." : `You're a${ws.role === "editor" ? "n" : ""} ${ws.role} here. Only the owner can change settings.`}
+          {isOwner
+            ? "You own this workspace."
+            : `You're a${ws.role === "editor" ? "n" : ""} ${ws.role} here. Only the owner can change settings.`}
         </p>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
       {notice && <p className="text-sm text-emerald-600">{notice}</p>}
 
       <form onSubmit={save} className="space-y-6">
-        <fieldset disabled={!isOwner} className="space-y-6">
+        <fieldset disabled={!isOwner || saving} className="space-y-6">
           <section className="card space-y-3 p-5">
             <h2 className="font-semibold text-ink">General</h2>
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required placeholder="Workspace name" className="field" />
@@ -136,7 +230,9 @@ export default function WorkspaceSettings() {
           <section className="card space-y-4 p-5">
             <div>
               <h2 className="font-semibold text-ink">AI summaries</h2>
-              <p className="mt-1 text-xs text-slate-400">Applies to clips added after you save. Existing summaries aren't changed.</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Applies to clips added after you save. For older clips, open one and click Regenerate.
+              </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {FORMATS.map((f) => (
@@ -167,21 +263,116 @@ export default function WorkspaceSettings() {
                 </button>
               ))}
             </div>
+
             <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink">Custom instructions</label>
               <textarea
                 value={ai.instructions}
                 onChange={(e) => setAi({ ...ai, instructions: e.target.value })}
                 maxLength={500}
-                rows={3}
-                placeholder='Custom instructions (optional), e.g. "Focus on methodology and sample sizes."'
+                rows={4}
+                placeholder='What should the AI focus on? e.g. "Focus on methodology and sample sizes. Write for a first-year student."'
                 className="field"
               />
-              <div className="mt-1 text-right text-[11px] text-slate-400">{ai.instructions.length}/500</div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-slate-400">Try an example:</span>
+                {PRESETS.map((p) => (
+                  <button
+                    type="button"
+                    key={p.label}
+                    onClick={() => setAi({ ...ai, instructions: p.text })}
+                    className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+                <span className="ml-auto text-[11px] text-slate-400">{ai.instructions.length}/500</span>
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                Say what to focus on, include, or avoid. Use the format and length options above for structure.
+              </p>
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <FlaskConical className="size-4 text-blue-600" /> Test these settings
+              </div>
+              <p className="text-xs text-slate-500">
+                Uses the choices above, even before you save. Nothing is saved or changed.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <select value={testItem} onChange={(e) => setTestItem(e.target.value)} className="field min-w-0 flex-1">
+                  <option value="">Built-in sample article</option>
+                  {clips.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title.slice(0, 70)}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" onClick={runTest} disabled={testing} className="btn-secondary min-w-32">
+                  {testing ? (
+                    <>
+                      <span className="size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+                      Testing…
+                    </>
+                  ) : (
+                    "Run test"
+                  )}
+                </button>
+              </div>
+              {testError && <p className="text-sm text-red-600">{testError}</p>}
+              {testResult && (
+                <div className="space-y-3 rounded-xl border border-blue-100 bg-white p-4 text-sm">
+                  <div>
+                    <div className="eyebrow mb-1">Summary</div>
+                    <p className="whitespace-pre-line leading-relaxed text-slate-800">{testResult.summary}</p>
+                  </div>
+                  <div>
+                    <div className="eyebrow mb-1">Key arguments</div>
+                    <p className="leading-relaxed text-slate-700">{testResult.paraphrase}</p>
+                  </div>
+                  {testResult.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {testResult.tags.map((t) => (
+                        <span key={t} className="chip">{t}</span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-400">
+                    Tested on {testResult.source}. Happy with it? Click Save changes below.
+                  </p>
+                </div>
+              )}
             </div>
           </section>
         </fieldset>
-        {isOwner && <button className="btn-primary">Save changes</button>}
+
+        {isOwner && (
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              disabled={saving}
+              className={`btn-primary min-w-40 transition-colors ${saved ? "!bg-emerald-600" : ""}`}
+            >
+              {saving ? (
+                <>
+                  <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Saving…
+                </>
+              ) : saved ? (
+                <>
+                  <Check className="size-4" /> Saved
+                </>
+              ) : (
+                "Save changes"
+              )}
+            </button>
+            {error && <span className="text-sm text-red-600">{error}</span>}
+          </div>
+        )}
       </form>
+
+      {!isOwner && error && <p className="text-sm text-red-600">{error}</p>}
 
       <section className="card p-5">
         <h2 className="font-semibold text-ink">Members</h2>

@@ -11,21 +11,31 @@ const PALETTES = [
 ];
 const palette = (s = "") => PALETTES[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTES.length];
 
-export default function ResearchCard({ item, onTag }: { item: ResearchItem; onTag: (t: string) => void }) {
+type Props = {
+  item: ResearchItem;
+  onTag: (t: string) => void;
+  workspaceName?: string;
+};
+
+export default function ResearchCard({ item, onTag, workspaceName }: Props) {
+  const isPdf = item.source.kind === "pdf";
+  const origin = isPdf ? `PDF${item.source.fileName ? ` · ${item.source.fileName}` : ""}` : item.source.domain;
+
   return (
     <div className="flex items-start gap-4 px-5 py-4 transition hover:bg-slate-50/80">
-      <div className={`mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl ${palette(item.source.domain)}`}>
+      <div className={`mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl ${palette(item.source.domain ?? item.source.fileName)}`}>
         <FileText className="size-4.5" strokeWidth={1.9} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <Link to={`/item/${item._id}`} className="min-w-0 truncate text-sm font-semibold text-slate-800 hover:text-blue-700">
-            {item.source.title || item.source.url}
+            {item.source.title || item.source.url || item.source.fileName}
           </Link>
           <span className="shrink-0 text-[11px] text-slate-400">{timeAgo(item.createdAt)}</span>
         </div>
-        <div className="mt-1 text-xs text-slate-400">
-          {item.source.domain}
+        <div className="mt-1 truncate text-xs text-slate-400">
+          {workspaceName && <span className="font-medium text-slate-500">{workspaceName} · </span>}
+          {origin}
           {item.source.author && ` · ${item.source.author}`}
         </div>
         {item.aiOutput.summary && (

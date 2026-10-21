@@ -1,57 +1,54 @@
-
-import { Link, NavLink, Outlet, useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import { useState, type FormEvent } from "react";
-import { Archive, Folder, LogOut, Menu, Plus, Puzzle, Search, Settings, Users, X } from "lucide-react";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Archive, Folder, LogOut, Menu, Plus, Search, Users, X } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import { useWorkspaces } from "../context/WorkspaceContext";
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { workspaces, current, select, create } = useWorkspaces();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [params] = useSearchParams();
   const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
   const q = params.get("q") ?? "";
   const initials = (user?.email ?? "?").slice(0, 2).toUpperCase();
-  const { workspaces, current, select, create } = useWorkspaces();
-const [adding, setAdding] = useState(false);
-const [newName, setNewName] = useState("");
-
-async function addWorkspace(e: FormEvent) {
-  e.preventDefault();
-  const name = newName.trim();
-  if (!name) return;
-  try {
-    await create(name);
-    setNewName("");
-    setAdding(false);
-    navigate("/");
-    setOpen(false);
-  } catch (err) {
-    alert(err instanceof Error ? err.message : "Could not create workspace");
-  }
-}
-
+  const onWorkspacePage = pathname === "/";
 
   function onSearch(value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set("q", value);
     else next.delete("q");
-    navigate({ pathname: "/", search: next.toString() }, { replace: true });
+    navigate({ pathname: pathname === "/all" ? "/all" : "/", search: next.toString() }, { replace: true });
+  }
+
+  async function addWorkspace(e: FormEvent) {
+    e.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    try {
+      await create(name);
+      setNewName("");
+      setAdding(false);
+      navigate("/");
+      setOpen(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not create workspace");
+    }
   }
 
   return (
     <div className="min-h-screen bg-canvas text-slate-900">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white px-4 py-5 transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col overflow-y-auto border-r border-slate-200 bg-white px-4 py-5 transition-transform lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="mb-8 flex items-center justify-between px-2">
           <Link to="/" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
-            <div className="relative flex size-9 items-center justify-center overflow-hidden rounded-xl bg-brand text-lg shadow-md shadow-blue-950/15">
-              🦉
-              <span className="absolute bottom-0 right-0 size-3 rounded-tl-lg bg-cyan-400" />
-            </div>
+<img src="/logo.png" alt="Owlet" className="size-9 rounded-[23.4%] shadow-md shadow-blue-950/15" />
             <div>
               <div className="text-[15px] font-bold tracking-tight text-ink">Owlet</div>
               <div className="eyebrow tracking-[0.16em]">Research smarter</div>
@@ -65,8 +62,7 @@ async function addWorkspace(e: FormEvent) {
         <nav className="space-y-1">
           <div className="eyebrow mb-2 px-3">Workspace</div>
           <NavLink
-            to="/"
-            end
+            to="/all"
             onClick={() => setOpen(false)}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
@@ -78,68 +74,49 @@ async function addWorkspace(e: FormEvent) {
             All clips
           </NavLink>
         </nav>
-          <nav className="mt-7 space-y-0.5">
-  <div className="mb-2 flex items-center justify-between px-3">
-    <span className="eyebrow">Workspaces</span>
-    <button onClick={() => setAdding((v) => !v)} className="text-slate-400 hover:text-brand" title="New workspace">
-      <Plus className="size-3.5" />
-    </button>
-  </div>
-  {adding && (
-    <form onSubmit={addWorkspace} className="px-1 pb-1">
-      <input
-        autoFocus
-        value={newName}
-        onChange={(e) => setNewName(e.target.value)}
-        placeholder="Workspace name, then Enter"
-        maxLength={80}
-        className="field !py-1.5"
-      />
-    </form>
-  )}
-  {workspaces.map((w) => (
-    <button
-      key={w.id}
-      onClick={() => {
-        select(w.id);
-        navigate("/");
-        setOpen(false);
-      }}
-      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
-        current?.id === w.id ? "bg-slate-100 font-medium text-brand" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
-      }`}
-    >
-      <Folder className={`size-4 ${current?.id === w.id ? "text-blue-500" : "text-slate-400"}`} />
-      <span className="min-w-0 flex-1 truncate text-left">{w.name}</span>
-      {w.memberCount > 1 && <Users className="size-3 text-slate-400" />}
-    </button>
-  ))}
-  {current && (
-    <NavLink
-      to={`/workspace/${current.id}/settings`}
-      onClick={() => setOpen(false)}
-      className={({ isActive }) =>
-        `flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
-          isActive ? "bg-brand text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
-        }`
-      }
-    >
-      <Settings className="size-4" /> Workspace settings
-    </NavLink>
-  )}
-</nav>
 
-
-        <div className="mt-auto">
-          <div className="mb-4 rounded-2xl bg-[#eef5ff] p-4">
-            <div className="mb-3 flex size-8 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
-              <Puzzle className="size-4" />
-            </div>
-            <div className="text-sm font-semibold text-brand">Clip from any page</div>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Use the Owlet extension to save articles with an AI summary and citations.
-            </p>
+        <nav className="mt-7 space-y-0.5">
+          <div className="mb-2 flex items-center justify-between px-3">
+            <span className="eyebrow">Workspaces</span>
+            <button onClick={() => setAdding((v) => !v)} className="text-slate-400 hover:text-brand" title="New workspace">
+              <Plus className="size-3.5" />
+            </button>
           </div>
+          {adding && (
+            <form onSubmit={addWorkspace} className="px-1 pb-1">
+              <input
+                autoFocus
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Workspace name, then Enter"
+                maxLength={80}
+                className="field !py-1.5"
+              />
+            </form>
+          )}
+          {workspaces.map((w) => {
+            const active = onWorkspacePage && current?.id === w.id;
+            return (
+              <button
+                key={w.id}
+                onClick={() => {
+                  select(w.id);
+                  navigate("/");
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
+                  active ? "bg-slate-100 font-medium text-brand" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
+                }`}
+              >
+                <Folder className={`size-4 ${active ? "text-blue-500" : "text-slate-400"}`} />
+                <span className="min-w-0 flex-1 truncate text-left">{w.name}</span>
+                {w.memberCount > 1 && <Users className="size-3 text-slate-400" />}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="mt-auto pt-6">
           <button
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-brand"
