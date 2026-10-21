@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Request, Response } from "express";
 import mongoose, { type UpdateQuery } from "mongoose";
 import { z } from "zod";
@@ -6,6 +7,7 @@ import { Workspace } from "../models/Workspace.js";
 import { User } from "../models/User.js";
 import { analyzeText } from "../services/groq.js";
 import { buildCitations } from "../services/citations.js";
+import { extractPdf, PdfImportError } from "../services/pdfImport.js";
 import { streamPdf } from "../services/pdf.js";
 import { toBibtex, toCsv } from "../services/export.js";
 import { atLeast, ensureDefaultWorkspace, roleIn, workspaceIds } from "../services/access.js";
@@ -30,6 +32,41 @@ const commentSchema = z.object({
 const tagsSchema = z.object({
   tags: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(20),
 });
+const sourceSchema = z.object({
+  title: z.string().trim().min(1).max(500),
+  author: z.string().trim().max(200).optional(),
+  publishedDate: z.string().trim().max(100).optional(),
+});
+
+// Resolves the workspace a clip/import goes into; answers the request itself and returns null on failure.
+async function targetWorkspace(res: Response, userId: string, workspaceId?: string) {
+  if (!workspaceId) return ensureDefaultWorkspace(userId);
+  if (!mongoose.isValidObjectId(workspaceId)) {
+    res.status(400).json({ error: "Bad workspace id" });
+    return null;
+  }
+  const ws = await Workspace.findById(workspaceId);
+  if (!ws || !atLeast(roleIn(ws, userId), "editor")) {
+    res.status(403).json({ error: "You can't add clips to that workspace" });
+    return null;
+  }
+  return ws;
+}
+
+// Runs the AI summary with the workspace's settings; a failure never blocks saving.
+async function runAi(ws: { aiSettings?: any }, title: string, text: string) {
+  try {
+    const ai = await analyzeText(title, text, {
+      format: ws.aiSettings?.format,
+      length: ws.aiSettings?.length,
+      instructions: ws.aiSettings?.instructions,
+    });
+    return { ai, aiFailed: false };
+  } catch (err) {
+    console.error("Groq failed:", err);
+    return { ai: { summary: "", paraphrase: "", tags: [] as string[] }, aiFailed: true };
+  }
+}
 
 export async function clip(req: Request, res: Response) {
   const parsed = clipSchema.safeParse(req.body);
@@ -37,34 +74,14 @@ export async function clip(req: Request, res: Response) {
   const d = parsed.data;
   const userId = res.locals.userId;
 
-  let ws;
-  if (d.workspaceId) {
-    if (!mongoose.isValidObjectId(d.workspaceId)) return res.status(400).json({ error: "Bad workspace id" });
-    ws = await Workspace.findById(d.workspaceId);
-    if (!ws || !atLeast(roleIn(ws, userId), "editor")) {
-      return res.status(403).json({ error: "You can't add clips to that workspace" });
-    }
-  } else {
-    ws = await ensureDefaultWorkspace(userId);
-  }
+  const ws = await targetWorkspace(res, userId, d.workspaceId);
+  if (!ws) return;
 
   const existing = await ResearchItem.findOne({ workspaceId: ws._id, "source.dedupeKey": d.url }).select("_id");
   if (existing) return res.status(409).json({ error: "Already clipped", id: existing.id });
 
   const domain = new URL(d.url).hostname;
-
-  let ai = { summary: "", paraphrase: "", tags: [] as string[] };
-  let aiFailed = false;
-  try {
-    ai = await analyzeText(d.title, d.rawText, {
-      format: ws.aiSettings?.format,
-      length: ws.aiSettings?.length,
-      instructions: ws.aiSettings?.instructions,
-    });
-  } catch (err) {
-    console.error("Groq failed:", err);
-    aiFailed = true; // still save the clip
-  }
+  const { ai, aiFailed } = await runAi(ws, d.title, d.rawText);
 
   const item = await ResearchItem.create({
     userId,
@@ -85,6 +102,59 @@ export async function clip(req: Request, res: Response) {
   });
 
   res.status(201).json({ item, aiFailed });
+}
+// long documents: give the AI the start (abstract/intro) and the end (conclusions)
+function forAi(text: string) {
+  return text.length > 12000 ? text.slice(0, 8000) + "\n[...]\n" + text.slice(-4000) : text;
+}
+export async function importPdf(req: Request, res: Response) {
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: "Attach a PDF file" });
+  if (file.buffer.subarray(0, 5).toString() !== "%PDF-") {
+    return res.status(400).json({ error: "That file isn't a PDF" });
+  }
+
+  const userId = res.locals.userId;
+  const ws = await targetWorkspace(res, userId, typeof req.body?.workspaceId === "string" ? req.body.workspaceId : undefined);
+  if (!ws) return;
+
+  // same file content in the same workspace = duplicate, even if renamed
+  const dedupeKey = "pdf:" + createHash("sha256").update(file.buffer).digest("hex");
+  const existing = await ResearchItem.findOne({ workspaceId: ws._id, "source.dedupeKey": dedupeKey }).select("_id");
+  if (existing) return res.status(409).json({ error: "This PDF is already in the workspace", id: existing.id });
+
+  let pdf;
+  try {
+    pdf = await extractPdf(file.buffer, file.originalname);
+  } catch (e) {
+    if (e instanceof PdfImportError) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+  if (pdf.text.length < 50) {
+    return res.status(422).json({ error: "No readable text found. Scanned (image-only) PDFs aren't supported yet." });
+  }
+
+  const rawText = pdf.text.slice(0, 200000);
+  // long documents: give the AI the start (abstract/intro) and the end (conclusions)
+    const { ai, aiFailed } = await runAi(ws, pdf.title, forAi(rawText));
+
+  const item = await ResearchItem.create({
+    userId,
+    workspaceId: ws._id,
+    source: {
+      kind: "pdf",
+      dedupeKey,
+      fileName: file.originalname.slice(0, 200),
+      title: pdf.title,
+      author: pdf.author,
+    },
+    content: { rawText, wordCount: rawText.split(/\s+/).length },
+    aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
+    citations: buildCitations({ author: pdf.author, title: pdf.title }),
+    tags: ai.tags,
+  });
+
+  res.status(201).json({ item, aiFailed, truncated: pdf.text.length > rawText.length });
 }
 
 async function buildFilter(req: Request, userId: string) {
@@ -179,6 +249,35 @@ export async function setTags(req: Request, res: Response) {
   return mutate(req, res, { $set: { tags: [...new Set(p.data.tags)] } });
 }
 
+// Fix a clip's title/author/date and rebuild its citations from the corrected details.
+export async function updateSource(req: Request, res: Response) {
+  const p = sourceSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: "A title is required" });
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await workspaceIds(res.locals.userId, "editor");
+
+  const found = await ResearchItem.findOne({ _id: id, workspaceId: { $in: ids } }).select("source").lean();
+  if (!found) return res.status(404).json({ error: "Not found" });
+  const s = (found.source ?? {}) as { url?: string; domain?: string };
+
+  const { title, author = "", publishedDate = "" } = p.data;
+  const item = await ResearchItem.findOneAndUpdate(
+    { _id: id, workspaceId: { $in: ids } },
+    {
+      $set: {
+        "source.title": title,
+        "source.author": author,
+        "source.publishedDate": publishedDate,
+        citations: buildCitations({ author, title, url: s.url, domain: s.domain, publishedDate }),
+      },
+    },
+    { new: true }
+  );
+  if (!item) return res.status(404).json({ error: "Not found" });
+  res.json({ source: item.source, citations: item.citations });
+}
+
 export async function pdf(req: Request, res: Response) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
@@ -214,4 +313,43 @@ export async function exportItems(req: Request, res: Response) {
   res.setHeader("Content-Type", `${type}; charset=utf-8`);
   res.setHeader("Content-Disposition", `attachment; filename="owlet-export.${ext}"`);
   res.send(body);
+}
+
+// Re-runs the AI summary with the workspace's CURRENT settings. Tags are left alone.
+export async function regenerate(req: Request, res: Response) {
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await workspaceIds(res.locals.userId, "editor");
+  const item = await ResearchItem.findOne({ _id: id, workspaceId: { $in: ids } }).select(
+    "workspaceId source.kind source.title content.rawText"
+  );
+  if (!item) return res.status(404).json({ error: "Not found" });
+
+  const text = item.content?.rawText ?? "";
+  if (text.length < 50) return res.status(422).json({ error: "This clip has no text to summarize" });
+
+  const ws = await Workspace.findById(item.workspaceId).select("aiSettings");
+  const settings: any = ws?.aiSettings ?? {};
+  const input = item.source?.kind === "pdf" ? forAi(text) : text;
+
+  let ai;
+  try {
+    ai = await analyzeText(item.source?.title ?? "Untitled", input, {
+      format: settings.format,
+      length: settings.length,
+      instructions: settings.instructions,
+    });
+  } catch (err) {
+    console.error("Groq failed:", err);
+    return res.status(502).json({ error: "The AI service failed. Your existing summary is unchanged." });
+  }
+  if (!ai.summary.trim()) {
+    return res.status(502).json({ error: "The AI returned an empty summary. Your existing summary is unchanged." });
+  }
+
+  await ResearchItem.updateOne(
+    { _id: item._id },
+    { $set: { "aiOutput.summary": ai.summary, "aiOutput.paraphrase": ai.paraphrase } }
+  );
+  res.json({ aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase } });
 }

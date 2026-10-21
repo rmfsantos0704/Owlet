@@ -5,6 +5,9 @@ import { Workspace } from "../models/Workspace.js";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { User } from "../models/User.js";
 import { ensureDefaultWorkspace, roleIn, type Role } from "../services/access.js";
+import { analyzeText } from "../services/groq.js";
+import { streamWorkspacePdf } from "../services/workspacePdf.js";
+import { Writable } from "node:stream";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -173,4 +176,95 @@ export async function removeMember(req: Request, res: Response) {
     { $pull: { members: { userId: new mongoose.Types.ObjectId(target) } } }
   );
   res.json({ ok: true });
+}
+const testSchema = z.object({
+  aiSettings: z.object({
+    format: z.enum(["paragraph", "bullets", "academic", "simple"]),
+    length: z.enum(["short", "medium", "detailed"]),
+    instructions: z.string().trim().max(500),
+  }),
+  itemId: z.string().optional(),
+});
+
+const SAMPLE_TITLE = "How Sleep Affects Memory";
+const SAMPLE_TEXT =
+  "Sleep plays a critical role in memory consolidation. In a 2023 study of 120 university students, those who slept at least seven hours after studying scored 18% higher on recall tests than students who stayed awake. The researchers argue that during deep sleep the brain replays recent experiences and strengthens the neural connections that store them. REM sleep, they add, supports creative problem solving and emotional regulation. The study had limits: participants were all aged 18 to 24, sleep was self-reported rather than measured, and the effect was weaker for complex tasks than for simple fact recall. The authors recommend that students protect sleep during exam periods instead of studying through the night, and call for larger studies across more age groups.";
+
+// Runs the given (possibly unsaved) AI settings on sample text or one of the workspace's clips. Saves nothing.
+export async function testAi(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  if (found.role !== "owner") return res.status(403).json({ error: "Only the owner can test settings" });
+  const p = testSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: "Invalid settings" });
+
+  let title = SAMPLE_TITLE;
+  let text = SAMPLE_TEXT;
+  let source = "the built-in sample article";
+
+  if (p.data.itemId) {
+    if (!mongoose.isValidObjectId(p.data.itemId)) return res.status(400).json({ error: "Bad clip id" });
+    const item = await ResearchItem.findOne({ _id: p.data.itemId, workspaceId: found.ws._id }).select(
+      "source.title source.kind content.rawText"
+    );
+    const raw = item?.content?.rawText ?? "";
+    if (!item || raw.length < 50) return res.status(404).json({ error: "Clip not found in this workspace" });
+    title = item.source?.title ?? "Untitled";
+    // same text preparation as a real import: PDFs send the start and the end
+    text = item.source?.kind === "pdf" && raw.length > 12000 ? raw.slice(0, 8000) + "\n[...]\n" + raw.slice(-4000) : raw;
+    source = `"${title}"`;
+  }
+
+  try {
+    const ai = await analyzeText(title, text, p.data.aiSettings);
+    res.json({ summary: ai.summary, paraphrase: ai.paraphrase, tags: ai.tags, source });
+  } catch (err) {
+    console.error("Groq test failed:", err);
+    res.status(502).json({
+      error: "The AI service failed. If your instructions ask for a different output format, try removing that part.",
+    });
+  }
+}
+const EXPORT_LIMIT = 500;
+
+export async function exportPdf(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  const mode = req.query.mode === "citations" ? "citations" : "full";
+
+  const [items, total] = await Promise.all([
+    ResearchItem.find({ workspaceId: found.ws._id })
+      .select("-content.rawText")
+      .sort({ createdAt: -1 })
+      .limit(EXPORT_LIMIT)
+      .lean(),
+    ResearchItem.countDocuments({ workspaceId: found.ws._id }),
+  ]);
+  if (!items.length) return res.status(400).json({ error: "This workspace has no clips to export yet" });
+
+  // Build the PDF in memory and send it inside JSON. Download managers and PDF extensions
+  // intercept raw application/pdf responses, which can cancel the browser's own request.
+  const chunks: Buffer[] = [];
+  const sink: any = new Writable({
+    write(chunk, _enc, cb) {
+      chunks.push(Buffer.from(chunk));
+      cb();
+    },
+  });
+  sink.setHeader = () => {}; // the generator sets file headers; not needed here
+  const finished = new Promise<void>((resolve, reject) => {
+    sink.on("finish", resolve);
+    sink.on("error", reject);
+  });
+
+  streamWorkspacePdf(
+    { name: found.ws.name, description: found.ws.description ?? "" },
+    items,
+    mode,
+    total - items.length,
+    sink as Response
+  );
+  await finished;
+
+  res.json({ pdf: Buffer.concat(chunks).toString("base64") });
 }

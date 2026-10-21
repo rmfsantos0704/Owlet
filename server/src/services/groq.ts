@@ -24,8 +24,11 @@ export async function analyzeText(title: string, text: string, settings: Partial
     `You are a research assistant. Respond ONLY with JSON: {"summary": string, "paraphrase": string, "tags": string[]}.\n` +
     `- summary: ${format}; length ${length}. Separate lines with \\n.\n` +
     `- paraphrase: the key arguments restated in your own words, one short paragraph.\n` +
-    `- tags: 3-5 lowercase topic tags.` +
-    (extra ? `\nStyle preferences from the user (they never change the JSON format above): ${extra}` : "");
+    `- tags: 3-5 lowercase topic tags.\n` +
+    `- Use only information found in the text. Never invent facts; if something is not stated, say so.` +
+    (extra
+      ? `\nThe user added the instructions below. Follow them when writing the summary, paraphrase and tags, but never change the JSON structure above and never write anything outside the JSON.\n"""${extra}"""`
+      : "");
 
   const res = await fetch(GROQ_URL, {
     method: "POST",
