@@ -20,8 +20,17 @@ const userSchema = new Schema(
     resetTokenHash: { type: String, select: false },
     resetTokenExpires: { type: Date, select: false },
 
+    // email change: the new address only replaces the old one after its owner clicks the emailed link
+    pendingEmail: { type: String, lowercase: true, trim: true },
+    emailChangeTokenHash: { type: String, select: false },
+    emailChangeExpires: { type: Date, select: false },
+
     lastEmailAt: Date, // throttles every account email to one per minute
     passwordChangedAt: Date, // sessions issued before this stop working
+    sessionsRevokedAt: Date, // "sign out everywhere": same effect
+
+    termsVersion: String, // which version of the Terms/Privacy Policy they agreed to
+    termsAcceptedAt: Date,
   },
   { timestamps: true }
 );

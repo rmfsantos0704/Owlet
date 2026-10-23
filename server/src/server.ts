@@ -8,10 +8,11 @@ for (const key of ["MONGODB_URI", "JWT_SECRET"]) {
 }
 
 if (process.env.NODE_ENV === "production") {
-  // a live site must be able to send real email and must have a strong signing key
-  for (const key of ["SMTP_HOST", "MAIL_FROM", "CLIENT_URL"]) {
+  // a live site must send real email, know how many proxies sit in front of it, and use a strong signing key
+  for (const key of ["SMTP_HOST", "MAIL_FROM", "CLIENT_URL", "GROQ_API_KEY", "TRUST_PROXY"]) {
     if (!process.env[key]) throw new Error(`Missing env var in production: ${key}`);
   }
+  if (!process.env.CLIENT_URL!.startsWith("https://")) throw new Error("CLIENT_URL must start with https:// in production");
   if (process.env.JWT_SECRET!.length < 32) throw new Error("JWT_SECRET must be at least 32 characters in production");
 }
 

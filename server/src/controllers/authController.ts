@@ -7,6 +7,7 @@ import { User, OCCUPATIONS } from "../models/User.js";
 import { sendMail } from "../services/mailer.js";
 import * as tpl from "../services/emailTemplates.js";
 
+export const TERMS_VERSION = "2026-10-21"; // bump together with LEGAL.termsVersion on the client
 const VERIFY_TTL_MS = 24 * 60 * 60 * 1000;
 const RESET_TTL_MS = 30 * 60 * 1000;
 const EMAIL_COOLDOWN_MS = 60 * 1000;
@@ -21,30 +22,34 @@ const COMMON_PASSWORDS = new Set([
   "admin123", "abc12345", "abcd1234", "monkey123", "football1", "baseball1", "sunshine1", "princess1",
 ]);
 
-const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
-const newToken = () => crypto.randomBytes(32).toString("hex");
-const fire = (p: Promise<unknown>) => void p.catch((err) => console.error("Auth email failed:", err));
+export const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
+export const newToken = () => crypto.randomBytes(32).toString("hex");
+export const fire = (p: Promise<unknown>) => void p.catch((err) => console.error("Auth email failed:", err));
 const firstError = (e: z.ZodError) => e.issues[0]?.message ?? "Please check your details and try again.";
 
-const emailField = z.string().trim().toLowerCase().email("Enter a valid email address").max(254);
-const passwordField = z
+export const emailField = z.string().trim().toLowerCase().email("Enter a valid email address").max(254);
+export const passwordField = z
   .string()
   .min(8, "Password must be at least 8 characters")
   .max(72, "Password must be 72 characters or fewer")
   .refine((p) => !COMMON_PASSWORDS.has(p.toLowerCase()), "That password is too common. Choose a different one.");
 const tokenField = z.string().regex(/^[a-f0-9]{64}$/, LINK_ERROR);
 
+export const ageField = z.coerce
+  .number("Enter your age")
+  .int("Enter your age as a whole number")
+  .min(13, "You must be at least 13 to use Owlet")
+  .max(120, "Enter a valid age");
+export const occupationField = z.enum(OCCUPATIONS, "Choose what best describes you");
+
 const registerSchema = z
   .object({
     email: emailField,
     password: passwordField,
     confirmPassword: z.string(),
-    age: z.coerce
-      .number("Enter your age")
-      .int("Enter your age as a whole number")
-      .min(13, "You must be at least 13 to use Owlet")
-      .max(120, "Enter a valid age"),
-    occupation: z.enum(OCCUPATIONS, "Choose what best describes you"),
+    age: ageField,
+    occupation: occupationField,
+    acceptTerms: z.any().refine((v) => v === true, "You need to agree to the Terms and Privacy Policy to continue"),
   })
   .refine((d) => d.password === d.confirmPassword, { message: "Passwords don't match", path: ["confirmPassword"] })
   .refine((d) => d.password.toLowerCase() !== d.email, { message: "Your password can't be your email", path: ["password"] });
@@ -56,10 +61,10 @@ const resetSchema = z
   .object({ token: tokenField, password: passwordField, confirmPassword: z.string() })
   .refine((d) => d.password === d.confirmPassword, { message: "Passwords don't match", path: ["confirmPassword"] });
 
-const signToken = (id: string) => jwt.sign({ id }, process.env.JWT_SECRET!, { expiresIn: "7d" });
+export const signToken = (id: string) => jwt.sign({ id }, process.env.JWT_SECRET!, { expiresIn: "7d" });
 
 // Atomically takes this account's "one email per minute" slot. False means an email just went out.
-async function claimEmailSlot(userId: unknown) {
+export async function claimEmailSlot(userId: unknown) {
   const r = await User.updateOne(
     {
       _id: userId,
@@ -102,11 +107,20 @@ export async function register(req: Request, res: Response) {
     if (await claimEmailSlot(existing._id)) fire(sendMail(tpl.alreadyRegisteredEmail(email)));
   } else if (existing) {
     // Never-verified registration: the newest submission wins, so nobody can pre-claim someone else's address.
-    await User.updateOne({ _id: existing._id }, { $set: { passwordHash, age, occupation } });
+    await User.updateOne(
+      { _id: existing._id },
+      { $set: { passwordHash, age, occupation, termsVersion: TERMS_VERSION, termsAcceptedAt: new Date() } }
+    );
     if (await claimEmailSlot(existing._id)) fire(issueVerification(existing));
   } else {
     try {
-      const user = await User.create({ email, passwordHash, age, occupation, emailVerified: false, lastEmailAt: new Date() });
+      const user = await User.create({
+        email, passwordHash, age, occupation,
+        emailVerified: false,
+        lastEmailAt: new Date(),
+        termsVersion: TERMS_VERSION,
+        termsAcceptedAt: new Date(),
+      });
       fire(issueVerification(user));
     } catch (err) {
       if ((err as { code?: number })?.code !== 11000) throw err; // lost a race with a parallel signup: same answer

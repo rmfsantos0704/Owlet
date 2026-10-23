@@ -2,7 +2,8 @@ import { Schema, model } from "mongoose";
 
 const researchItemSchema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true }, // who clipped it
+// who clipped it; becomes null if that person deletes their account (the clip stays with the workspace)
+userId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
     source: {
       kind: { type: String, enum: ["web", "pdf"], default: "web" },

@@ -67,3 +67,52 @@ export function passwordChangedEmail(to: string): Mail {
     html: layout({ title: "Password changed", intro, button: { label: "This wasn't me", url }, note }),
   };
 }
+
+export function emailChangeEmail(to: string, token: string): Mail {
+  const url = `${clientUrl()}/confirm-email-change?token=${token}`;
+  const intro = "Confirm this address to use it as the email for your Owlet account.";
+  const note = "This link expires in 1 hour. If you didn't ask for this, you can ignore this email.";
+  return {
+    to,
+    subject: "Confirm your new Owlet email",
+    text: `${intro}\n\nConfirm: ${url}\n\n${note}`,
+    html: layout({ title: "Confirm your new email", intro, button: { label: "Confirm new email", url }, note }),
+  };
+}
+
+// sent to the OLD address when a change is requested
+export function emailChangeRequestedNotice(to: string, newEmail: string): Mail {
+  const url = `${clientUrl()}/forgot-password`;
+  const intro = `Someone asked to change the email on your Owlet account to ${newEmail}. Nothing changes until that address is confirmed.`;
+  const note = "If this wasn't you, reset your password now so nobody else can use your account.";
+  return {
+    to,
+    subject: "Email change requested on your Owlet account",
+    text: `${intro}\n\nNot you? Reset your password: ${url}\n\n${note}`,
+    html: layout({ title: "Email change requested", intro, button: { label: "Secure my account", url }, note }),
+  };
+}
+
+// sent to the OLD address once the change has happened
+export function emailChangedNotice(to: string, newEmail: string): Mail {
+  const url = `${clientUrl()}/forgot-password`;
+  const intro = `The email on your Owlet account was changed to ${newEmail}, and you were signed out everywhere.`;
+  const note = "If you didn't do this, contact us right away.";
+  return {
+    to,
+    subject: "Your Owlet email was changed",
+    text: `${intro}\n\n${note}`,
+    html: layout({ title: "Email changed", intro, note }),
+  };
+}
+
+export function accountDeletedEmail(to: string): Mail {
+  const intro = "Your Owlet account and personal data were deleted, as you asked.";
+  const note = "If you didn't request this, contact us right away. You're welcome back any time.";
+  return {
+    to,
+    subject: "Your Owlet account was deleted",
+    text: `${intro}\n\n${note}`,
+    html: layout({ title: "Account deleted", intro, note }),
+  };
+}

@@ -16,11 +16,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   // one small lookup per request: deleted accounts and password changes take effect immediately
-  const user = await User.findById(payload.id).select("passwordChangedAt emailVerified");
+  const user = await User.findById(payload.id).select("passwordChangedAt sessionsRevokedAt emailVerified");
   if (!user) return res.status(401).json({ error: "Account not found" });
   if (user.emailVerified === false) return res.status(403).json({ error: "Please verify your email first" });
-  if (user.passwordChangedAt && Math.floor(user.passwordChangedAt.getTime() / 1000) > payload.iat) {
-    return res.status(401).json({ error: "Your password was changed. Please log in again." });
+
+  // a password change or "sign out everywhere" ends every session issued before it
+  const cutoff = Math.max(user.passwordChangedAt?.getTime() ?? 0, user.sessionsRevokedAt?.getTime() ?? 0);
+  if (cutoff && Math.floor(cutoff / 1000) > payload.iat) {
+    return res.status(401).json({ error: "You were signed out. Please log in again." });
   }
 
   res.locals.userId = payload.id;
