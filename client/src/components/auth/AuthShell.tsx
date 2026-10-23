@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-
+import { Link } from "react-router-dom";
 // The page frame shared by every auth screen: mascot on the left, the card on the right.
 export default function AuthShell({ children }: { children: ReactNode }) {
   return (
@@ -27,7 +27,15 @@ export default function AuthShell({ children }: { children: ReactNode }) {
         <section className="w-full max-w-md">{children}</section>
       </main>
       <footer className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-400">
-        English (US) · Privacy · Terms · Help · Owlet © 2026
+                English (US) ·{" "}
+        <Link to="/privacy" className="hover:text-slate-600 hover:underline">
+          Privacy
+        </Link>{" "}
+        ·{" "}
+        <Link to="/terms" className="hover:text-slate-600 hover:underline">
+          Terms
+        </Link>{" "}
+        · Help · Owlet © 2026
       </footer>
     </div>
   );

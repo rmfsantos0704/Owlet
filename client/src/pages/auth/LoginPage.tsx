@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { LockKeyhole, Mail } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -7,11 +7,16 @@ import { useCooldown } from "../../hooks/useCooldown";
 import AuthShell, { AuthCard, Banner } from "../../components/auth/AuthShell";
 import AuthField from "../../components/auth/AuthField";
 import { PrimaryButton, TextButton } from "../../components/auth/AppButton";
+import { clearLoginNotice, peekLoginNotice } from "../../utils/notice";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const location = useLocation();
-  const notice = (location.state as { notice?: string } | null)?.notice;
+  const [stored] = useState(peekLoginNotice);
+  useEffect(() => {
+    clearLoginNotice();
+  }, []);
+  const notice = (location.state as { notice?: string } | null)?.notice ?? stored;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

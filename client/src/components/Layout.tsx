@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Archive, Folder, LogOut, Menu, Plus, Search, Users, X } from "lucide-react";
+import { Archive, Folder, LogOut, Menu, Plus, Search, Users, X ,UserRound} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useWorkspaces } from "../context/WorkspaceContext";
 
@@ -116,7 +116,19 @@ export default function Layout() {
           })}
         </nav>
 
-        <div className="mt-auto pt-6">
+                <div className="mt-auto space-y-0.5 pt-6">
+          <NavLink
+            to="/account"
+            onClick={() => setOpen(false)}
+            className={({ isActive }) =>
+              `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                isActive ? "bg-brand text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
+              }`
+            }
+          >
+            <UserRound className="size-4.5" strokeWidth={1.8} />
+            Account
+          </NavLink>
           <button
             onClick={logout}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-brand"
@@ -148,10 +160,12 @@ export default function Layout() {
             />
           </div>
           <div className="ml-auto flex items-center gap-2.5">
+          <Link to="/account" className="ml-auto flex items-center gap-2.5 rounded-xl p-1 transition hover:bg-slate-100" title="Account settings">
             <div className="flex size-9 items-center justify-center rounded-xl bg-[#dbeafe] text-xs font-bold text-[#174ea6]">
               {initials}
             </div>
             <span className="hidden max-w-48 truncate text-xs font-semibold text-slate-700 sm:block">{user?.email}</span>
+          </Link>
           </div>
         </header>
 

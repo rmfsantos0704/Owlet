@@ -13,9 +13,9 @@ import PasswordStrength from "../../components/auth/PasswordStrength";
 import { PrimaryButton, TextButton } from "../../components/auth/AppButton";
 
 type Form = { email: string; occupation: string; age: string; password: string; confirm: string };
-type Errors = Partial<Record<keyof Form, string>>;
+type Errors = Partial<Record<keyof Form | "agree", string>>;
 
-function validate(f: Form): Errors {
+function validate(f: Form, agree: boolean): Errors {
   const e: Errors = {};
   if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) e.email = "Enter a valid email address.";
   if (!f.occupation) e.occupation = "Choose what best describes you.";
@@ -30,12 +30,14 @@ function validate(f: Form): Errors {
   if (pw) e.password = pw;
   if (!f.confirm) e.confirm = "Re-enter your password.";
   else if (f.confirm !== f.password) e.confirm = "Passwords don't match.";
+  if (!agree) e.agree = "You need to agree to continue.";
   return e;
 }
 
 export default function RegisterPage() {
   const { register } = useAuth();
   const [form, setForm] = useState<Form>({ email: "", occupation: "", age: "", password: "", confirm: "" });
+  const [agree, setAgree] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,14 +46,14 @@ export default function RegisterPage() {
   const cooldown = useCooldown();
 
   const set = (key: keyof Form) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
-  const errors = attempted ? validate(form) : {};
+  const errors = attempted ? validate(form, agree)  : {};
   const matches = form.confirm.length > 0 && form.confirm === form.password;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setAttempted(true);
     setError("");
-    if (Object.keys(validate(form)).length > 0) return;
+if (Object.keys(validate(form, agree)).length > 0) return;
 
     setBusy(true);
     try {
@@ -62,6 +64,7 @@ export default function RegisterPage() {
         confirmPassword: form.confirm,
         age: Number(form.age),
         occupation: form.occupation,
+        acceptTerms: agree,
       });
       setSentTo(email);
       cooldown.start(60);
@@ -191,6 +194,28 @@ export default function RegisterPage() {
                 <Check className="size-3.5" /> Passwords match
               </p>
             ) : null}
+                        <div>
+              <label className="flex items-start gap-2.5 text-sm leading-6 text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={agree}
+                  onChange={(e) => setAgree(e.target.checked)}
+                  className="mt-1 size-4 rounded border-slate-300"
+                />
+                <span>
+                  I agree to the{" "}
+                  <Link to="/terms" target="_blank" rel="noreferrer" className="font-semibold text-blue-700 hover:underline">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link to="/privacy" target="_blank" rel="noreferrer" className="font-semibold text-blue-700 hover:underline">
+                    Privacy Policy
+                  </Link>
+                  .
+                </span>
+              </label>
+              {errors.agree ? <p className="mt-1.5 text-xs font-medium text-red-600">{errors.agree}</p> : null}
+            </div>
 
             {error ? <Banner kind="error">{error}</Banner> : null}
 

@@ -7,6 +7,10 @@ import RegisterPage from "./pages/auth/RegisterPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
+import ConfirmEmailChangePage from "./pages/auth/ConfirmEmailChangePage";
+import TermsPage from "./pages/legal/TermsPage";
+import PrivacyPage from "./pages/legal/PrivacyPage";
+import AccountPage from "./pages/account/AccountPage";
 import Library from "./pages/Library";
 import ItemDetail from "./pages/ItemDetail";
 import WorkspaceSettings from "./pages/WorkspaceSettings";
@@ -23,15 +27,19 @@ export default function App() {
       <Route path="/register" element={guest(<RegisterPage />)} />
       <Route path="/forgot-password" element={guest(<ForgotPasswordPage />)} />
 
-      {/* emailed links must work whether or not someone is logged in */}
+      {/* emailed links and legal pages must work whether or not someone is logged in */}
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       <Route element={user ? <Layout /> : <Navigate to="/login" replace />}>
         <Route path="/" element={<Library />} />
         <Route path="/all" element={<Library all />} />
         <Route path="/item/:id" element={<ItemDetail />} />
         <Route path="/workspace/:id/settings" element={<WorkspaceSettings />} />
+        <Route path="/account" element={<AccountPage />} />
       </Route>
     </Routes>
   );
