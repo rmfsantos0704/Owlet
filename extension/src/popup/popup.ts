@@ -343,52 +343,37 @@ $("saveSettings").addEventListener("click", async () => {
 
 render();
 
-// ---------- login handling ----------
+// ---------- login ----------
 
-async function handleLogin(e: SubmitEvent) {
-  e.preventDefault();
-  loginMsg("");
-
-  const emailInput = $<HTMLInputElement>("email");
-  const passwordInput = $<HTMLInputElement>("password");
-  const email = emailInput.value.trim();
-  const password = passwordInput.value;
-
-  if (!email || !password) return;
-
-  const btn = $<HTMLButtonElement>("loginBtn");
-  const spinner = $<HTMLElement>("loginSpinner");
-  const label = $<HTMLElement>("loginLabel");
-
-  btn.disabled = true;
-  spinner.hidden = false;
-  label.textContent = "Logging in…";
-
-  try {
-    // Adjust endpoint if your backend route differs (e.g., "/auth/login" or "/login")
-    const r = await api("/auth/login", {
-      method: "POST",
-      body: { email, password },
-    });
-
-    if (!r.ok) {
-      return loginMsg(r.data.error || "Invalid email or password.");
-    }
-
-    // Assuming your backend returns { token: "..." } upon successful login
-    const token = r.data.token;
-    if (!token) {
-      return loginMsg("Server did not return an authentication token.");
-    }
-
-    await setToken(token);
-    await render();
-  } catch {
-    loginMsg("Can't reach Owlet server. Is it running on port 4000?");
-  } finally {
-    btn.disabled = false;
-    spinner.hidden = true;
-    label.textContent = "Log in";
+async function handleLogin(e: SubmitEvent) {  
+  e.preventDefault();  
+  loginMsg("");  
+  
+  const email = $<HTMLInputElement>("email").value.trim();  
+  const password = $<HTMLInputElement>("password").value;  
+  if (!email || !password) return;  
+  
+  const btn = $<HTMLButtonElement>("loginBtn");  
+  btn.disabled = true;  
+  $("loginSpinner").hidden = false;  
+  $("loginLabel").textContent = "Logging in…";  
+  
+  try {    
+    const r = await api("/auth/login", { method: "POST", body: { email, password } });    
+    
+    if (r.status === 429) return loginMsg("Too many attempts. Wait a few minutes and try again.");    
+    if (!r.ok) return loginMsg(r.data.error || "Incorrect email or password.");    
+    if (!r.data.token) return loginMsg("The server didn't return a login token.");    
+    
+    await setToken(r.data.token);    
+    $<HTMLInputElement>("password").value = "";    
+    await render();  
+  } catch {    
+    loginMsg(OFFLINE);  
+  } finally {    
+    btn.disabled = false;    
+    $("loginSpinner").hidden = true;    
+    $("loginLabel").textContent = "Log in";  
   }
 }
 
