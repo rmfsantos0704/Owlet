@@ -22,7 +22,7 @@ export default function DataCard() {
   return (
     <SectionCard
       title="Your data"
-      description="Download a copy of your profile, the workspaces you own with all their clips, highlights and comments, and what you've contributed to other people's workspaces."
+      description="Download a copy of your profile, the collections you own with all their clips, highlights and comments, and what you've contributed to other people's collections."
     >
       {action.error ? <div className="mb-3"><Note kind="error">{action.error}</Note></div> : null}
       {action.done ? <div className="mb-3"><Note kind="success">{action.done}</Note></div> : null}

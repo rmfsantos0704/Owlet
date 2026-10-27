@@ -27,7 +27,7 @@ export default function AccountPage() {
 
   if (error) return <p className="text-red-600">{error}</p>;
   if (!data) return <p className="text-slate-400">Loading…</p>;
-  const { account, ownedWorkspaces } = data;
+  const { account, ownedcollections } = data;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -50,7 +50,7 @@ export default function AccountPage() {
       <PasswordCard />
       <SessionsCard />
       <DataCard />
-      <DeleteAccountCard workspaces={ownedWorkspaces} />
+      <DeleteAccountCard collections={ownedcollections} />
     </div>
   );
 }

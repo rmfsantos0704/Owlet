@@ -7,7 +7,7 @@ export type AiSettings = {
   length: "short" | "medium" | "detailed";
   instructions: string;
 };
-export type Workspace = {
+export type Collection = {
   id: string;
   name: string;
   description: string;
@@ -17,11 +17,23 @@ export type Workspace = {
   aiSettings: AiSettings;
 };
 export type Member = { userId: string; email: string; role: "editor" | "viewer" };
-export type WorkspaceDetail = Workspace & { owner: { id: string; email: string }; members: Member[] };
+export type JoinLink = {
+  token: string;
+  role: "editor" | "viewer";
+  expiresAt: string;
+  maxUses: number | null;
+  uses: number;
+  expired: boolean;
+};
+export type collectionDetail = Collection & {
+  owner: { id: string; email: string };
+  members: Member[];
+  joinLink?: JoinLink | null; // only sent to the owner
+};
 
 export type ResearchItem = {
   _id: string;
-  workspaceId: string;
+  collectionId: string;
   source: {
     kind?: "web" | "pdf";
     url?: string;
@@ -45,7 +57,32 @@ export type Invitation = {
   role: "editor" | "viewer";
   invitedBy: string;
   expiresAt: string;
-  workspace: { id: string; name: string; description: string };
+  Collection: { id: string; name: string; description: string };
 };
-// an invitation the workspace owner sent that hasn't been answered yet
+// an invitation the Collection owner sent that hasn't been answered yet
 export type SentInvitation = { id: string; email: string; role: "editor" | "viewer"; expiresAt: string };
+
+// what a join link shows before the person confirms
+export type JoinPreview = {
+  Collection: { name: string; description: string };
+  ownerEmail: string;
+  role: "editor" | "viewer";
+  alreadyMember: boolean;
+  collectionId: string;
+};
+
+export type ActivityType =
+  | "clip_added" | "pdf_imported" | "highlight_added" | "comment_added"
+  | "member_joined" | "member_left" | "member_removed";
+export type ActivityPerson = { email: string | null; isYou: boolean };
+export type ActivityEntry = {
+  id: string;
+  type: ActivityType;
+  count: number;
+  createdAt: string;
+  actor: ActivityPerson;
+  target: ActivityPerson | null;
+  item: { id: string; title: string; exists: boolean } | null;
+  Collection?: { id: string; name: string }; // only in notifications
+  unread?: boolean; // only in notifications
+};

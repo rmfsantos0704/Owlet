@@ -3,10 +3,10 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../services/api";
 import { useAction } from "../../hooks/useAction";
 import { setLoginNotice } from "../../utils/notice";
-import type { OwnedWorkspace } from "../../types/account";
+import type { Ownedcollection } from "../../types/account";
 import SectionCard, { Note, Spinner } from "./SectionCard";
 
-export default function DeleteAccountCard({ workspaces }: { workspaces: OwnedWorkspace[] }) {
+export default function DeleteAccountCard({ collections }: { collections: Ownedcollection[] }) {
   const { logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [choices, setChoices] = useState<Record<string, string>>({}); // "" | "delete" | "transfer:<userId>"
@@ -15,8 +15,8 @@ export default function DeleteAccountCard({ workspaces }: { workspaces: OwnedWor
   const [attempted, setAttempted] = useState(false);
   const action = useAction();
 
-  const shared = workspaces.filter((w) => w.members.length > 0);
-  const solo = workspaces.filter((w) => w.members.length === 0);
+  const shared = collections.filter((w) => w.members.length > 0);
+  const solo = collections.filter((w) => w.members.length === 0);
   const undecided = shared.filter((w) => !choices[w.id]);
 
   async function submit(e: FormEvent) {
@@ -30,7 +30,7 @@ export default function DeleteAccountCard({ workspaces }: { workspaces: OwnedWor
       decisions[w.id] = c === "delete" ? { action: "delete" } : { action: "transfer", to: c.replace("transfer:", "") };
     }
     const ok = await action.run(async () => {
-      await api("/account/delete", { method: "POST", body: { password, workspaces: decisions } });
+      await api("/account/delete", { method: "POST", body: { password, collections: decisions } });
     });
     if (ok) {
       setLoginNotice("Your account was deleted. We're sorry to see you go.");
@@ -56,22 +56,22 @@ export default function DeleteAccountCard({ workspaces }: { workspaces: OwnedWor
               <li>Your account, profile, and login are deleted immediately, and every device is signed out.</li>
               {solo.length > 0 ? (
                 <li>
-                  These workspaces and all their clips are deleted (nobody else is in them):{" "}
+                  These collections and all their clips are deleted (nobody else is in them):{" "}
                   <span className="font-semibold text-slate-800">{solo.map((w) => w.name).join(", ")}</span>.
                 </li>
               ) : null}
               <li>
-                Clips and comments you added to workspaces owned by other people stay there, without your name or
+                Clips and comments you added to collections owned by other people stay there, without your name or
                 email.
               </li>
-              <li>You're removed from every workspace you were a member of.</li>
+              <li>You're removed from every Collection you were a member of.</li>
             </ul>
           </div>
 
           {shared.length > 0 ? (
             <div className="space-y-3">
               <p className="text-sm font-semibold text-slate-800">
-                You own shared workspaces. Choose what happens to each one:
+                You own shared collections. Choose what happens to each one:
               </p>
               {shared.map((w) => (
                 <div key={w.id} className="rounded-xl border border-slate-200 p-3">
@@ -90,7 +90,7 @@ export default function DeleteAccountCard({ workspaces }: { workspaces: OwnedWor
                         Transfer to {m.email} ({m.role})
                       </option>
                     ))}
-                    <option value="delete">Delete this workspace and all its clips</option>
+                    <option value="delete">Delete this Collection and all its clips</option>
                   </select>
                   {attempted && !choices[w.id] ? <p className="mt-1.5 text-xs font-medium text-red-600">Choose an option.</p> : null}
                 </div>

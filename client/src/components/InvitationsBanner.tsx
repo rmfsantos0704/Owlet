@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MailPlus } from "lucide-react";
-import { useWorkspaces } from "../context/WorkspaceContext";
+import { useCollections } from "../context/CollectionContext";
 import type { Invitation } from "../types";
 
 const ROLE_TEXT = {
@@ -13,7 +13,7 @@ const daysLeft = (iso: string) => Math.max(1, Math.ceil((new Date(iso).getTime()
 
 // Shown above every page while the person has invitations waiting. Nothing changes until they choose.
 export default function InvitationsBanner() {
-  const { invitations, respondToInvitation } = useWorkspaces();
+  const { invitations, respondToInvitation } = useCollections();
   const navigate = useNavigate();
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
@@ -35,7 +35,7 @@ export default function InvitationsBanner() {
   }
 
   return (
-    <section aria-label="Workspace invitations" className="mb-6 space-y-3">
+    <section aria-label="Collection invitations" className="mb-6 space-y-3">
       {invitations.map((inv) => (
         <div key={inv.id} className="card flex flex-col gap-3 border-blue-200 bg-blue-50/60 p-4 sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -43,9 +43,9 @@ export default function InvitationsBanner() {
               <MailPlus className="size-4.5" strokeWidth={1.9} />
             </div>
             <div className="min-w-0 text-sm">
-              <p className="font-semibold text-ink">
-                Join <span className="break-words">“{inv.workspace.name}”</span>?
-              </p>
+<p className="font-semibold text-ink">
+  Join <span className="break-words">“{inv?.Collection?.name ?? "Collection"}”</span>?
+</p>
               <p className="mt-0.5 text-slate-600">
                 <span className="break-all font-medium">{inv.invitedBy}</span> invited you as {ROLE_TEXT[inv.role]}.
               </p>

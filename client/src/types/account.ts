@@ -7,11 +7,11 @@ export type Account = {
   termsVersion: string | null;
 };
 
-export type OwnedWorkspace = {
+export type Ownedcollection = {
   id: string;
   name: string;
   isDefault: boolean;
   members: { userId: string; email: string; role: string }[];
 };
 
-export type AccountData = { account: Account; ownedWorkspaces: OwnedWorkspace[] };
+export type AccountData = { account: Account; ownedcollections: Ownedcollection[] };

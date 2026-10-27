@@ -6,8 +6,10 @@ import {
 import { api, download, upload } from "../services/api";
 import type { ResearchItem } from "../types";
 import ResearchCard from "../components/ResearchCard";
-import { useWorkspaces } from "../context/WorkspaceContext";
-import WorkspaceExportMenu from "../components/WorkspaceExportMenu";
+import { useCollections } from "../context/CollectionContext";
+import CollectionExportMenu from "../components/CollectionExportMenu";
+import CopyCollectionLink from "../components/CopyCollectionLink";
+import RecentActivity from "../components/RecentActivity";
 
 const MAX_FILES = 10;
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -28,9 +30,9 @@ function StatCard({ label, value, icon: Icon, accent }: { label: string; value: 
 }
 
 export default function Library({ all = false }: { all?: boolean }) {
-  const { current, ready, workspaces } = useWorkspaces();
+  const { current, ready, collections } = useCollections();
   const wid = all ? undefined : current?.id;
-  const wsName = (id: string) => workspaces.find((w) => w.id === id)?.name;
+  const wsName = (id: string) => collections.find((w) => w.id === id)?.name;
   const [params, setParams] = useSearchParams();
   const q = params.get("q") ?? "";
   const tag = params.get("tag") ?? "";
@@ -59,7 +61,7 @@ export default function Library({ all = false }: { all?: boolean }) {
 
     const timer = setTimeout(() => {
       const p = new URLSearchParams();
-      if (wid) p.set("workspaceId", wid);
+      if (wid) p.set("collectionId", wid);
       if (q.trim()) p.set("q", q.trim());
       if (tag) p.set("tag", tag);
 
@@ -90,7 +92,7 @@ export default function Library({ all = false }: { all?: boolean }) {
 
   function exportAs(format: "bibtex" | "csv" | "json") {
     const p = new URLSearchParams({ format });
-    if (wid) p.set("workspaceId", wid);
+    if (wid) p.set("collectionId", wid);
     if (q.trim()) p.set("q", q.trim());
     if (tag) p.set("tag", tag);
     download(`/research/export?${p}`, `owlet-export.${format === "bibtex" ? "bib" : format}`)
@@ -122,7 +124,7 @@ export default function Library({ all = false }: { all?: boolean }) {
           continue;
         }
         const form = new FormData();
-        form.append("workspaceId", wid); // fields must come before the file
+        form.append("collectionId", wid);
         form.append("file", f);
         try {
           const r = await upload<{ aiFailed: boolean }>("/research/import", form);
@@ -145,12 +147,10 @@ export default function Library({ all = false }: { all?: boolean }) {
     setReloadKey((k) => k + 1);
   }
 
-  // keep the drop handler pointed at the latest importFiles
   useEffect(() => {
     importRef.current = importFiles;
   });
 
-  // whole-page drag-and-drop for files
   useEffect(() => {
     let depth = 0;
     const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
@@ -162,7 +162,7 @@ export default function Library({ all = false }: { all?: boolean }) {
       if (canImport) setDragging(true);
     };
     const over = (e: DragEvent) => {
-      if (hasFiles(e)) e.preventDefault(); // required, or the drop never fires
+      if (hasFiles(e)) e.preventDefault();
     };
     const leave = (e: DragEvent) => {
       if (!hasFiles(e)) return;
@@ -171,11 +171,11 @@ export default function Library({ all = false }: { all?: boolean }) {
     };
     const drop = (e: DragEvent) => {
       if (!hasFiles(e)) return;
-      e.preventDefault(); // stops the browser from opening the file
+      e.preventDefault();
       depth = 0;
       setDragging(false);
       if (!canImport) {
-        setNotice({ text: "Open a workspace where you're an owner or editor to import PDFs.", error: true });
+        setNotice({ text: "Open a Collection where you're an owner or editor to import PDFs.", error: true });
         return;
       }
       importRef.current(e.dataTransfer ? Array.from(e.dataTransfer.files) : []);
@@ -202,8 +202,64 @@ export default function Library({ all = false }: { all?: boolean }) {
   ];
 
   if (!all && ready && !current) {
-    return <p className="text-red-600">Couldn't load your workspaces. Check that the server is running, then refresh.</p>;
+    return <p className="text-red-600">Couldn't load your collections. Check that the server is running, then refresh.</p>;
   }
+
+  const clipsCard = (
+    <div className="card overflow-hidden">
+      <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-ink">{filtering ? "Results" : "Recent clips"}</h2>
+          <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+            <span>{items.length} {items.length === 1 ? "clip" : "clips"}</span>
+            {tag && (
+              <button onClick={() => setTag("")} className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
+                {tag} <X className="size-3" />
+              </button>
+            )}
+          </div>
+        </div>
+        {items.length > 0 && (
+          <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+            <FileDown className="ml-2 size-3.5 text-slate-400" />
+            {(["bibtex", "csv", "json"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => exportAs(f)}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-white hover:text-brand hover:shadow-sm"
+              >
+                {f === "bibtex" ? "BibTeX" : f.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {error && <p className="px-5 py-3 text-sm text-red-600">{error}</p>}
+
+      {loading ? (
+        <p className="px-5 py-16 text-center text-sm text-slate-400">Loading…</p>
+      ) : items.length === 0 ? (
+        <div className="px-5 py-16 text-center">
+          <Search className="mx-auto mb-3 size-6 text-slate-300" />
+          <div className="text-sm font-medium text-slate-600">{filtering ? "No matching clips" : "No clips yet"}</div>
+          <div className="mt-1 text-xs text-slate-400">
+            {filtering
+              ? "Try another search or filter."
+              : canImport
+                ? "Clip a page with the Owlet extension, or drop PDFs anywhere on this page."
+                : "Clip a page with the Owlet extension."}
+          </div>
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {items.map((it) => (
+            <ResearchCard key={it._id} item={it} onTag={setTag} collectionName={all ? wsName(it.collectionId) : undefined} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div>
@@ -228,7 +284,7 @@ export default function Library({ all = false }: { all?: boolean }) {
             {all ? "All clips" : current?.name ?? "Your library"}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            {all ? "Clips from every workspace you belong to." : current?.description || "Articles, papers, and PDFs you've clipped."}
+            {all ? "Clips from every Collection you belong to." : current?.description || "Articles, papers, and PDFs you've clipped."}
           </p>
         </div>
         {!all && current && (
@@ -246,10 +302,11 @@ export default function Library({ all = false }: { all?: boolean }) {
                 <button onClick={() => fileRef.current?.click()} disabled={!!importing} className="btn-primary">
                   <Upload className="size-4" /> {importing || "Import PDF"}
                 </button>
-                 <WorkspaceExportMenu workspaceId={current.id} workspaceName={current.name} />
+                 <CollectionExportMenu collectionId={current.id} collectionName={current.name} />
               </>
             )}
-            <Link to={`/workspace/${current.id}/settings`} className="btn-secondary">
+            {current.role === "owner" && !current.isDefault && <CopyCollectionLink key={current.id} Collection={current} />}
+            <Link to={`/Collection/${current.id}/settings`} className="btn-secondary">
               <Settings className="size-4" /> Settings
             </Link>
           </div>
@@ -275,59 +332,18 @@ export default function Library({ all = false }: { all?: boolean }) {
         </section>
       )}
 
-      <div className="card overflow-hidden">
-        <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+      {!all && current ? (
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            {clipsCard}
+          </div>
           <div>
-            <h2 className="font-semibold text-ink">{filtering ? "Results" : "Recent clips"}</h2>
-            <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-              <span>{items.length} {items.length === 1 ? "clip" : "clips"}</span>
-              {tag && (
-                <button onClick={() => setTag("")} className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
-                  {tag} <X className="size-3" />
-                </button>
-              )}
-            </div>
+            <RecentActivity collectionId={current.id} reloadKey={reloadKey} />
           </div>
-          {items.length > 0 && (
-            <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-              <FileDown className="ml-2 size-3.5 text-slate-400" />
-              {(["bibtex", "csv", "json"] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => exportAs(f)}
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-white hover:text-brand hover:shadow-sm"
-                >
-                  {f === "bibtex" ? "BibTeX" : f.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
-
-        {error && <p className="px-5 py-3 text-sm text-red-600">{error}</p>}
-
-        {loading ? (
-          <p className="px-5 py-16 text-center text-sm text-slate-400">Loading…</p>
-        ) : items.length === 0 ? (
-          <div className="px-5 py-16 text-center">
-            <Search className="mx-auto mb-3 size-6 text-slate-300" />
-            <div className="text-sm font-medium text-slate-600">{filtering ? "No matching clips" : "No clips yet"}</div>
-            <div className="mt-1 text-xs text-slate-400">
-              {filtering
-                ? "Try another search or filter."
-                : canImport
-                  ? "Clip a page with the Owlet extension, or drop PDFs anywhere on this page."
-                  : "Clip a page with the Owlet extension."}
-            </div>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {items.map((it) => (
-              <ResearchCard key={it._id} item={it} onTag={setTag} workspaceName={all ? wsName(it.workspaceId) : undefined} />
-            ))}
-          </div>
-        )}
-      </div>
+      ) : (
+        clipsCard
+      )}
     </div>
   );
 }

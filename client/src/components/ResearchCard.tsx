@@ -14,10 +14,10 @@ const palette = (s = "") => PALETTES[[...s].reduce((a, c) => a + c.charCodeAt(0)
 type Props = {
   item: ResearchItem;
   onTag: (t: string) => void;
-  workspaceName?: string;
+  collectionName?: string;
 };
 
-export default function ResearchCard({ item, onTag, workspaceName }: Props) {
+export default function ResearchCard({ item, onTag, collectionName }: Props) {
   const isPdf = item.source.kind === "pdf";
   const origin = isPdf ? `PDF${item.source.fileName ? ` · ${item.source.fileName}` : ""}` : item.source.domain;
 
@@ -34,7 +34,7 @@ export default function ResearchCard({ item, onTag, workspaceName }: Props) {
           <span className="shrink-0 text-[11px] text-slate-400">{timeAgo(item.createdAt)}</span>
         </div>
         <div className="mt-1 truncate text-xs text-slate-400">
-          {workspaceName && <span className="font-medium text-slate-500">{workspaceName} · </span>}
+          {collectionName && <span className="font-medium text-slate-500">{collectionName} · </span>}
           {origin}
           {item.source.author && ` · ${item.source.author}`}
         </div>

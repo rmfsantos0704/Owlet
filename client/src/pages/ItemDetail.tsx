@@ -43,7 +43,7 @@ export default function ItemDetail() {
   const run = (path: string, method: string, body?: unknown) => act(path, method, body).catch(() => {});
 
   async function regenerate() {
-    if (!confirm("Replace the summary and key arguments using this workspace's current AI settings?")) return;
+    if (!confirm("Replace the summary and key arguments using this Collection's current AI settings?")) return;
     setRegenerating(true);
     await run("/regenerate", "POST");
     setRegenerating(false);
@@ -121,7 +121,7 @@ export default function ItemDetail() {
                 <button
                   onClick={regenerate}
                   disabled={regenerating}
-                  title="Rewrite using this workspace's current AI settings"
+                  title="Rewrite using this Collection's current AI settings"
                   className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
                 >
                   <RefreshCw className={`size-3.5 ${regenerating ? "animate-spin" : ""}`} />

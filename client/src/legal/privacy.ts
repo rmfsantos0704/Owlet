@@ -24,8 +24,8 @@ export const privacySections: Section[] = [
       [
         "web pages and PDFs you save: their text, title, author, date, and web address or file name;",
         "the AI summaries, key arguments, tags, and citations generated for them;",
-        "your highlights, notes, comments, and your workspaces' names, descriptions, and settings;",
-        "who belongs to your workspaces, and their roles.",
+        "your highlights, notes, comments, and your collections' names, descriptions, and settings;",
+        "who belongs to your collections, and their roles.",
       ],
       "Technical information: our servers and hosting providers may log IP addresses and request details for security, abuse prevention, and troubleshooting. We use your IP address to apply rate limits.",
       "We do not use advertising cookies or third-party analytics. We keep your login token in your browser's local storage (and the extension's storage) so you stay signed in.",
@@ -37,7 +37,7 @@ export const privacySections: Section[] = [
     body: [
       [
         "to create and secure your account, including emailing you confirmation, password-reset, and security messages;",
-        "to run Owlet: saving your clips, generating summaries and citations, and sharing workspaces with the people you choose;",
+        "to run Owlet: saving your clips, generating summaries and citations, and sharing collections with the people you choose;",
         "to prevent abuse and keep Owlet working;",
         "to follow the law.",
       ],
@@ -48,7 +48,7 @@ export const privacySections: Section[] = [
     id: "ai",
     title: "AI processing",
     body: [
-      "When you save a page or PDF, Owlet sends its text (up to about 12,000 characters; for long PDFs, the beginning and the end), its title, and your workspace's custom instructions to Groq, our AI provider, to create the summary, key arguments, and tags. The Regenerate button and the Test panel in workspace settings do the same. Groq handles this under its own terms and privacy policy.",
+      "When you save a page or PDF, Owlet sends its text (up to about 12,000 characters; for long PDFs, the beginning and the end), its title, and your Collection's custom instructions to Groq, our AI provider, to create the summary, key arguments, and tags. The Regenerate button and the Test panel in Collection settings do the same. Groq handles this under its own terms and privacy policy.",
       "Don't save anything confidential or that you are not allowed to share with a third-party AI provider.",
     ],
   },
@@ -56,7 +56,7 @@ export const privacySections: Section[] = [
     id: "sharing",
     title: "Who sees your information",
     body: [
-      "Members of a workspace can see its content and each other's email addresses. Comments show their author's email. Other Owlet users cannot see your age or your role.",
+      "Members of a Collection can see its content and each other's email addresses. Comments show their author's email. Other Owlet users cannot see your age or your role.",
       `Service providers help us run Owlet: hosting (${LEGAL.hostingProviders}), our database (MongoDB Atlas), email delivery (${LEGAL.emailProvider}), and AI summaries (Groq). They process data only to provide those services.`,
       "We may disclose information if the law requires it or to protect people's safety or rights.",
     ],
@@ -68,9 +68,9 @@ export const privacySections: Section[] = [
       "We keep your account and content until you delete them. When you delete your account (Account page, then Delete account):",
       [
         "your account, profile, and login are removed immediately;",
-        "your Personal workspace and any shared workspace you choose to delete are deleted with all their clips;",
-        "shared workspaces you choose to transfer move to another member;",
-        "clips and comments you added to workspaces owned by other people stay with those workspaces, without your name or email.",
+        "your Personal Collection and any shared Collection you choose to delete are deleted with all their clips;",
+        "shared collections you choose to transfer move to another member;",
+        "clips and comments you added to collections owned by other people stay with those collections, without your name or email.",
       ],
       `Backups and server logs may keep copies for up to ${LEGAL.backupDays} days before they are removed.`,
     ],
@@ -95,7 +95,7 @@ export const privacySections: Section[] = [
     id: "security",
     title: "Security",
     body: [
-      "We protect your data with measures such as hashed passwords, email confirmation, rate limits on sign-in and account actions, encrypted connections, and access controls on workspaces. No system is perfectly secure. If a breach affects your data, we will tell you as the law requires.",
+      "We protect your data with measures such as hashed passwords, email confirmation, rate limits on sign-in and account actions, encrypted connections, and access controls on collections. No system is perfectly secure. If a breach affects your data, we will tell you as the law requires.",
     ],
   },
   {

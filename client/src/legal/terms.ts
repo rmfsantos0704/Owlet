@@ -6,7 +6,7 @@ export const termsSections: Section[] = [
     id: "about",
     title: "About these Terms",
     body: [
-      `These Terms of Service ("Terms") are an agreement between you and ${LEGAL.operator} ("we", "us"), who run ${LEGAL.appName}: a web app and browser extension for saving web pages and PDFs, getting AI summaries and citations, and organizing research in workspaces.`,
+      `These Terms of Service ("Terms") are an agreement between you and ${LEGAL.operator} ("we", "us"), who run ${LEGAL.appName}: a web app and browser extension for saving web pages and PDFs, getting AI summaries and citations, and organizing research in collections.`,
       "By creating an account or using Owlet you agree to these Terms and to our Privacy Policy. If you don't agree, please don't use Owlet.",
     ],
   },
@@ -31,18 +31,18 @@ export const termsSections: Section[] = [
     id: "content",
     title: "Your content",
     body: [
-      "Your content means the pages and PDFs you save, the summaries, tags, and citations created for them, and your highlights, notes, comments, and workspace settings. You keep ownership of your content.",
-      "You give us a limited licence to store, process, and display your content, and to show it to the people you share a workspace with, only so that we can run Owlet for you. This includes sending the text of what you save to our AI provider to produce summaries and tags.",
-      "You are responsible for your content. Only save or share material you have the right to use. Owlet is meant for personal study and research: don't use shared workspaces or exports to republish or distribute other people's copyrighted material without permission.",
+      "Your content means the pages and PDFs you save, the summaries, tags, and citations created for them, and your highlights, notes, comments, and Collection settings. You keep ownership of your content.",
+      "You give us a limited licence to store, process, and display your content, and to show it to the people you share a Collection with, only so that we can run Owlet for you. This includes sending the text of what you save to our AI provider to produce summaries and tags.",
+      "You are responsible for your content. Only save or share material you have the right to use. Owlet is meant for personal study and research: don't use shared collections or exports to republish or distribute other people's copyrighted material without permission.",
       `If you believe something in Owlet infringes your rights, contact us at ${LEGAL.contactEmail}. We will review it and may remove it.`,
     ],
   },
   {
     id: "sharing",
-    title: "Workspaces and sharing",
+    title: "collections and sharing",
     body: [
-      "The owner of a workspace decides who can join it and what each person can do (owner, editor, or viewer). Members can see everything in the workspace and the email addresses of its other members. Editors can add and change clips, highlights, comments, and tags.",
-      "If a workspace owner deletes their account, they must choose, for each shared workspace, whether to transfer it to a member or delete it. Clips and comments you add to a workspace owned by someone else stay with that workspace if you later delete your account, but without your name or email.",
+      "The owner of a Collection decides who can join it and what each person can do (owner, editor, or viewer). Members can see everything in the Collection and the email addresses of its other members. Editors can add and change clips, highlights, comments, and tags.",
+      "If a Collection owner deletes their account, they must choose, for each shared Collection, whether to transfer it to a member or delete it. Clips and comments you add to a Collection owned by someone else stay with that Collection if you later delete your account, but without your name or email.",
     ],
   },
   {
@@ -63,7 +63,7 @@ export const termsSections: Section[] = [
         "break the law or other people's rights;",
         "upload malware, or try to damage, overload, or get around the limits of Owlet, including rate limits;",
         "access other people's accounts or data, or look for security weaknesses without our written permission;",
-        "send spam or harass anyone, including through workspace invitations or comments;",
+        "send spam or harass anyone, including through Collection invitations or comments;",
         "save or share illegal content, or material that sexually exploits or endangers children;",
         "create accounts automatically or scrape Owlet.",
       ],

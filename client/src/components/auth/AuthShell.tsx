@@ -12,7 +12,7 @@ export default function AuthShell({ children }: { children: ReactNode }) {
               <span className="block text-blue-600">Write with confidence.</span>
             </h1>
             <p className="mt-3 max-w-md text-base leading-7 text-slate-500">
-              Keep every source, insight, and citation in one focused workspace.
+              Keep every source, insight, and citation in one focused Collection.
             </p>
           </div>
           <div className="relative mt-2 w-full">
