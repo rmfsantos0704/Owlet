@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import {
   clip, importPdf, list, getOne, remove,
   addHighlight, removeHighlight, addComment, removeComment, setTags,
-  updateSource, regenerate, pdf, exportItems,
+  updateSource, regenerate, pdf, exportItems, ask
 } from "../controllers/researchController.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { uploadPdf } from "../middlewares/upload.js";
@@ -20,6 +20,8 @@ router.post("/clip", clipDailyLimiter, trackActivity("clip_added"), clip);
 router.post("/import", importDailyLimiter, uploadPdf, trackActivity("pdf_imported"), importPdf);
 router.get("/", list);
 router.get("/export", exportItems);
+const askLimit = rateLimit({ windowMs: 60 * 1000, limit: 10 });
+router.post("/ask", askLimit, ask); // put before the "/:id" routes
 router.get("/:id", getOne);
 router.delete("/:id", writeLimiter, remove);
 router.get("/:id/pdf", pdf);

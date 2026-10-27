@@ -5,7 +5,7 @@ import { z } from "zod";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { collection } from "../models/Collection.js";
 import { User } from "../models/User.js";
-import { analyzeText } from "../services/groq.js";
+import { analyzeText, askSources } from "../services/groq.js";
 import { buildCitations } from "../services/citations.js";
 import { extractPdf, PdfImportError } from "../services/pdfImport.js";
 import { streamPdf } from "../services/pdf.js";
@@ -36,6 +36,11 @@ const sourceSchema = z.object({
   title: z.string().trim().min(1).max(500),
   author: z.string().trim().max(200).optional(),
   publishedDate: z.string().trim().max(100).optional(),
+});
+const askSchema = z.object({
+  itemIds: z.array(z.string()).min(1).max(8),
+  mode: z.enum(["Research brief", "Summarize", "Compare sources"]),
+  prompt: z.string().trim().max(1000).optional(),
 });
 
 // Resolves the collection a clip/import goes into; answers the request itself and returns null on failure.
@@ -103,10 +108,12 @@ export async function clip(req: Request, res: Response) {
 
   res.status(201).json({ item, aiFailed });
 }
+
 // long documents: give the AI the start (abstract/intro) and the end (conclusions)
 function forAi(text: string) {
   return text.length > 12000 ? text.slice(0, 8000) + "\n[...]\n" + text.slice(-4000) : text;
 }
+
 export async function importPdf(req: Request, res: Response) {
   const file = req.file;
   if (!file) return res.status(400).json({ error: "Attach a PDF file" });
@@ -136,7 +143,7 @@ export async function importPdf(req: Request, res: Response) {
 
   const rawText = pdf.text.slice(0, 200000);
   // long documents: give the AI the start (abstract/intro) and the end (conclusions)
-    const { ai, aiFailed } = await runAi(ws, pdf.title, forAi(rawText));
+  const { ai, aiFailed } = await runAi(ws, pdf.title, forAi(rawText));
 
   const item = await ResearchItem.create({
     userId,
@@ -352,4 +359,31 @@ export async function regenerate(req: Request, res: Response) {
     { $set: { "aiOutput.summary": ai.summary, "aiOutput.paraphrase": ai.paraphrase } }
   );
   res.json({ aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase } });
+}
+
+// AI workspace: a brief / summary / comparison across up to 8 saved sources the user can view.
+export async function ask(req: Request, res: Response) {
+  const p = askSchema.safeParse(req.body);
+  if (!p.success || !p.data.itemIds.every((i) => mongoose.isValidObjectId(i))) {
+    return res.status(400).json({ error: "Pick 1-8 sources and a valid mode" });
+  }
+  const ids = await collectionIds(res.locals.userId, "viewer");
+  const items = await ResearchItem.find({ _id: { $in: p.data.itemIds }, collectionId: { $in: ids } })
+    .select("source.title aiOutput.summary content.rawText")
+    .lean();
+  if (!items.length) return res.status(404).json({ error: "Sources not found" });
+
+  const sources = items.map((i: any) => ({
+    id: String(i._id),
+    title: i.source?.title ?? "Untitled",
+    text: i.content?.rawText || i.aiOutput?.summary || "",
+  }));
+
+  try {
+    const out = await askSources(p.data.mode, p.data.prompt ?? "", sources);
+    res.json({ ...out, sources: sources.map(({ id, title }) => ({ id, title })) });
+  } catch (err) {
+    console.error("Groq failed:", err);
+    res.status(502).json({ error: "The AI service failed. Try again." });
+  }
 }
