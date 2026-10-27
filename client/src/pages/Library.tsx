@@ -8,7 +8,7 @@ import type { ResearchItem } from "../types";
 import ResearchCard from "../components/ResearchCard";
 import { useCollections } from "../context/CollectionContext";
 import CollectionExportMenu from "../components/CollectionExportMenu";
-import CopyCollectionLink from "../components/CopyCollectionLink";
+
 import RecentActivity from "../components/RecentActivity";
 
 const MAX_FILES = 10;
@@ -305,7 +305,7 @@ export default function Library({ all = false }: { all?: boolean }) {
                  <CollectionExportMenu collectionId={current.id} collectionName={current.name} />
               </>
             )}
-            {current.role === "owner" && !current.isDefault && <CopyCollectionLink key={current.id} Collection={current} />}
+            
             <Link to={`/Collection/${current.id}/settings`} className="btn-secondary">
               <Settings className="size-4" /> Settings
             </Link>

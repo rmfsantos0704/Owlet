@@ -16,7 +16,9 @@ import ItemDetail from "./pages/ItemDetail";
 // Change these imports:
 import CollectionSettings from "./pages/CollectionSettings"; // Ensure file is CollectionSettings.tsx
 import JoinCollection from "./pages/JoinCollection";       // Ensure file is JoinCollection.tsx
-
+import AiWorkspace from "./pages/AiWorkspace";
+import Highlights from "./pages/Highlights";
+import Comments from "./pages/Comments";
 // A join link opened while logged out: remember it, send the person to log in, then bring them back.
 // Only join links are remembered, so this can't be used as an open redirect.
 const RETURN_KEY = "owlet.returnTo";
@@ -65,6 +67,9 @@ export default function App() {
       <Route path="/privacy" element={<PrivacyPage />} />
 
       <Route element={user ? <Layout /> : <ToLogin />}>
+      <Route path="/ai" element={<AiWorkspace />} />
+<Route path="/highlights" element={<Highlights />} />
+<Route path="/comments" element={<Comments />} />
         <Route path="/" element={<Library />} />
         <Route path="/all" element={<Library all />} />
         <Route path="/item/:id" element={<ItemDetail />} />

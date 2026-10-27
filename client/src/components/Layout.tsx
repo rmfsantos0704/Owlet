@@ -1,10 +1,33 @@
 import { useState, type FormEvent } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Archive, Folder, LogOut, Menu, Plus, Search, Users, X, UserRound } from "lucide-react";
+import {
+  Archive,
+  Folder,
+  Highlighter,
+  LogOut,
+  Menu,
+  MessageSquareText,
+  Plus,
+  Search,
+  Sparkles,
+  Users,
+  X,
+  UserRound,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
 import InvitationsBanner from "./InvitationsBanner";
 import NotificationsBell from "./NotificationsBell";
+
+const WORKSPACE_LINKS = [
+  { to: "/all", label: "All clips", icon: Archive },
+  { to: "/ai", label: "AI workspace", icon: Sparkles },
+  { to: "/highlights", label: "Highlights", icon: Highlighter },
+  { to: "/comments", label: "Comments", icon: MessageSquareText },
+];
+
+// pages where the header search filters what's shown (everywhere else it jumps to the collection page)
+const SEARCHABLE = ["/all", "/highlights", "/comments"];
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -23,7 +46,7 @@ export default function Layout() {
     const next = new URLSearchParams(params);
     if (value) next.set("q", value);
     else next.delete("q");
-    navigate({ pathname: pathname === "/all" ? "/all" : "/", search: next.toString() }, { replace: true });
+    navigate({ pathname: SEARCHABLE.includes(pathname) ? pathname : "/", search: next.toString() }, { replace: true });
   }
 
   async function addCollection(e: FormEvent) {
@@ -63,18 +86,21 @@ export default function Layout() {
 
         <nav className="space-y-1">
           <div className="eyebrow mb-2 px-3">Workspaces</div>
-          <NavLink
-            to="/all"
-            onClick={() => setOpen(false)}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                isActive ? "bg-brand text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
-              }`
-            }
-          >
-            <Archive className="size-4.5" strokeWidth={1.9} />
-            All clips
-          </NavLink>
+          {WORKSPACE_LINKS.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              onClick={() => setOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                  isActive ? "bg-brand text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
+                }`
+              }
+            >
+              <Icon className="size-4.5" strokeWidth={1.9} />
+              {label}
+            </NavLink>
+          ))}
         </nav>
 
         <nav className="mt-7 space-y-0.5">
@@ -98,7 +124,7 @@ export default function Layout() {
           )}
           {collections.map((w: any) => {
             const collectionId = w?.id || w?._id;
-            const currentId = current?.id || current?.id;
+            const currentId = current?.id;
             const active = onCollectionPage && currentId && currentId === collectionId;
             return (
               <button
