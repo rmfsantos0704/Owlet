@@ -4,6 +4,10 @@ import { z } from "zod";
 import { Workspace } from "../models/Workspace.js";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { User } from "../models/User.js";
+import { Invitation } from "../models/Invitation.js";
+import {
+  DECLINE_COOLDOWN_MS, INVITE_TTL_MS, MAX_MEMBERS, MAX_PENDING_PER_USER, MAX_PENDING_PER_WORKSPACE,
+} from "../services/invitations.js";
 import { ensureDefaultWorkspace, roleIn, type Role } from "../services/access.js";
 import { analyzeText } from "../services/groq.js";
 import { streamWorkspacePdf } from "../services/workspacePdf.js";
@@ -122,28 +126,107 @@ export async function deleteWorkspace(req: Request, res: Response) {
   if (found.role !== "owner") return res.status(403).json({ error: "Only the owner can delete a workspace" });
   if (found.ws.isDefault) return res.status(400).json({ error: "Your Personal workspace can't be deleted" });
   await ResearchItem.deleteMany({ workspaceId: found.ws._id });
+  await Invitation.deleteMany({ workspaceId: found.ws._id });
   await Workspace.deleteOne({ _id: found.ws._id });
   res.json({ ok: true });
 }
 
+// Sends an invitation. Nobody joins until they accept it, and no email is sent (it shows up in their Owlet).
 export async function addMember(req: Request, res: Response) {
   const found = await load(req, res);
   if (!found) return;
-  if (found.role !== "owner") return res.status(403).json({ error: "Only the owner can add members" });
+  if (found.role !== "owner") return res.status(403).json({ error: "Only the owner can invite members" });
   const p = addMemberSchema.safeParse(req.body);
   if (!p.success) return res.status(400).json({ error: "A valid email and role are required" });
 
   const user = await User.findOne({ email: p.data.email });
   if (!user) return res.status(404).json({ error: "No Owlet account uses that email. Ask them to sign up first." });
   if (String(user._id) === String(found.ws.ownerId)) return res.status(400).json({ error: "That's the owner" });
-  if (found.ws.members.length >= 50) return res.status(400).json({ error: "Member limit reached" });
+  if (found.ws.members.some((m) => String(m.userId) === String(user._id))) {
+    return res.status(409).json({ error: "Already a member" });
+  }
 
-  const r = await Workspace.updateOne(
-    { _id: found.ws._id, "members.userId": { $ne: user._id } },
-    { $push: { members: { userId: user._id, role: p.data.role } } }
-  );
-  if (!r.modifiedCount) return res.status(409).json({ error: "Already a member" });
-  res.status(201).json({ ok: true });
+  const now = new Date();
+  const live = { status: "pending" as const, expiresAt: { $gt: now } };
+  const [pendingHere, pendingForThem, existing] = await Promise.all([
+    Invitation.countDocuments({ workspaceId: found.ws._id, ...live }),
+    Invitation.countDocuments({ inviteeId: user._id, ...live }),
+    Invitation.findOne({ workspaceId: found.ws._id, inviteeId: user._id }),
+  ]);
+
+  if (existing?.status === "pending" && existing.expiresAt > now) {
+    return res.status(409).json({ error: "That person already has an open invitation. Wait for their answer." });
+  }
+  if (pendingHere >= MAX_PENDING_PER_WORKSPACE) {
+    return res.status(429).json({ error: "Too many open invitations. Wait for answers or cancel some first." });
+  }
+  if (found.ws.members.length + pendingHere >= MAX_MEMBERS) {
+    return res.status(400).json({ error: "Member limit reached (open invitations count toward it)" });
+  }
+  // Same message for "declined recently" and "inbox full", so the inviter learns nothing about the person's choices.
+  const declinedRecently =
+    existing?.status === "declined" &&
+    existing.respondedAt &&
+    now.getTime() - existing.respondedAt.getTime() < DECLINE_COOLDOWN_MS;
+  if (declinedRecently || pendingForThem >= MAX_PENDING_PER_USER) {
+    return res.status(409).json({ error: "That person can't be invited right now. Try again later." });
+  }
+
+  const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
+  try {
+    if (existing) {
+      const r = await Invitation.updateOne(
+        { _id: existing._id, status: existing.status },
+        { $set: { inviterId: res.locals.userId, role: p.data.role, status: "pending", expiresAt }, $unset: { respondedAt: "" } }
+      );
+      if (!r.matchedCount) return res.status(409).json({ error: "That person already has an open invitation." });
+    } else {
+      await Invitation.create({
+        workspaceId: found.ws._id,
+        inviterId: res.locals.userId,
+        inviteeId: user._id,
+        role: p.data.role,
+        expiresAt,
+      });
+    }
+  } catch (err) {
+    if ((err as { code?: number })?.code === 11000) {
+      return res.status(409).json({ error: "That person already has an open invitation." });
+    }
+    throw err;
+  }
+  res.status(201).json({ ok: true, invited: true });
+}
+
+// Owner view: invitations that are still waiting for an answer.
+export async function listInvitations(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  if (found.role !== "owner") return res.status(403).json({ error: "Only the owner can see invitations" });
+  const invs = await Invitation.find({ workspaceId: found.ws._id, status: "pending", expiresAt: { $gt: new Date() } })
+    .sort({ createdAt: -1 })
+    .lean();
+  const users = invs.length
+    ? await User.find({ _id: { $in: invs.map((i) => i.inviteeId) } }).select("email").lean()
+    : [];
+  res.json({
+    invitations: invs.map((i) => ({
+      id: String(i._id),
+      email: users.find((u) => String(u._id) === String(i.inviteeId))?.email ?? "unknown",
+      role: i.role,
+      expiresAt: i.expiresAt,
+    })),
+  });
+}
+
+export async function cancelInvitation(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  if (found.role !== "owner") return res.status(403).json({ error: "Only the owner can cancel invitations" });
+  const invId = String(req.params.invId);
+  if (!mongoose.isValidObjectId(invId)) return res.status(400).json({ error: "Bad id" });
+  await Invitation.deleteOne({ _id: invId, workspaceId: found.ws._id, status: "pending" });
+  res.json({ ok: true });
 }
 
 export async function setMemberRole(req: Request, res: Response) {

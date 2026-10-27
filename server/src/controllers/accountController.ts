@@ -5,6 +5,7 @@ import { z } from "zod";
 import { User } from "../models/User.js";
 import { Workspace } from "../models/Workspace.js";
 import { ResearchItem } from "../models/ResearchItem.js";
+import { Invitation } from "../models/Invitation.js";
 import { sendMail } from "../services/mailer.js";
 import * as tpl from "../services/emailTemplates.js";
 import {
@@ -285,6 +286,7 @@ export async function deleteAccount(req: Request, res: Response) {
   for (const step of plan) {
     if (step.action === "delete") {
       await ResearchItem.deleteMany({ workspaceId: step.ws._id });
+      await Invitation.deleteMany({ workspaceId: step.ws._id });
       await Workspace.deleteOne({ _id: step.ws._id });
     } else {
       // isDefault off: the new owner may already have their own Personal workspace (one per owner)
@@ -303,6 +305,9 @@ export async function deleteAccount(req: Request, res: Response) {
     { $set: { "comments.$[c].userId": null, "comments.$[c].authorEmail": "Deleted user" } },
     { arrayFilters: [{ "c.userId": new mongoose.Types.ObjectId(id) }] }
   );
+
+  // invitations sent to or by this person go with the account
+  await Invitation.deleteMany({ $or: [{ inviteeId: id }, { inviterId: id }] });
 
   await User.deleteOne({ _id: id });
   fire(sendMail(tpl.accountDeletedEmail(user.email)));
