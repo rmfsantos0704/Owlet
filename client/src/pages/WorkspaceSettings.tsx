@@ -4,7 +4,7 @@ import { Check, ChevronLeft, FlaskConical, Trash2 } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useWorkspaces } from "../context/WorkspaceContext";
-import type { AiSettings, ResearchItem, WorkspaceDetail } from "../types";
+import type { AiSettings, ResearchItem, SentInvitation, WorkspaceDetail } from "../types";
 
 const FORMATS: { value: AiSettings["format"]; label: string; hint: string }[] = [
   { value: "paragraph", label: "Paragraph", hint: "One short, flowing paragraph" },
@@ -66,6 +66,7 @@ export default function WorkspaceSettings() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testError, setTestError] = useState("");
+  const [sent, setSent] = useState<SentInvitation[]>([]);
 
   const fetchWs = useCallback(
     () => api<{ workspace: WorkspaceDetail }>(`/workspaces/${id}`).then((r) => r.workspace),
@@ -98,6 +99,19 @@ export default function WorkspaceSettings() {
       )
       .catch(() => {});
   }, [id, wsRole]);
+
+  // invitations the owner sent that nobody has answered yet
+  const fetchSent = useCallback(
+    () =>
+      api<{ invitations: SentInvitation[] }>(`/workspaces/${id}/invitations`)
+        .then((r) => setSent(r.invitations))
+        .catch(() => {}),
+    [id]
+  );
+  useEffect(() => {
+    if (wsRole === "owner") void fetchSent();
+    else setSent([]);
+  }, [wsRole, fetchSent]);
 
   // for the smaller actions (members, delete): shows a short notice or an error
   async function run(fn: () => Promise<unknown>, ok = "") {
@@ -166,9 +180,15 @@ export default function WorkspaceSettings() {
     run(async () => {
       await api(`/workspaces/${id}/members`, { method: "POST", body: { email, role } });
       setEmail("");
-      await refresh();
-    }, "Member added");
+      await fetchSent();
+    }, "Invitation sent");
   };
+
+  const cancelInvite = (invId: string) =>
+    run(async () => {
+      await api(`/workspaces/${id}/invitations/${invId}`, { method: "DELETE" });
+      await fetchSent();
+    }, "Invitation cancelled");
 
   const changeRole = (uid: string, r: string) =>
     run(async () => {
@@ -404,15 +424,36 @@ export default function WorkspaceSettings() {
             </li>
           ))}
         </ul>
+        {isOwner && sent.length > 0 && (
+          <div className="mt-4">
+            <div className="eyebrow mb-1">Waiting for an answer</div>
+            <ul className="divide-y divide-slate-100">
+              {sent.map((s) => (
+                <li key={s.id} className="flex items-center gap-2 py-2.5 text-sm">
+                  <span className="min-w-0 flex-1 truncate">{s.email}</span>
+                  <span className="chip capitalize">{s.role}</span>
+                  <button onClick={() => cancelInvite(s.id)} className="text-xs font-medium text-red-600 hover:underline">
+                    Cancel
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {isOwner && (
-          <form onSubmit={addMember} className="mt-4 flex flex-col gap-2 sm:flex-row">
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email of an existing Owlet user" className="field flex-1" />
-            <select value={role} onChange={(e) => setRole(e.target.value as "editor" | "viewer")} className="field sm:!w-32">
-              <option value="viewer">Viewer</option>
-              <option value="editor">Editor</option>
-            </select>
-            <button className="btn-primary">Add</button>
-          </form>
+          <>
+            <form onSubmit={addMember} className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email of an existing Owlet user" className="field flex-1" />
+              <select value={role} onChange={(e) => setRole(e.target.value as "editor" | "viewer")} className="field sm:!w-32">
+                <option value="viewer">Viewer</option>
+                <option value="editor">Editor</option>
+              </select>
+              <button className="btn-primary">Invite</button>
+            </form>
+            <p className="mt-1.5 text-[11px] text-slate-400">
+              They join only after they accept. The invitation shows up in their Owlet and expires after 14 days.
+            </p>
+          </>
         )}
       </section>
 

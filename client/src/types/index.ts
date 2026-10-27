@@ -39,3 +39,13 @@ export type ResearchItem = {
   comments: Comment[];
   createdAt: string;
 };
+// an invitation waiting for the signed-in person to accept or decline
+export type Invitation = {
+  id: string;
+  role: "editor" | "viewer";
+  invitedBy: string;
+  expiresAt: string;
+  workspace: { id: string; name: string; description: string };
+};
+// an invitation the workspace owner sent that hasn't been answered yet
+export type SentInvitation = { id: string; email: string; role: "editor" | "viewer"; expiresAt: string };

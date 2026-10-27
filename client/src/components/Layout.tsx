@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from
 import { Archive, Folder, LogOut, Menu, Plus, Search, Users, X ,UserRound} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useWorkspaces } from "../context/WorkspaceContext";
+import InvitationsBanner from "./InvitationsBanner";
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -170,6 +171,7 @@ export default function Layout() {
         </header>
 
         <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 lg:py-9">
+          <InvitationsBanner />
           <Outlet />
         </div>
       </main>
