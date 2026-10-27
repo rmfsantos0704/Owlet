@@ -2,9 +2,9 @@ import { Schema, model } from "mongoose";
 
 const researchItemSchema = new Schema(
   {
-// who clipped it; becomes null if that person deletes their account (the clip stays with the workspace)
+// who clipped it; becomes null if that person deletes their account (the clip stays with the collection)
 userId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
-    workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true },
+    collectionId: { type: Schema.Types.ObjectId, ref: "collection", required: true },
     source: {
       kind: { type: String, enum: ["web", "pdf"], default: "web" },
       url: String,
@@ -41,10 +41,10 @@ userId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true }
   { timestamps: true }
 );
 
-researchItemSchema.index({ workspaceId: 1, createdAt: -1 });
-// no duplicate clips inside one workspace (partial, so old unmigrated items don't collide)
+researchItemSchema.index({ collectionId: 1, createdAt: -1 });
+// no duplicate clips inside one collection (partial, so old unmigrated items don't collide)
 researchItemSchema.index(
-  { workspaceId: 1, "source.dedupeKey": 1 },
+  { collectionId: 1, "source.dedupeKey": 1 },
   { unique: true, partialFilterExpression: { "source.dedupeKey": { $type: "string" } } }
 );
 

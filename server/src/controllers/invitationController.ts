@@ -1,14 +1,15 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Invitation } from "../models/Invitation.js";
-import { Workspace } from "../models/Workspace.js";
+import { collection } from "../models/Collection.js";
 import { User } from "../models/User.js";
 import { roleIn } from "../services/access.js";
 import { MAX_MEMBERS } from "../services/invitations.js";
+import { recordActivity } from "../services/activityLog.js";
 
 const GONE = "This invitation is no longer available.";
 
-// The signed-in person's open invitations (not expired, workspace still exists).
+// The signed-in person's open invitations (not expired, collection still exists).
 export async function listMine(_req: Request, res: Response) {
   const uid = res.locals.userId;
   const invs = await Invitation.find({ inviteeId: uid, status: "pending", expiresAt: { $gt: new Date() } })
@@ -17,13 +18,13 @@ export async function listMine(_req: Request, res: Response) {
     .lean();
   if (!invs.length) return res.json({ invitations: [] });
 
-  const [workspaces, inviters] = await Promise.all([
-    Workspace.find({ _id: { $in: invs.map((i) => i.workspaceId) } }).select("name description").lean(),
+  const [collections, inviters] = await Promise.all([
+    collection.find({ _id: { $in: invs.map((i) => i.collectionId) } }).select("name description").lean(),
     User.find({ _id: { $in: invs.map((i) => i.inviterId) } }).select("email").lean(),
   ]);
 
   const invitations = invs.flatMap((i) => {
-    const ws = workspaces.find((w) => String(w._id) === String(i.workspaceId));
+    const ws = collections.find((w) => String(w._id) === String(i.collectionId));
     if (!ws) return [];
     return [
       {
@@ -31,7 +32,7 @@ export async function listMine(_req: Request, res: Response) {
         role: i.role,
         expiresAt: i.expiresAt,
         invitedBy: inviters.find((u) => String(u._id) === String(i.inviterId))?.email ?? "Someone",
-        workspace: { id: String(ws._id), name: ws.name, description: ws.description ?? "" },
+        collection: { id: String(ws._id), name: ws.name, description: ws.description ?? "" },
       },
     ];
   });
@@ -47,7 +48,7 @@ export async function accept(req: Request, res: Response) {
   const inv = await Invitation.findOne({ _id: id, inviteeId: uid, status: "pending", expiresAt: { $gt: now } });
   if (!inv) return res.status(404).json({ error: GONE });
 
-  const ws = await Workspace.findById(inv.workspaceId);
+  const ws = await collection.findById(inv.collectionId);
   if (!ws) {
     await Invitation.deleteOne({ _id: inv._id });
     return res.status(404).json({ error: GONE });
@@ -56,10 +57,10 @@ export async function accept(req: Request, res: Response) {
   // already in (e.g. became the owner through a transfer): just close the invitation
   if (roleIn(ws, uid)) {
     await Invitation.updateOne({ _id: inv._id }, { $set: { status: "accepted", respondedAt: now } });
-    return res.json({ ok: true, workspaceId: String(ws._id) });
+    return res.json({ ok: true, collectionId: String(ws._id) });
   }
   if (ws.members.length >= MAX_MEMBERS) {
-    return res.status(409).json({ error: "This workspace is full, so you can't join it right now." });
+    return res.status(409).json({ error: "This collection is full, so you can't join it right now." });
   }
 
   // claim the invitation first so a double click can't add the member twice
@@ -69,11 +70,12 @@ export async function accept(req: Request, res: Response) {
   );
   if (!claimed) return res.status(404).json({ error: GONE });
 
-  await Workspace.updateOne(
+  await collection.updateOne(
     { _id: ws._id, "members.userId": { $ne: new mongoose.Types.ObjectId(String(uid)) } },
     { $push: { members: { userId: uid, role: inv.role } } }
   );
-  res.json({ ok: true, workspaceId: String(ws._id) });
+  await recordActivity({ collectionId: ws._id, actorId: uid, type: "member_joined" });
+  res.json({ ok: true, collectionId: String(ws._id) });
 }
 
 export async function decline(req: Request, res: Response) {

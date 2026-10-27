@@ -3,9 +3,10 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { User } from "../models/User.js";
-import { Workspace } from "../models/Workspace.js";
+import { collection } from "../models/Collection.js";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { Invitation } from "../models/Invitation.js";
+import { Activity, NotificationState } from "../models/Activity.js";
 import { sendMail } from "../services/mailer.js";
 import * as tpl from "../services/emailTemplates.js";
 import {
@@ -44,8 +45,8 @@ export async function getAccount(_req: Request, res: Response) {
   );
   if (!user) return res.status(404).json({ error: "User not found" });
 
-  // shared workspaces need a decision before an account can be deleted, so the page needs their members
-  const owned = await Workspace.find({ ownerId: id }).select("name isDefault members").lean();
+  // shared collections need a decision before an account can be deleted, so the page needs their members
+  const owned = await collection.find({ ownerId: id }).select("name isDefault members").lean();
   const memberIds = [...new Set(owned.flatMap((w) => w.members.map((m) => String(m.userId))))];
   const people = memberIds.length ? await User.find({ _id: { $in: memberIds } }).select("email").lean() : [];
   const emailOf = (uid: unknown) => people.find((p) => String(p._id) === String(uid))?.email ?? "unknown";
@@ -59,7 +60,7 @@ export async function getAccount(_req: Request, res: Response) {
       createdAt: user.createdAt,
       termsVersion: user.termsVersion ?? null,
     },
-    ownedWorkspaces: owned.map((w) => ({
+    ownedcollections: owned.map((w) => ({
       id: String(w._id),
       name: w.name,
       isDefault: !!w.isDefault,
@@ -189,19 +190,19 @@ export async function exportData(_req: Request, res: Response) {
   );
   if (!user) return res.status(404).json({ error: "User not found" });
 
-  const owned = await Workspace.find({ ownerId: id }).lean();
+  const owned = await collection.find({ ownerId: id }).lean();
   const ownedIds = new Set(owned.map((w) => String(w._id)));
-  const memberships = await Workspace.find({ "members.userId": id }).select("name members").lean();
+  const memberships = await collection.find({ "members.userId": id }).select("name members").lean();
 
   const everyone = [...new Set([...owned.flatMap((w) => w.members.map((m) => String(m.userId)))])];
   const people = everyone.length ? await User.find({ _id: { $in: everyone } }).select("email").lean() : [];
   const emailOf = (uid: unknown) => people.find((p) => String(p._id) === String(uid))?.email ?? "unknown";
 
   const ownedItems = ownedIds.size
-    ? await ResearchItem.find({ workspaceId: { $in: [...ownedIds] } }).limit(5000).lean()
+    ? await ResearchItem.find({ collectionId: { $in: [...ownedIds] } }).limit(5000).lean()
     : [];
-  const myClips = await ResearchItem.find({ userId: id }).select("workspaceId source citations aiOutput tags createdAt").lean();
-  const commented = await ResearchItem.find({ "comments.userId": id }).select("workspaceId source.title comments").lean();
+  const myClips = await ResearchItem.find({ userId: id }).select("collectionId source citations aiOutput tags createdAt").lean();
+  const commented = await ResearchItem.find({ "comments.userId": id }).select("collectionId source.title comments").lean();
 
   const strip = <T extends Record<string, unknown>>(o: T) => {
     const { __v, ...rest } = o as T & { __v?: unknown };
@@ -219,18 +220,18 @@ export async function exportData(_req: Request, res: Response) {
       agreedToTermsVersion: user.termsVersion ?? null,
       agreedToTermsAt: user.termsAcceptedAt ?? null,
     },
-    workspacesYouOwn: owned.map((w) => ({
+    collectionsYouOwn: owned.map((w) => ({
       ...strip(w),
       members: w.members.map((m) => ({ email: emailOf(m.userId), role: m.role, addedAt: m.addedAt })),
-      clips: ownedItems.filter((i) => String(i.workspaceId) === String(w._id)).map(strip),
+      clips: ownedItems.filter((i) => String(i.collectionId) === String(w._id)).map(strip),
     })),
-    workspacesYouBelongTo: memberships.map((w) => ({
+    collectionsYouBelongTo: memberships.map((w) => ({
       name: w.name,
       yourRole: w.members.find((m) => String(m.userId) === id)?.role,
     })),
-    yourClipsInOthersWorkspaces: myClips.filter((c) => !ownedIds.has(String(c.workspaceId))).map(strip),
-    yourCommentsInOthersWorkspaces: commented
-      .filter((c) => !ownedIds.has(String(c.workspaceId)))
+    yourClipsInOtherscollections: myClips.filter((c) => !ownedIds.has(String(c.collectionId))).map(strip),
+    yourCommentsInOtherscollections: commented
+      .filter((c) => !ownedIds.has(String(c.collectionId)))
       .map((c) => ({
         clipTitle: c.source?.title,
         comments: c.comments.filter((m) => String(m.userId) === id).map((m) => ({ text: m.text, createdAt: m.createdAt })),
@@ -247,7 +248,7 @@ const decisionSchema = z.union([
 
 export async function deleteAccount(req: Request, res: Response) {
   const p = z
-    .object({ password: passwordBody, workspaces: z.record(z.string(), decisionSchema).default({}) })
+    .object({ password: passwordBody, collections: z.record(z.string(), decisionSchema).default({}) })
     .safeParse(req.body);
   if (!p.success) return res.status(400).json({ error: firstError(p.error) });
 
@@ -255,14 +256,14 @@ export async function deleteAccount(req: Request, res: Response) {
   if (!user) return;
   const id = String(user._id);
 
-  // 1. Work out what happens to every workspace this person owns BEFORE touching anything.
-  const owned = await Workspace.find({ ownerId: id });
+  // 1. Work out what happens to every collection this person owns BEFORE touching anything.
+  const owned = await collection.find({ ownerId: id });
   const plan: { ws: (typeof owned)[number]; action: "delete" | "transfer"; to?: string }[] = [];
   const undecided: string[] = [];
 
   for (const ws of owned) {
     const memberIds = ws.members.map((m) => String(m.userId));
-    const choice = p.data.workspaces[String(ws._id)];
+    const choice = p.data.collections[String(ws._id)];
     if (memberIds.length === 0) {
       plan.push({ ws, action: "delete" }); // nobody else is in it
     } else if (!choice) {
@@ -277,28 +278,29 @@ export async function deleteAccount(req: Request, res: Response) {
   }
   if (undecided.length) {
     return res.status(400).json({
-      error: `Decide what happens to your shared workspaces: ${undecided.join(", ")}.`,
-      code: "WORKSPACE_DECISION_REQUIRED",
+      error: `Decide what happens to your shared collections: ${undecided.join(", ")}.`,
+      code: "collection_DECISION_REQUIRED",
     });
   }
 
   // 2. Do the work. The account itself goes last, so a failure part-way can simply be retried.
   for (const step of plan) {
     if (step.action === "delete") {
-      await ResearchItem.deleteMany({ workspaceId: step.ws._id });
-      await Invitation.deleteMany({ workspaceId: step.ws._id });
-      await Workspace.deleteOne({ _id: step.ws._id });
+      await ResearchItem.deleteMany({ collectionId: step.ws._id });
+      await Invitation.deleteMany({ collectionId: step.ws._id });
+      await Activity.deleteMany({ collectionId: step.ws._id });
+      await collection.deleteOne({ _id: step.ws._id });
     } else {
-      // isDefault off: the new owner may already have their own Personal workspace (one per owner)
-      await Workspace.updateOne(
+      // isDefault off: the new owner may already have their own Personal collection (one per owner)
+      await collection.updateOne(
         { _id: step.ws._id },
         { $set: { ownerId: step.to, isDefault: false }, $pull: { members: { userId: step.to } } }
       );
     }
   }
-  await Workspace.updateMany({ "members.userId": id }, { $pull: { members: { userId: id } } });
+  await collection.updateMany({ "members.userId": id }, { $pull: { members: { userId: id } } });
 
-  // What they added to workspaces owned by others stays with those workspaces, minus their identity.
+  // What they added to collections owned by others stays with those collections, minus their identity.
   await ResearchItem.updateMany({ userId: id }, { $set: { userId: null } });
   await ResearchItem.updateMany(
     { "comments.userId": id },
@@ -308,6 +310,10 @@ export async function deleteAccount(req: Request, res: Response) {
 
   // invitations sent to or by this person go with the account
   await Invitation.deleteMany({ $or: [{ inviteeId: id }, { inviterId: id }] });
+
+  // their activity and notification state go with the account
+  await Activity.deleteMany({ $or: [{ actorId: id }, { targetUserId: id }] });
+  await NotificationState.deleteOne({ userId: id });
 
   await User.deleteOne({ _id: id });
   fire(sendMail(tpl.accountDeletedEmail(user.email)));

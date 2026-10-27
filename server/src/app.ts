@@ -1,3 +1,4 @@
+console.log("app.ts loaded", new Date().toISOString());
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -5,7 +6,7 @@ import rateLimit from "express-rate-limit";
 import authRoutes from "./routes/authRoutes.js";
 import accountRoutes from "./routes/accountRoutes.js";
 import researchRoutes from "./routes/researchRoutes.js";
-import workspaceRoutes from "./routes/workspaceRoutes.js";
+import collectionRoutes from "./routes/collectionRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
@@ -55,7 +56,8 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/research", researchRoutes);
-app.use("/api/workspaces", workspaceRoutes);
+app.use("/api/collections", collectionRoutes);
+
 
 app.use(errorHandler);
 

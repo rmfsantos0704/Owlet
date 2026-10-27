@@ -3,14 +3,14 @@ import { Request, Response } from "express";
 import mongoose, { type UpdateQuery } from "mongoose";
 import { z } from "zod";
 import { ResearchItem } from "../models/ResearchItem.js";
-import { Workspace } from "../models/Workspace.js";
+import { collection } from "../models/Collection.js";
 import { User } from "../models/User.js";
 import { analyzeText } from "../services/groq.js";
 import { buildCitations } from "../services/citations.js";
 import { extractPdf, PdfImportError } from "../services/pdfImport.js";
 import { streamPdf } from "../services/pdf.js";
 import { toBibtex, toCsv } from "../services/export.js";
-import { atLeast, ensureDefaultWorkspace, roleIn, workspaceIds } from "../services/access.js";
+import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../services/access.js";
 
 const clipSchema = z.object({
   url: z.string().url(),
@@ -18,7 +18,7 @@ const clipSchema = z.object({
   author: z.string().max(200).optional(),
   publishedDate: z.string().max(100).optional(),
   rawText: z.string().min(50).max(200000),
-  workspaceId: z.string().optional(),
+  collectionId: z.string().optional(),
 });
 const highlightSchema = z.object({
   text: z.string().trim().min(1).max(2000),
@@ -38,22 +38,22 @@ const sourceSchema = z.object({
   publishedDate: z.string().trim().max(100).optional(),
 });
 
-// Resolves the workspace a clip/import goes into; answers the request itself and returns null on failure.
-async function targetWorkspace(res: Response, userId: string, workspaceId?: string) {
-  if (!workspaceId) return ensureDefaultWorkspace(userId);
-  if (!mongoose.isValidObjectId(workspaceId)) {
-    res.status(400).json({ error: "Bad workspace id" });
+// Resolves the collection a clip/import goes into; answers the request itself and returns null on failure.
+async function targetcollection(res: Response, userId: string, collectionId?: string) {
+  if (!collectionId) return ensureDefaultcollection(userId);
+  if (!mongoose.isValidObjectId(collectionId)) {
+    res.status(400).json({ error: "Bad collection id" });
     return null;
   }
-  const ws = await Workspace.findById(workspaceId);
+  const ws = await collection.findById(collectionId);
   if (!ws || !atLeast(roleIn(ws, userId), "editor")) {
-    res.status(403).json({ error: "You can't add clips to that workspace" });
+    res.status(403).json({ error: "You can't add clips to that collection" });
     return null;
   }
   return ws;
 }
 
-// Runs the AI summary with the workspace's settings; a failure never blocks saving.
+// Runs the AI summary with the collection's settings; a failure never blocks saving.
 async function runAi(ws: { aiSettings?: any }, title: string, text: string) {
   try {
     const ai = await analyzeText(title, text, {
@@ -74,10 +74,10 @@ export async function clip(req: Request, res: Response) {
   const d = parsed.data;
   const userId = res.locals.userId;
 
-  const ws = await targetWorkspace(res, userId, d.workspaceId);
+  const ws = await targetcollection(res, userId, d.collectionId);
   if (!ws) return;
 
-  const existing = await ResearchItem.findOne({ workspaceId: ws._id, "source.dedupeKey": d.url }).select("_id");
+  const existing = await ResearchItem.findOne({ collectionId: ws._id, "source.dedupeKey": d.url }).select("_id");
   if (existing) return res.status(409).json({ error: "Already clipped", id: existing.id });
 
   const domain = new URL(d.url).hostname;
@@ -85,7 +85,7 @@ export async function clip(req: Request, res: Response) {
 
   const item = await ResearchItem.create({
     userId,
-    workspaceId: ws._id,
+    collectionId: ws._id,
     source: {
       kind: "web",
       url: d.url,
@@ -115,13 +115,13 @@ export async function importPdf(req: Request, res: Response) {
   }
 
   const userId = res.locals.userId;
-  const ws = await targetWorkspace(res, userId, typeof req.body?.workspaceId === "string" ? req.body.workspaceId : undefined);
+  const ws = await targetcollection(res, userId, typeof req.body?.collectionId === "string" ? req.body.collectionId : undefined);
   if (!ws) return;
 
-  // same file content in the same workspace = duplicate, even if renamed
+  // same file content in the same collection = duplicate, even if renamed
   const dedupeKey = "pdf:" + createHash("sha256").update(file.buffer).digest("hex");
-  const existing = await ResearchItem.findOne({ workspaceId: ws._id, "source.dedupeKey": dedupeKey }).select("_id");
-  if (existing) return res.status(409).json({ error: "This PDF is already in the workspace", id: existing.id });
+  const existing = await ResearchItem.findOne({ collectionId: ws._id, "source.dedupeKey": dedupeKey }).select("_id");
+  if (existing) return res.status(409).json({ error: "This PDF is already in the collection", id: existing.id });
 
   let pdf;
   try {
@@ -140,7 +140,7 @@ export async function importPdf(req: Request, res: Response) {
 
   const item = await ResearchItem.create({
     userId,
-    workspaceId: ws._id,
+    collectionId: ws._id,
     source: {
       kind: "pdf",
       dedupeKey,
@@ -158,10 +158,10 @@ export async function importPdf(req: Request, res: Response) {
 }
 
 async function buildFilter(req: Request, userId: string) {
-  const ids = await workspaceIds(userId, "viewer");
-  const wid = typeof req.query.workspaceId === "string" ? req.query.workspaceId : "";
+  const ids = await collectionIds(userId, "viewer");
+  const wid = typeof req.query.collectionId === "string" ? req.query.collectionId : "";
   const filter: Record<string, unknown> = {
-    workspaceId: { $in: wid ? ids.filter((i) => String(i) === wid) : ids },
+    collectionId: { $in: wid ? ids.filter((i) => String(i) === wid) : ids },
   };
   if (typeof req.query.tag === "string" && req.query.tag) filter.tags = req.query.tag;
   if (typeof req.query.q === "string" && req.query.q.trim()) {
@@ -182,18 +182,18 @@ export async function list(req: Request, res: Response) {
 export async function getOne(req: Request, res: Response) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
-  const ids = await workspaceIds(res.locals.userId, "viewer");
-  const item = await ResearchItem.findOne({ _id: id, workspaceId: { $in: ids } });
+  const ids = await collectionIds(res.locals.userId, "viewer");
+  const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } });
   if (!item) return res.status(404).json({ error: "Not found" });
-  const ws = await Workspace.findById(item.workspaceId).select("ownerId members");
+  const ws = await collection.findById(item.collectionId).select("ownerId members");
   res.json({ item, role: ws ? roleIn(ws, res.locals.userId) : null });
 }
 
 export async function remove(req: Request, res: Response) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
-  const ids = await workspaceIds(res.locals.userId, "editor");
-  const result = await ResearchItem.deleteOne({ _id: id, workspaceId: { $in: ids } });
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const result = await ResearchItem.deleteOne({ _id: id, collectionId: { $in: ids } });
   if (!result.deletedCount) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
 }
@@ -202,8 +202,8 @@ export async function remove(req: Request, res: Response) {
 async function mutate(req: Request, res: Response, update: UpdateQuery<any>, status = 200) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
-  const ids = await workspaceIds(res.locals.userId, "editor");
-  const item = await ResearchItem.findOneAndUpdate({ _id: id, workspaceId: { $in: ids } }, update, { new: true });
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const item = await ResearchItem.findOneAndUpdate({ _id: id, collectionId: { $in: ids } }, update, { new: true });
   if (!item) return res.status(404).json({ error: "Not found" });
   res.status(status).json({ highlights: item.highlights, comments: item.comments, tags: item.tags });
 }
@@ -255,15 +255,15 @@ export async function updateSource(req: Request, res: Response) {
   if (!p.success) return res.status(400).json({ error: "A title is required" });
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
-  const ids = await workspaceIds(res.locals.userId, "editor");
+  const ids = await collectionIds(res.locals.userId, "editor");
 
-  const found = await ResearchItem.findOne({ _id: id, workspaceId: { $in: ids } }).select("source").lean();
+  const found = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("source").lean();
   if (!found) return res.status(404).json({ error: "Not found" });
   const s = (found.source ?? {}) as { url?: string; domain?: string };
 
   const { title, author = "", publishedDate = "" } = p.data;
   const item = await ResearchItem.findOneAndUpdate(
-    { _id: id, workspaceId: { $in: ids } },
+    { _id: id, collectionId: { $in: ids } },
     {
       $set: {
         "source.title": title,
@@ -281,8 +281,8 @@ export async function updateSource(req: Request, res: Response) {
 export async function pdf(req: Request, res: Response) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
-  const ids = await workspaceIds(res.locals.userId, "viewer");
-  const item = await ResearchItem.findOne({ _id: id, workspaceId: { $in: ids } })
+  const ids = await collectionIds(res.locals.userId, "viewer");
+  const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } })
     .select("-content.rawText")
     .lean();
   if (!item) return res.status(404).json({ error: "Not found" });
@@ -315,20 +315,20 @@ export async function exportItems(req: Request, res: Response) {
   res.send(body);
 }
 
-// Re-runs the AI summary with the workspace's CURRENT settings. Tags are left alone.
+// Re-runs the AI summary with the collection's CURRENT settings. Tags are left alone.
 export async function regenerate(req: Request, res: Response) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
-  const ids = await workspaceIds(res.locals.userId, "editor");
-  const item = await ResearchItem.findOne({ _id: id, workspaceId: { $in: ids } }).select(
-    "workspaceId source.kind source.title content.rawText"
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select(
+    "collectionId source.kind source.title content.rawText"
   );
   if (!item) return res.status(404).json({ error: "Not found" });
 
   const text = item.content?.rawText ?? "";
   if (text.length < 50) return res.status(422).json({ error: "This clip has no text to summarize" });
 
-  const ws = await Workspace.findById(item.workspaceId).select("aiSettings");
+  const ws = await collection.findById(item.collectionId).select("aiSettings");
   const settings: any = ws?.aiSettings ?? {};
   const input = item.source?.kind === "pdf" ? forAi(text) : text;
 
