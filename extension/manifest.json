@@ -18,5 +18,18 @@
     }
   },
   "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["http://localhost:4000/*"]
+  "host_permissions": ["http://localhost:4000/*"],
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:5173/*"],
+      "js": ["pageHook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["http://localhost:5173/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
 }

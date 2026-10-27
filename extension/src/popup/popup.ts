@@ -343,6 +343,13 @@ $("saveSettings").addEventListener("click", async () => {
 
 render();
 
+// the dashboard logged in or out (bridge.ts): follow it while the popup is open
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.token) return;
+  workspaces = [];
+  void render();
+});
+
 // ---------- login ----------
 
 async function handleLogin(e: SubmitEvent) {  

@@ -9,7 +9,12 @@ rmSync("dist", { recursive: true, force: true });
 mkdirSync("dist/fonts", { recursive: true });
 
 await build({
-  entryPoints: { popup: "src/popup/popup.ts", content: "src/content.ts" },
+  entryPoints: {
+    popup: "src/popup/popup.ts",
+    content: "src/content.ts",
+    bridge: "src/bridge.ts", // syncs login with the dashboard
+    pageHook: "src/pageHook.ts", // runs inside the dashboard page
+  },
   bundle: true,
   outdir: "dist",
   format: "iife",

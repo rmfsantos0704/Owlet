@@ -5,8 +5,12 @@ export async function getToken(): Promise<string | null> {
   const { token } = await chrome.storage.local.get("token");
   return typeof token === "string" ? token : null;
 }
-export const setToken = (token: string) => chrome.storage.local.set({ token });
-export const clearToken = () => chrome.storage.local.remove("token");
+// tokenAt records when the login last changed, so the dashboard bridge (bridge.ts) can tell which side is newer
+export const setToken = (token: string) => chrome.storage.local.set({ token, tokenAt: Date.now() });
+export const clearToken = async () => {
+  await chrome.storage.local.set({ tokenAt: Date.now() });
+  await chrome.storage.local.remove("token");
+};
 
 export async function api(path: string, options: { method?: string; body?: unknown } = {}) {
   const token = await getToken();
