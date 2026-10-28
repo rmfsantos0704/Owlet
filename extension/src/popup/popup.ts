@@ -27,6 +27,7 @@ let collections: Collection[] = [];
 let clippable = false;
 let clipping = false;
 let lastCollectionId = ""; // last real selection, so Cancel can go back to it
+let hasLink = false; // whether the selected collection currently has a usable join link
 
 const open = (url: string) => chrome.tabs.create({ url });
 const selected = () => collections.find((w) => w.id === $<HTMLSelectElement>("collection").value);
@@ -126,15 +127,19 @@ function fillSettings() {
     $<HTMLInputElement>(id).disabled = !owner;
   }
   $("ownerNote").hidden = owner || !ws;
-  $("shareRow").hidden = !(owner && !ws?.isDefault); // the Personal collection can't be shared
+  const canShare = !!(owner && !ws?.isDefault); // the Personal collection can't be shared
+  $("shareRow").hidden = !canShare;
   shareNote();
+  if (canShare) void refreshLinkInfo();
   $("aiHint").textContent = ws
     ? `AI summary: ${FORMATS[s?.format ?? ""] ?? "Paragraph"} \u00B7 ${LENGTHS[s?.length ?? ""] ?? "Medium"}`
     : "AI summary";
   updateClipEnabled();
 }
 
-// the line under the "Copy join link" button; pass a url to show it for copying by hand
+// ---------- join link ----------
+
+// the line under the link buttons; pass a url to show it for copying by hand
 function shareNote(text = "", url = "") {
   const note = $("copyLinkNote");
   note.textContent = text;
@@ -145,56 +150,123 @@ function shareNote(text = "", url = "") {
   if (url) field.select();
 }
 
-// Copies the collection's join link, making a viewer link (7 days) first if there isn't a working one.
-async function copyJoinLink() {
+function setSelect(id: string, value: string) {
+  const sel = $<HTMLSelectElement>(id);
+  if (![...sel.options].some((o) => o.value === value)) sel.add(new Option(value, value));
+  sel.value = value;
+}
+
+function resetLinkLabels() {
+  $("copyLinkLabel").textContent = "Copy link";
+  $("newLinkLabel").textContent = hasLink ? "Replace link" : "New link";
+}
+
+// Shows the current link's details and loads its role and use limit into the pickers so they can be tweaked.
+function applyLink(link: JoinLink | null | undefined) {
+  const info = $("linkInfo");
+  hasLink = linkUsable(link);
+  if (linkUsable(link)) {
+    const uses = link.maxUses === null ? `${link.uses} joined` : `${link.uses} of ${link.maxUses} used`;
+    info.innerHTML = `<strong>Active</strong> · joins as ${link.role} · expires ${new Date(link.expiresAt).toLocaleDateString()} · ${uses}. A new link replaces this one.`;
+    setSelect("linkRole", link.role);
+    setSelect("linkUses", link.maxUses === null ? "" : String(link.maxUses));
+  } else if (link) {
+    info.textContent = link.expired ? "The link has expired. Create a new one." : "The link has reached its use limit. Create a new one.";
+  } else {
+    info.textContent = "No active link. Choose the settings below and create one.";
+  }
+  resetLinkLabels();
+}
+
+async function refreshLinkInfo() {
   const ws = selected();
   if (!ws || ws.role !== "owner" || ws.isDefault) return;
-  const btn = $<HTMLButtonElement>("copyLinkBtn");
-  const label = $("copyLinkLabel");
-  btn.disabled = true;
-  label.textContent = "Getting link\u2026";
+  $("linkInfo").textContent = "Checking link…";
+  try {
+    const got = await api(`/collections/${ws.id}`);
+    if (selected()?.id !== ws.id) return; // the person switched collections meanwhile
+    if (!got.ok) {
+      $("linkInfo").textContent = "";
+      return;
+    }
+    applyLink(got.data.collection?.joinLink);
+  } catch {
+    if (selected()?.id === ws.id) $("linkInfo").textContent = "";
+  }
+}
+
+function linkOptions() {
+  const uses = $<HTMLSelectElement>("linkUses").value;
+  return {
+    role: $<HTMLSelectElement>("linkRole").value,
+    expiresInDays: Number($<HTMLSelectElement>("linkExpiry").value),
+    maxUses: uses ? Number(uses) : null,
+  };
+}
+
+// "copy": copy the working link (making one with the chosen settings if there isn't one).
+// "new": always make a fresh link with the chosen settings, then copy it.
+async function shareLink(mode: "copy" | "new") {
+  const ws = selected();
+  if (!ws || ws.role !== "owner" || ws.isDefault) return;
+  const copyBtn = $<HTMLButtonElement>("copyLinkBtn");
+  const newBtn = $<HTMLButtonElement>("newLinkBtn");
+  const label = $(mode === "copy" ? "copyLinkLabel" : "newLinkLabel");
+  copyBtn.disabled = newBtn.disabled = true;
+  label.textContent = mode === "copy" ? "Getting link\u2026" : "Creating\u2026";
   shareNote();
   let copied = false;
   try {
-    const got = await api(`/collections/${ws.id}`);
-    if (got.status === 401) {
-      await clearToken();
-      await render();
-      return loginMsg("Session expired. Please log in again.");
+    let link: JoinLink | null | undefined;
+    if (mode === "copy") {
+      const got = await api(`/collections/${ws.id}`);
+      if (got.status === 401) {
+        await clearToken();
+        await render();
+        return loginMsg("Session expired. Please log in again.");
+      }
+      if (!got.ok) return shareNote(got.data.error ?? "Couldn't load the collection.");
+      link = got.data.collection?.joinLink;
     }
-    if (!got.ok) return shareNote(got.data.error ?? "Couldn't load the collection.");
 
-    let link = got.data.collection?.joinLink as JoinLink | null | undefined;
-    if (!linkUsable(link)) {
-      const made = await api(`/collections/${ws.id}/join-link`, {
-        method: "POST",
-        body: { role: "viewer", expiresInDays: 7, maxUses: null },
-      });
+    let created = false;
+    if (mode === "new" || !linkUsable(link)) {
+      const made = await api(`/collections/${ws.id}/join-link`, { method: "POST", body: linkOptions() });
+      if (made.status === 401) {
+        await clearToken();
+        await render();
+        return loginMsg("Session expired. Please log in again.");
+      }
       if (made.status === 429) return shareNote("Too many requests. Try again in a little while.");
       if (!made.ok) return shareNote(made.data.error ?? "Couldn't create the link.");
       link = made.data.joinLink as JoinLink;
+      created = true;
     }
+    if (!link) return shareNote("Couldn't get the link.");
 
+    applyLink(link);
     const url = `${DASHBOARD_URL}/join/${link.token}`;
-    const info = `Joins as ${link.role}, expires ${new Date(link.expiresAt).toLocaleDateString()}.`;
+    const prefix = created ? "New link created" : "Copied";
     try {
       await navigator.clipboard.writeText(url);
       copied = true;
-      label.textContent = "Link copied";
-      shareNote(`Copied. ${info}`);
+      label.textContent = created ? "Created" : "Copied";
+      shareNote(`${prefix} and copied.`);
       setTimeout(() => {
-        if (!btn.disabled) label.textContent = "Copy join link";
+        if (!copyBtn.disabled) resetLinkLabels();
       }, 2000);
     } catch {
-      shareNote(`Couldn't copy automatically. ${info}`, url); // the link exists; the browser blocked copying
+      shareNote(`${prefix}, but copying was blocked. Copy it by hand:`, url); // the link exists; the browser blocked copying
     }
   } catch {
     shareNote(OFFLINE);
   } finally {
-    btn.disabled = false;
-    if (!copied) label.textContent = "Copy join link";
+    copyBtn.disabled = newBtn.disabled = false;
+    if (!copied) resetLinkLabels();
   }
 }
+
+// ---------- collections ----------
 
 async function loadCollections(preferId?: string) {
   try {
@@ -288,7 +360,8 @@ $("openSettings").addEventListener("click", () => {
   const ws = selected();
   open(ws ? `${DASHBOARD_URL}/collection/${ws.id}/settings` : DASHBOARD_URL);
 });
-$("copyLinkBtn").addEventListener("click", copyJoinLink);
+$("copyLinkBtn").addEventListener("click", () => void shareLink("copy"));
+$("newLinkBtn").addEventListener("click", () => void shareLink("new"));
 $("statusLink").addEventListener("click", () => {
   const url = $("statusLink").dataset.url;
   if (url) open(url);
@@ -387,35 +460,35 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // ---------- login ----------
 
-async function handleLogin(e: SubmitEvent) {  
-  e.preventDefault();  
-  loginMsg("");  
-  
-  const email = $<HTMLInputElement>("email").value.trim();  
-  const password = $<HTMLInputElement>("password").value;  
-  if (!email || !password) return;  
-  
-  const btn = $<HTMLButtonElement>("loginBtn");  
-  btn.disabled = true;  
-  $("loginSpinner").hidden = false;  
-  $("loginLabel").textContent = "Logging in…";  
-  
-  try {    
-    const r = await api("/auth/login", { method: "POST", body: { email, password } });    
-    
-    if (r.status === 429) return loginMsg("Too many attempts. Wait a few minutes and try again.");    
-    if (!r.ok) return loginMsg(r.data.error || "Incorrect email or password.");    
-    if (!r.data.token) return loginMsg("The server didn't return a login token.");    
-    
-    await setToken(r.data.token);    
-    $<HTMLInputElement>("password").value = "";    
-    await render();  
-  } catch {    
-    loginMsg(OFFLINE);  
-  } finally {    
-    btn.disabled = false;    
-    $("loginSpinner").hidden = true;    
-    $("loginLabel").textContent = "Log in";  
+async function handleLogin(e: SubmitEvent) {
+  e.preventDefault();
+  loginMsg("");
+
+  const email = $<HTMLInputElement>("email").value.trim();
+  const password = $<HTMLInputElement>("password").value;
+  if (!email || !password) return;
+
+  const btn = $<HTMLButtonElement>("loginBtn");
+  btn.disabled = true;
+  $("loginSpinner").hidden = false;
+  $("loginLabel").textContent = "Logging in…";
+
+  try {
+    const r = await api("/auth/login", { method: "POST", body: { email, password } });
+
+    if (r.status === 429) return loginMsg("Too many attempts. Wait a few minutes and try again.");
+    if (!r.ok) return loginMsg(r.data.error || "Incorrect email or password.");
+    if (!r.data.token) return loginMsg("The server didn't return a login token.");
+
+    await setToken(r.data.token);
+    $<HTMLInputElement>("password").value = "";
+    await render();
+  } catch {
+    loginMsg(OFFLINE);
+  } finally {
+    btn.disabled = false;
+    $("loginSpinner").hidden = true;
+    $("loginLabel").textContent = "Log in";
   }
 }
 
