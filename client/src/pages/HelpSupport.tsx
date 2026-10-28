@@ -11,9 +11,7 @@ import {
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
-
-// Change this to the address people should write to.
-const SUPPORT_EMAIL = "support@owlet.app";
+import SupportModal from "../components/SupportModal"; // adjust path to match where the file lives
 
 const GUIDES: { icon: LucideIcon; title: string; text: string; accent: string }[] = [
   {
@@ -81,6 +79,7 @@ const FAQ: [string, string][] = [
 
 export default function HelpSupport() {
   const [open, setOpen] = useState<number | null>(0);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   return (
     <div>
@@ -146,12 +145,13 @@ export default function HelpSupport() {
             <p className="mt-2 text-xs leading-5 text-blue-100/70">
               Tell us what you were doing and what happened. Screenshots help.
             </p>
-            <a
-              href={`mailto:${SUPPORT_EMAIL}?subject=Owlet%20support`}
+            <button
+              type="button"
+              onClick={() => setSupportOpen(true)}
               className="mt-4 block w-full rounded-xl bg-white py-2.5 text-center text-xs font-bold text-brand hover:bg-blue-50"
             >
               Email support
-            </a>
+            </button>
           </div>
 
           <div className="card p-5">
@@ -167,6 +167,8 @@ export default function HelpSupport() {
           </div>
         </div>
       </section>
+
+      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
     </div>
   );
 }

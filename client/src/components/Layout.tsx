@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
+import { useDialog } from "../context/DialogContext";
 import NotificationsBell from "./NotificationsBell";
 import CollectionMenu from "./CollectionMenu";
 
@@ -34,6 +35,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const { collections = [], current, select, create, pinned, archived } = useCollections();
   const navigate = useNavigate();
+  const dialog = useDialog();
   const { pathname } = useLocation();
   const [params] = useSearchParams();
   const [open, setOpen] = useState(false);
@@ -62,7 +64,7 @@ export default function Layout() {
       navigate("/");
       setOpen(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not create Collection");
+      void dialog.alert({ title: "Couldn't create the collection", message: err instanceof Error ? err.message : "Please try again." });
     }
   }
 

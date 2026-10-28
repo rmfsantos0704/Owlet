@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Check, ChevronLeft, Copy, FlaskConical, Link2, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, Copy, FlaskConical, Link2, Power, Trash2 } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
+import { useDialog } from "../context/DialogContext";
 import type { AiSettings, JoinLink, ResearchItem, SentInvitation, collectionDetail } from "../types";
 
 const FORMATS: { value: AiSettings["format"]; label: string; hint: string }[] = [
@@ -49,7 +50,8 @@ export default function CollectionSettings() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { reload } = useCollections();
+  const { reload, select } = useCollections();
+  const dialog = useDialog();
   const [ws, setWs] = useState<collectionDetail | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -201,7 +203,14 @@ export default function CollectionSettings() {
 
   const makeLink = async () => {
     if (linkBusy) return;
-    if (ws?.joinLink && !confirm("Make a new link? The current link will stop working right away.")) return;
+    if (ws?.joinLink) {
+      const ok = await dialog.confirm({
+        title: "Make a new link?",
+        message: "The current link will stop working right away.",
+        confirmLabel: "Make new link",
+      });
+      if (!ok) return;
+    }
     setLinkBusy(true);
     await run(async () => {
       const r = await api<{ joinLink: JoinLink }>(`/collections/${id}/join-link`, {
@@ -213,8 +222,14 @@ export default function CollectionSettings() {
     setLinkBusy(false);
   };
 
-  const revokeLink = () => {
-    if (!confirm("Turn off the join link? Anyone who hasn't joined yet will no longer be able to.")) return;
+  const revokeLink = async () => {
+    const ok = await dialog.confirm({
+      title: "Turn off the join link?",
+      message: "Anyone who hasn't joined yet will no longer be able to.",
+      confirmLabel: "Turn off link",
+      danger: true,
+    });
+    if (!ok) return;
     run(async () => {
       await api(`/collections/${id}/join-link`, { method: "DELETE" });
       setWs((w) => (w ? { ...w, joinLink: null } : w));
@@ -237,8 +252,23 @@ export default function CollectionSettings() {
       await refresh();
     }, "Role updated");
 
-  const removeMember = (uid: string, leaving: boolean) => {
-    if (!confirm(leaving ? "Leave this Collection?" : "Remove this member?")) return;
+  const removeMember = async (uid: string, leaving: boolean) => {
+    const ok = await dialog.confirm(
+      leaving
+        ? {
+            title: "Leave this collection?",
+            message: "You'll lose access until someone invites you again.",
+            confirmLabel: "Leave",
+            danger: true,
+          }
+        : {
+            title: "Remove this member?",
+            message: "They'll lose access to this collection.",
+            confirmLabel: "Remove",
+            danger: true,
+          }
+    );
+    if (!ok) return;
     run(async () => {
       await api(`/collections/${id}/members/${uid}`, { method: "DELETE" });
       if (leaving) {
@@ -250,8 +280,14 @@ export default function CollectionSettings() {
     });
   };
 
-  const deleteCollection = () => {
-    if (!confirm("Delete this Collection and ALL its clips? This can't be undone.")) return;
+  const deleteCollection = async () => {
+    const ok = await dialog.confirm({
+      title: "Delete this collection?",
+      message: "Every clip, highlight and comment in it is permanently deleted. This can't be undone.",
+      confirmLabel: "Delete collection",
+      danger: true,
+    });
+    if (!ok) return;
     run(async () => {
       await api(`/collections/${id}`, { method: "DELETE" });
       await reload();
@@ -263,10 +299,17 @@ export default function CollectionSettings() {
 
   const isOwner = ws.role === "owner";
   const me = user?.email.toLowerCase();
+  const linkActive =
+    !!ws.joinLink && !ws.joinLink.expired && (ws.joinLink.maxUses === null || ws.joinLink.uses < ws.joinLink.maxUses);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Link to="/" className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand">
+      {/* the library shows whichever collection is selected, so select this one before going back */}
+      <Link
+        to="/"
+        onClick={() => id && select(id)}
+        className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand"
+      >
         <ChevronLeft className="size-4" /> Back to {ws.name}
       </Link>
 
@@ -282,10 +325,36 @@ export default function CollectionSettings() {
 
       <form onSubmit={save} className="space-y-6">
         <fieldset disabled={!isOwner || saving} className="space-y-6">
-          <section className="card space-y-3 p-5">
+          <section className="card space-y-4 p-5">
             <h2 className="font-semibold text-ink">General</h2>
-            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required placeholder="Collection name" className="field" />
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={300} rows={2} placeholder="Description (optional)" className="field" />
+            <div>
+              <label htmlFor="collection-name" className="mb-1.5 block text-sm font-medium text-ink">
+                Name
+              </label>
+              <input
+                id="collection-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={80}
+                required
+                placeholder="Collection name"
+                className="field"
+              />
+            </div>
+            <div>
+              <label htmlFor="collection-description" className="mb-1.5 block text-sm font-medium text-ink">
+                Description <span className="font-normal text-slate-400">(optional)</span>
+              </label>
+              <textarea
+                id="collection-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={300}
+                rows={2}
+                placeholder="What is this collection for?"
+                className="field"
+              />
+            </div>
           </section>
 
           <section className="card space-y-4 p-5">
@@ -509,7 +578,7 @@ export default function CollectionSettings() {
             </p>
           </div>
 
-          {ws.joinLink && !ws.joinLink.expired && (ws.joinLink.maxUses === null || ws.joinLink.uses < ws.joinLink.maxUses) ? (
+          {linkActive && ws.joinLink ? (
             <div className="space-y-2">
               <div className="flex gap-2">
                 <input
@@ -531,9 +600,6 @@ export default function CollectionSettings() {
                 {new Date(ws.joinLink.expiresAt).toLocaleDateString()} · {ws.joinLink.uses}
                 {ws.joinLink.maxUses ? ` of ${ws.joinLink.maxUses}` : ""} joined
               </p>
-              <button type="button" onClick={revokeLink} className="text-xs font-medium text-red-600 hover:underline">
-                Turn off link
-              </button>
             </div>
           ) : (
             ws.joinLink && (
@@ -560,9 +626,22 @@ export default function CollectionSettings() {
               <option value="10">10 uses</option>
               <option value="25">25 uses</option>
             </select>
-            <button type="button" onClick={makeLink} disabled={linkBusy} className="btn-primary">
-              {ws.joinLink ? "Make new link" : "Create link"}
-            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={makeLink} disabled={linkBusy} className="btn-primary flex-1 sm:flex-none">
+                {ws.joinLink ? "Make new link" : "Create link"}
+              </button>
+              {linkActive && (
+                <button
+                  type="button"
+                  onClick={revokeLink}
+                  title="Turn off link"
+                  aria-label="Turn off link"
+                  className="btn-secondary !px-3 text-red-600 hover:!bg-red-50"
+                >
+                  <Power className="size-4" />
+                </button>
+              )}
+            </div>
           </div>
           {linkRole === "editor" && (
             <p className="text-[11px] text-amber-600">

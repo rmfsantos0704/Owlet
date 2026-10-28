@@ -94,6 +94,7 @@ export type AiEvidence = { source: number; quote: string; verified: boolean };
 export type AiSession = {
   id: string;
   collectionId: string;
+  title?: string; // user-chosen name; missing/empty on older sessions
   mode: "Research brief" | "Summarize" | "Compare sources";
   prompt: string;
   summary: string;

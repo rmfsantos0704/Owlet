@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { api } from "../services/api";
 import { useCollections } from "../context/CollectionContext";
+import { useDialog } from "../context/DialogContext";
+import EditCollectionModal from "./EditCollectionModal";
 import type { Collection } from "../types";
 
 const MENU_W = 224; // w-56
@@ -37,15 +39,17 @@ type Item = {
 
 // The three-dot menu beside a collection in the sidebar. It renders in a portal so the sidebar's
 // scroll area never clips it. Pin and Archive are personal (they only change your own sidebar);
-// Rename, Merge and Delete are for owners; everyone else can Leave.
+// Edit details, Merge and Delete are for owners; everyone else can Leave.
 export default function CollectionMenu({ collection, onNavigate }: { collection: Collection; onNavigate?: () => void }) {
   const navigate = useNavigate();
+  const dialog = useDialog();
   const { collections, current, select, reload, pinned, archived, togglePin, toggleArchive } = useCollections();
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const itemsRef = useRef<Item[]>([]);
   const [open, setOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
   const id = collection.id;
@@ -61,7 +65,7 @@ export default function CollectionMenu({ collection, onNavigate }: { collection:
     try {
       await fn();
     } catch (e) {
-      alert(e instanceof Error ? e.message : fallback);
+      await dialog.alert({ title: "Something went wrong", message: e instanceof Error ? e.message : fallback });
     }
   }
 
@@ -76,22 +80,25 @@ export default function CollectionMenu({ collection, onNavigate }: { collection:
 
   function archive() {
     if (!isArchived && collections.filter((c) => !archived.includes(c.id)).length <= 1) {
-      alert("Keep at least one collection unarchived.");
+      void dialog.alert({ title: "Can't archive this one", message: "Keep at least one collection unarchived." });
       return;
     }
     toggleArchive(id);
     if (!isArchived) leaveIfCurrent(id);
   }
 
-  function merge(target: Collection) {
+  async function merge(target: Collection) {
     const others = (collection.memberCount ?? 1) - 1;
-    const ok = window.confirm(
-      `Merge "${collection.name}" into "${target.name}"?\n\n` +
-        `All its clips move to "${target.name}" (clips already there are skipped). ` +
+    const ok = await dialog.confirm({
+      title: `Merge into "${target.name}"?`,
+      message:
+        `All the clips in "${collection.name}" move to "${target.name}" (clips already there are skipped). ` +
         `"${collection.name}" is then deleted` +
         (others > 0 ? `, and its ${others} other member${others === 1 ? "" : "s"} lose access to it` : "") +
-        `.\n\nThis can't be undone.`
-    );
+        `.\n\nThis can't be undone.`,
+      confirmLabel: "Merge",
+      danger: true,
+    });
     if (!ok) return;
     return attempt(async () => {
       const r = await api<{ moved: number; skipped: number }>(`/collections/${id}/merge`, {
@@ -102,7 +109,10 @@ export default function CollectionMenu({ collection, onNavigate }: { collection:
       select(target.id);
       navigate("/");
       onNavigate?.();
-      alert(`Moved ${r.moved} clip${r.moved === 1 ? "" : "s"}${r.skipped ? `, skipped ${r.skipped} already in "${target.name}"` : ""}.`);
+      await dialog.alert({
+        title: "Merge complete",
+        message: `Moved ${r.moved} clip${r.moved === 1 ? "" : "s"}${r.skipped ? `, skipped ${r.skipped} already in "${target.name}"` : ""}.`,
+      });
     }, "Could not merge the collections");
   }
 
@@ -119,19 +129,12 @@ export default function CollectionMenu({ collection, onNavigate }: { collection:
 
   if (removable) {
     items.push({
-      key: "rename",
-      label: "Rename",
+      key: "edit",
+      label: "Edit details",
       icon: Pencil,
-      shortcut: "R",
+      shortcut: "E",
       group: 1,
-      run: () => {
-        const name = window.prompt("Rename collection", collection.name)?.trim();
-        if (!name || name === collection.name) return;
-        return attempt(async () => {
-          await api(`/collections/${id}`, { method: "PATCH", body: { name } });
-          await reload();
-        }, "Could not rename the collection");
-      },
+      run: () => setEditing(true),
     });
     if (mergeTargets.length > 0) {
       items.push({
@@ -148,7 +151,7 @@ export default function CollectionMenu({ collection, onNavigate }: { collection:
 
   items.push({
     key: "settings",
-    label: "Settings",
+    label: "Settings & members",
     icon: Settings,
     shortcut: "S",
     group: 1,
@@ -177,10 +180,13 @@ export default function CollectionMenu({ collection, onNavigate }: { collection:
       shortcut: "D",
       group: 2,
       danger: true,
-      run: () => {
-        const ok = window.confirm(
-          `Delete "${collection.name}"? Its clips, highlights and comments are permanently removed for everyone. This can't be undone.`
-        );
+      run: async () => {
+        const ok = await dialog.confirm({
+          title: `Delete "${collection.name}"?`,
+          message: "Its clips, highlights and comments are permanently removed for everyone. This can't be undone.",
+          confirmLabel: "Delete collection",
+          danger: true,
+        });
         if (!ok) return;
         return attempt(async () => {
           await api(`/collections/${id}`, { method: "DELETE" });
@@ -200,8 +206,14 @@ export default function CollectionMenu({ collection, onNavigate }: { collection:
       shortcut: "L",
       group: 2,
       danger: true,
-      run: () => {
-        if (!window.confirm(`Leave "${collection.name}"? You'll lose access until someone invites you again.`)) return;
+      run: async () => {
+        const ok = await dialog.confirm({
+          title: `Leave "${collection.name}"?`,
+          message: "You'll lose access until someone invites you again.",
+          confirmLabel: "Leave",
+          danger: true,
+        });
+        if (!ok) return;
         return attempt(async () => {
           await api(`/collections/${id}/members/me`, { method: "DELETE" });
           await reload();
@@ -269,6 +281,7 @@ export default function CollectionMenu({ collection, onNavigate }: { collection:
 
   return (
     <>
+      <EditCollectionModal collection={collection} open={editing} onClose={() => setEditing(false)} />
       <button
         ref={btn}
         type="button"

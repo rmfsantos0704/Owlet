@@ -19,6 +19,7 @@ import AiWorkspace from "./pages/AiWorkspace";
 import Highlights from "./pages/Highlights";
 import Comments from "./pages/Comments";
 import HelpSupport from "./pages/HelpSupport";
+import { DialogProvider } from "./context/DialogContext";
 
 // A join link opened while logged out: remember it, send the person to log in, then bring them back.
 // Only join links are remembered, so this can't be used as an open redirect.
@@ -55,6 +56,7 @@ export default function App() {
   const guest = (page: ReactElement) => (user ? <Navigate to={peekReturnTo()} replace /> : page);
 
   return (
+    <DialogProvider>
     <Routes>
       <Route path="/login" element={guest(<LoginPage />)} />
       <Route path="/register" element={guest(<RegisterPage />)} />
@@ -80,5 +82,6 @@ export default function App() {
         <Route path="/account" element={<AccountPage />} />
       </Route>
     </Routes>
+    </DialogProvider>
   );
 }

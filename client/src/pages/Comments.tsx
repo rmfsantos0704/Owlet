@@ -4,6 +4,7 @@ import { MessageSquareText, Trash2 } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
+import { useDialog } from "../context/DialogContext";
 import type { ResearchItem } from "../types";
 
 const FILTERS = ["All", "On highlights", "General"] as const;
@@ -17,6 +18,7 @@ function tint(email = "") {
 
 export default function Comments() {
   const { user } = useAuth();
+  const dialog = useDialog();
   const { current, ready } = useCollections();
   const [params] = useSearchParams();
   const q = (params.get("q") ?? "").toLowerCase();
@@ -56,12 +58,13 @@ export default function Comments() {
   );
 
   async function remove(itemId: string, commentId: string) {
-    if (!confirm("Delete this comment?")) return;
+    const ok = await dialog.confirm({ title: "Delete this comment?", message: "This can't be undone.", confirmLabel: "Delete", danger: true });
+    if (!ok) return;
     try {
       const r = await api<{ comments: ResearchItem["comments"] }>(`/research/${itemId}/comments/${commentId}`, { method: "DELETE" });
       setItems((list) => list.map((i) => (i._id === itemId ? { ...i, comments: r.comments } : i)));
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not delete comment");
+      void dialog.alert({ title: "Couldn't delete the comment", message: e instanceof Error ? e.message : "Please try again." });
     }
   }
 
