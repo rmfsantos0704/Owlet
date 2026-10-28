@@ -5,8 +5,10 @@ type Collection = {
   name: string;
   role: string;
   isDefault?: boolean;
-  aiSettings: { format: string; length: string; instructions: string };
 };
+
+type AiSettings = { format: string; length: string; instructions: string };
+const AI_DEFAULTS: AiSettings = { format: "paragraph", length: "medium", instructions: "" };
 
 type JoinLink = { token: string; role: string; expiresAt: string; maxUses: number | null; uses: number; expired: boolean };
 const linkUsable = (l?: JoinLink | null): l is JoinLink =>
@@ -75,6 +77,41 @@ function flashClipDone() {
   }, 2200);
 }
 
+// ---------- AI summary settings (per clip) ----------
+
+// The settings in the form. They are sent with the next clip and remembered here for the one after.
+function readAi(): AiSettings {
+  return {
+    format: $<HTMLSelectElement>("format").value,
+    length: $<HTMLSelectElement>("length").value,
+    instructions: $<HTMLTextAreaElement>("instructions").value.trim(),
+  };
+}
+
+function updateAiHint() {
+  const s = readAi();
+  $("aiHint").textContent = `AI summary: ${FORMATS[s.format] ?? "Paragraph"} \u00B7 ${LENGTHS[s.length] ?? "Medium"}`;
+}
+
+async function loadAi() {
+  const { aiSettings } = await chrome.storage.local.get("aiSettings");
+  const s: AiSettings = { ...AI_DEFAULTS, ...(aiSettings as Partial<AiSettings> | undefined) };
+  $<HTMLSelectElement>("format").value = s.format;
+  $<HTMLSelectElement>("length").value = s.length;
+  $<HTMLTextAreaElement>("instructions").value = s.instructions;
+  updateAiHint();
+}
+
+function onAiChange() {
+  updateAiHint();
+  void chrome.storage.local.set({ aiSettings: readAi() });
+}
+
+for (const id of ["format", "length", "instructions"]) {
+  $(id).addEventListener("input", onAiChange);
+  $(id).addEventListener("change", onAiChange);
+}
+
 // ---------- data ----------
 
 async function loadPage() {
@@ -116,24 +153,13 @@ function restoreSelection() {
   fillSettings();
 }
 
+// Collection settings: only the join link lives here now, and only the owner of a shared collection gets it.
 function fillSettings() {
   const ws = selected();
-  const owner = ws?.role === "owner";
-  const s = ws?.aiSettings;
-  $<HTMLSelectElement>("format").value = s?.format ?? "paragraph";
-  $<HTMLSelectElement>("length").value = s?.length ?? "medium";
-  $<HTMLTextAreaElement>("instructions").value = s?.instructions ?? "";
-  for (const id of ["format", "length", "instructions", "saveSettings"]) {
-    $<HTMLInputElement>(id).disabled = !owner;
-  }
-  $("ownerNote").hidden = owner || !ws;
-  const canShare = !!(owner && !ws?.isDefault); // the Personal collection can't be shared
+  const canShare = !!(ws?.role === "owner" && !ws.isDefault); // the Personal collection can't be shared
   $("shareRow").hidden = !canShare;
   shareNote();
   if (canShare) void refreshLinkInfo();
-  $("aiHint").textContent = ws
-    ? `AI summary: ${FORMATS[s?.format ?? ""] ?? "Paragraph"} \u00B7 ${LENGTHS[s?.length ?? ""] ?? "Medium"}`
-    : "AI summary";
   updateClipEnabled();
 }
 
@@ -301,7 +327,7 @@ async function render() {
   $("viewMain").hidden = !loggedIn;
   if (!loggedIn) return;
   status("");
-  await Promise.all([loadPage(), loadCollections()]);
+  await Promise.all([loadPage(), loadCollections(), loadAi()]);
 }
 
 // ---------- events ----------
@@ -392,7 +418,11 @@ $("clipBtn").addEventListener("click", async () => {
 
     const r = await api("/research/clip", {
       method: "POST",
-      body: { ...page, collectionId: $<HTMLSelectElement>("collection").value || undefined },
+      body: {
+        ...page,
+        collectionId: $<HTMLSelectElement>("collection").value || undefined,
+        aiSettings: readAi(), // this clip's own AI settings
+      },
     });
 
     if (r.status === 401) {
@@ -418,34 +448,6 @@ $("clipBtn").addEventListener("click", async () => {
     status("err", "Can't clip this page. Try a normal website, and check that the server is running.");
   } finally {
     setClipBusy(false);
-  }
-});
-
-$("saveSettings").addEventListener("click", async () => {
-  const ws = selected();
-  if (!ws) return;
-  const btn = $<HTMLButtonElement>("saveSettings");
-  btn.disabled = true;
-  $("saveSpinner").hidden = false;
-  $("saveLabel").textContent = "Saving…";
-  try {
-    const aiSettings = {
-      format: $<HTMLSelectElement>("format").value,
-      length: $<HTMLSelectElement>("length").value,
-      instructions: $<HTMLTextAreaElement>("instructions").value.trim(),
-    };
-    const r = await api(`/collections/${ws.id}`, { method: "PATCH", body: { aiSettings } });
-    if (!r.ok) return status("err", r.data.error ?? "Could not save settings");
-    await loadCollections(ws.id);
-    status("ok", "Settings saved.");
-    $("saveLabel").textContent = "Saved";
-    setTimeout(() => ($("saveLabel").textContent = "Save settings"), 1800);
-  } catch {
-    status("err", OFFLINE);
-  } finally {
-    $("saveSpinner").hidden = true;
-    btn.disabled = selected()?.role !== "owner";
-    if ($("saveLabel").textContent === "Saving…") $("saveLabel").textContent = "Save settings";
   }
 });
 

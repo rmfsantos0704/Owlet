@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, FileDown, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { ChevronLeft, FileDown, RefreshCw, Settings, Sparkles, Trash2 } from "lucide-react";
 import { api, download } from "../services/api";
 import CitationBox from "../components/CitationBox";
 import TagInput from "../components/TagInput";
@@ -8,7 +8,8 @@ import HighlightList from "../components/HighlightList";
 import ClippedText from "../components/ClippedText";
 import CommentThread from "../components/CommentThread";
 import SourceEditor from "../components/SourceEditor";
-import type { ResearchItem, Role } from "../types";
+import AiSettingsModal from "../components/AiSettingsModal";
+import type { AiSettings, ResearchItem, Role } from "../types";
 
 export default function ItemDetail() {
   const { id } = useParams();
@@ -18,6 +19,7 @@ export default function ItemDetail() {
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
   const [regenerating, setRegenerating] = useState(false);
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
 
   useEffect(() => {
     api<{ item: ResearchItem; role: Role | null }>(`/research/${id}`)
@@ -42,12 +44,20 @@ export default function ItemDetail() {
   // for handlers that don't need to react to failure (the error is already shown)
   const run = (path: string, method: string, body?: unknown) => act(path, method, body).catch(() => {});
 
-  async function regenerate() {
-    if (!confirm("Replace the summary and key arguments using this Collection's current AI settings?")) return;
+  // Rewrites the summary. With `settings` (from the modal), the server saves them on the clip first.
+  async function regenerate(settings?: AiSettings) {
     setRegenerating(true);
-    await run("/regenerate", "POST");
+    await run("/regenerate", "POST", settings ? { aiSettings: settings } : undefined);
     setRegenerating(false);
   }
+
+  async function regenerateClicked() {
+    if (!confirm("Replace the summary and key arguments using this clip's AI settings?")) return;
+    await regenerate();
+  }
+
+  // throws on failure so the modal can show the error
+  const saveAiSettings = (aiSettings: AiSettings) => act("/ai-settings", "PUT", { aiSettings });
 
   async function remove() {
     if (!confirm("Delete this clip?")) return;
@@ -69,7 +79,7 @@ export default function ItemDetail() {
   }
 
   if (error) return <p className="text-red-600">{error}</p>;
-  if (!item) return <p className="text-slate-400">Loading…</p>;
+  if (!item || !id) return <p className="text-slate-400">Loading…</p>;
 
   const canEdit = role === "owner" || role === "editor";
   const isPdf = item.source.kind === "pdf";
@@ -117,17 +127,27 @@ export default function ItemDetail() {
                 </div>
                 <h2 className="font-semibold">AI summary</h2>
               </div>
-              {canEdit && (
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={regenerate}
-                  disabled={regenerating}
-                  title="Rewrite using this Collection's current AI settings"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
+                  onClick={() => setAiSettingsOpen(true)}
+                  title="AI summary settings for this clip"
+                  aria-label="AI summary settings"
+                  className="inline-flex items-center justify-center rounded-lg bg-white/10 p-1.5 text-white transition hover:bg-white/20"
                 >
-                  <RefreshCw className={`size-3.5 ${regenerating ? "animate-spin" : ""}`} />
-                  {regenerating ? "Regenerating…" : "Regenerate"}
+                  <Settings className="size-4" />
                 </button>
-              )}
+                {canEdit && (
+                  <button
+                    onClick={regenerateClicked}
+                    disabled={regenerating}
+                    title="Rewrite using this clip's AI settings"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
+                  >
+                    <RefreshCw className={`size-3.5 ${regenerating ? "animate-spin" : ""}`} />
+                    {regenerating ? "Regenerating…" : "Regenerate"}
+                  </button>
+                )}
+              </div>
             </div>
             <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-white/90">
               {item.aiOutput.summary || "No AI summary for this clip."}
@@ -200,6 +220,16 @@ export default function ItemDetail() {
           </div>
         </div>
       </div>
+
+      <AiSettingsModal
+        open={aiSettingsOpen}
+        onClose={() => setAiSettingsOpen(false)}
+        itemId={id}
+        settings={item.aiSettings}
+        canEdit={canEdit}
+        onSave={saveAiSettings}
+        onRegenerate={regenerate}
+      />
     </div>
   );
 }

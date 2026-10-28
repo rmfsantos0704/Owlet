@@ -1,48 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Check, ChevronLeft, Copy, FlaskConical, Link2, Power, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, Copy, Link2, Power, Trash2 } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
-import type { AiSettings, JoinLink, ResearchItem, SentInvitation, collectionDetail } from "../types";
-
-const FORMATS: { value: AiSettings["format"]; label: string; hint: string }[] = [
-  { value: "paragraph", label: "Paragraph", hint: "One short, flowing paragraph" },
-  { value: "bullets", label: "Bullet points", hint: "Scannable key points" },
-  { value: "academic", label: "Academic", hint: "Question, approach, findings, limitations" },
-  { value: "simple", label: "Plain language", hint: "No jargon, easy to follow" },
-];
-const LENGTHS: { value: AiSettings["length"]; label: string }[] = [
-  { value: "short", label: "Short" },
-  { value: "medium", label: "Medium" },
-  { value: "detailed", label: "Detailed" },
-];
-
-const PRESETS: { label: string; text: string }[] = [
-  {
-    label: "Literature review",
-    text: 'Focus on the research question, methodology, sample size, and main findings. Mention limitations when the text states them. Use neutral academic wording. Use only information from the text and write "not stated" for anything missing.',
-  },
-  {
-    label: "Study notes",
-    text: "Write for a first-year student. Define each technical term in a few words the first time it appears. Highlight cause-and-effect relationships. Skip background history unless it is needed to understand the main point.",
-  },
-  {
-    label: "Critical reading",
-    text: "State the author's main claim, the evidence used to support it, and any assumptions or missing perspectives. Keep a neutral tone and do not add opinions of your own.",
-  },
-  {
-    label: "News & policy",
-    text: "Separate facts from claims and say who said what. Include dates, numbers, and places that appear in the text. Do not guess at anything the text does not state.",
-  },
-  {
-    label: "Filipino",
-    text: "Write the summary and key arguments in Filipino. Keep technical terms and proper names in English. Keep the tags in English.",
-  },
-];
-
-type TestResult = { summary: string; paraphrase: string; tags: string[]; source: string };
+import type { JoinLink, SentInvitation, collectionDetail } from "../types";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -55,19 +18,12 @@ export default function CollectionSettings() {
   const [ws, setWs] = useState<collectionDetail | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [ai, setAi] = useState<AiSettings>({ format: "paragraph", length: "medium", instructions: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"editor" | "viewer">("viewer");
-
-  const [clips, setClips] = useState<{ id: string; title: string }[]>([]);
-  const [testItem, setTestItem] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<TestResult | null>(null);
-  const [testError, setTestError] = useState("");
   const [sent, setSent] = useState<SentInvitation[]>([]);
 
   // join link form
@@ -87,29 +43,16 @@ export default function CollectionSettings() {
   useEffect(() => {
     setWs(null);
     setSaved(false);
-    setTestResult(null);
-    setTestError("");
-    setTestItem("");
     fetchWs()
       .then((w) => {
         setWs(w);
         setName(w.name ?? "");
         setDescription(w.description ?? "");
-        setAi(w.aiSettings ?? { format: "paragraph", length: "medium", instructions: "" });
       })
       .catch((e) => setError(e.message));
   }, [fetchWs]);
 
-  // the owner can test on one of this Collection's own clips
   const wsRole = ws?.role;
-  useEffect(() => {
-    if (wsRole !== "owner") return;
-    api<{ items: ResearchItem[] }>(`/research?collectionId=${id}`)
-      .then((r) =>
-        setClips(r.items.map((i) => ({ id: i._id, title: i.source.title || i.source.fileName || "Untitled" })))
-      )
-      .catch(() => {});
-  }, [id, wsRole]);
 
   // invitations the owner sent that nobody has answered yet
   const fetchSent = useCallback(
@@ -151,7 +94,7 @@ export default function CollectionSettings() {
       // keep the spinner up for at least 0.4s so the save is always visible
       await Promise.all([
         (async () => {
-          await api(`/collections/${id}`, { method: "PATCH", body: { name, description, aiSettings: ai } });
+          await api(`/collections/${id}`, { method: "PATCH", body: { name, description } });
           await refresh();
         })(),
         wait(400),
@@ -162,27 +105,6 @@ export default function CollectionSettings() {
       setError(err instanceof Error ? err.message : "Could not save changes");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function runTest() {
-    if (testing) return;
-    setTesting(true);
-    setTestError("");
-    try {
-      const [r] = await Promise.all([
-        api<TestResult>(`/collections/${id}/test-ai`, {
-          method: "POST",
-          body: { aiSettings: ai, itemId: testItem || undefined },
-        }),
-        wait(400),
-      ]);
-      setTestResult(r);
-    } catch (e) {
-      setTestResult(null);
-      setTestError(e instanceof Error ? e.message : "Test failed");
-    } finally {
-      setTesting(false);
     }
   }
 
@@ -355,125 +277,9 @@ export default function CollectionSettings() {
                 className="field"
               />
             </div>
-          </section>
-
-          <section className="card space-y-4 p-5">
-            <div>
-              <h2 className="font-semibold text-ink">AI summaries</h2>
-              <p className="mt-1 text-xs text-slate-400">
-                Applies to clips added after you save. For older clips, open one and click Regenerate.
-              </p>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {FORMATS.map((f) => (
-                <button
-                  type="button"
-                  key={f.value}
-                  onClick={() => setAi({ ...ai, format: f.value })}
-                  className={`rounded-xl border p-3 text-left transition ${
-                    ai.format === f.value ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100" : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="text-sm font-semibold text-ink">{f.label}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{f.hint}</div>
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1 sm:w-fit">
-              {LENGTHS.map((l) => (
-                <button
-                  type="button"
-                  key={l.value}
-                  onClick={() => setAi({ ...ai, length: l.value })}
-                  className={`rounded-md px-4 py-1.5 text-xs font-medium ${
-                    ai.length === l.value ? "bg-white text-brand shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink">Custom instructions</label>
-              <textarea
-                value={ai.instructions}
-                onChange={(e) => setAi({ ...ai, instructions: e.target.value })}
-                maxLength={500}
-                rows={4}
-                placeholder='What should the AI focus on? e.g. "Focus on methodology and sample sizes. Write for a first-year student."'
-                className="field"
-              />
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-slate-400">Try an example:</span>
-                {PRESETS.map((p) => (
-                  <button
-                    type="button"
-                    key={p.label}
-                    onClick={() => setAi({ ...ai, instructions: p.text })}
-                    className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200"
-                  >
-                    {p.label}
-                  </button>
-                ))}
-                <span className="ml-auto text-[11px] text-slate-400">{ai.instructions.length}/500</span>
-              </div>
-              <p className="mt-1.5 text-[11px] text-slate-400">
-                Say what to focus on, include, or avoid. Use the format and length options above for structure.
-              </p>
-            </div>
-
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <FlaskConical className="size-4 text-blue-600" /> Test these settings
-              </div>
-              <p className="text-xs text-slate-500">
-                Uses the choices above, even before you save. Nothing is saved or changed.
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <select value={testItem} onChange={(e) => setTestItem(e.target.value)} className="field min-w-0 flex-1">
-                  <option value="">Built-in sample article</option>
-                  {clips.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title.slice(0, 70)}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" onClick={runTest} disabled={testing} className="btn-secondary min-w-32">
-                  {testing ? (
-                    <>
-                      <span className="size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-                      Testing…
-                    </>
-                  ) : (
-                    "Run test"
-                  )}
-                </button>
-              </div>
-              {testError && <p className="text-sm text-red-600">{testError}</p>}
-              {testResult && (
-                <div className="space-y-3 rounded-xl border border-blue-100 bg-white p-4 text-sm">
-                  <div>
-                    <div className="eyebrow mb-1">Summary</div>
-                    <p className="whitespace-pre-line leading-relaxed text-slate-800">{testResult.summary}</p>
-                  </div>
-                  <div>
-                    <div className="eyebrow mb-1">Key arguments</div>
-                    <p className="leading-relaxed text-slate-700">{testResult.paraphrase}</p>
-                  </div>
-                  {testResult.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {testResult.tags.map((t) => (
-                        <span key={t} className="chip">{t}</span>
-                      ))}
-                    </div>
-                  )}
-                  <p className="text-[11px] text-slate-400">
-                    Tested on {testResult.source}. Happy with it? Click Save changes below.
-                  </p>
-                </div>
-              )}
-            </div>
+<p className="text-xs text-slate-400">
+  AI summary settings are set per clip, in the AI summary card on each clip.
+</p>
           </section>
         </fieldset>
 

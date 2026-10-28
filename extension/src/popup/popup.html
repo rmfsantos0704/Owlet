@@ -163,7 +163,7 @@
     .status .link { margin-left: 4px; color: inherit; }
     .msg-err { margin: 0; font-size: 13px; color: var(--err); }
 
-    /* settings */
+    /* collapsible settings sections */
     .settings summary {
       display: flex; align-items: center; gap: 10px; padding: 12px 14px;
       font-weight: 600; color: var(--ink); cursor: pointer; list-style: none; border-radius: 16px;
@@ -272,6 +272,42 @@
         <span id="statusText"></span><button id="statusLink" class="link" type="button" hidden></button>
       </div>
 
+     <!-- AI summary settings (applies to the next clip) -->
+<details id="aiSettings" class="card settings">
+  <summary>
+    <svg class="i" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+    AI summary settings
+    <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+  </summary>
+  <div class="inner stack">
+    <p class="link-info">Used for the next page you clip. You can change them later on the clip itself.</p>
+    <div class="two">
+      <div>
+        <label class="eyebrow" for="format">Format</label>
+        <select id="format" class="field">
+          <option value="paragraph">Paragraph</option>
+          <option value="bullets">Bullets</option>
+          <option value="academic">Academic</option>
+          <option value="simple">Plain language</option>
+        </select>
+      </div>
+      <div>
+        <label class="eyebrow" for="length">Length</label>
+        <select id="length" class="field">
+          <option value="short">Short</option>
+          <option value="medium">Medium</option>
+          <option value="detailed">Detailed</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label class="eyebrow" for="instructions">Custom instructions</label>
+      <textarea id="instructions" class="field" rows="3" maxlength="500" placeholder="e.g. Focus on methodology and sample sizes."></textarea>
+    </div>
+  </div>
+</details>
+
+      <!-- Collection settings (join link) -->
       <details id="settings" class="card settings">
         <summary>
           <svg class="i" viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></svg>
@@ -279,37 +315,7 @@
           <svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </summary>
         <div class="inner stack">
-          <div class="two">
-            <div>
-              <label class="eyebrow" for="format">Format</label>
-              <select id="format" class="field">
-                <option value="paragraph">Paragraph</option>
-                <option value="bullets">Bullets</option>
-                <option value="academic">Academic</option>
-                <option value="simple">Plain language</option>
-              </select>
-            </div>
-            <div>
-              <label class="eyebrow" for="length">Length</label>
-              <select id="length" class="field">
-                <option value="short">Short</option>
-                <option value="medium">Medium</option>
-                <option value="detailed">Detailed</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label class="eyebrow" for="instructions">Custom instructions</label>
-            <textarea id="instructions" class="field" rows="3" maxlength="500" placeholder="e.g. Focus on methodology and sample sizes."></textarea>
-          </div>
-          <button id="saveSettings" class="btn btn-secondary" type="button">
-            <span id="saveSpinner" class="spinner" hidden></span>
-            <span id="saveLabel">Save settings</span>
-          </button>
-          <p id="ownerNote" class="hint" style="margin:0" hidden>Only the owner can change these settings.</p>
-
           <div id="shareRow" class="stack" hidden>
-            <div class="divider"></div>
             <span class="eyebrow">Join link</span>
             <p id="linkInfo" class="link-info">Checking link…</p>
 
@@ -353,6 +359,7 @@
             </div>
             <input id="copyLinkField" class="field" readonly hidden aria-label="Join link" />
             <p id="copyLinkNote" class="hint" style="margin:0" hidden></p>
+            <div class="divider"></div>
           </div>
 
           <button id="openSettings" class="link small" type="button" style="align-self:flex-start">Members &amp; more in the dashboard</button>
