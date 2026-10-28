@@ -12,7 +12,14 @@ type Value = {
   reload: () => Promise<Collection[]>;
   create: (name: string) => Promise<void>;
   respondToInvitation: (id: string, accept: boolean) => Promise<void>;
+  pinned: string[]; // collection ids pinned to the top of the sidebar
+  archived: string[]; // collection ids hidden under "Archived" in the sidebar
+  togglePin: (id: string) => void;
+  toggleArchive: (id: string) => void;
 };
+
+type Prefs = { pinned: string[]; archived: string[] };
+const NO_PREFS: Prefs = { pinned: [], archived: [] };
 
 const Ctx = createContext<Value | null>(null);
 const KEY = "owlet.collectionId";
@@ -24,6 +31,35 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [currentId, setCurrentId] = useState(localStorage.getItem(KEY) ?? "");
   const [ready, setReady] = useState(false);
+
+  // Pins and archives are personal to this person on this browser; they never change the collection for others.
+  const prefsKey = `owlet.collectionPrefs:${user?.email ?? ""}`;
+  const [prefs, setPrefs] = useState<Prefs>(NO_PREFS);
+
+  useEffect(() => {
+    if (!user) {
+      setPrefs(NO_PREFS);
+      return;
+    }
+    try {
+      const p = JSON.parse(localStorage.getItem(prefsKey) ?? "null");
+      setPrefs({
+        pinned: Array.isArray(p?.pinned) ? p.pinned.map(String) : [],
+        archived: Array.isArray(p?.archived) ? p.archived.map(String) : [],
+      });
+    } catch {
+      setPrefs(NO_PREFS);
+    }
+  }, [user, prefsKey]);
+
+  const savePrefs = (next: Prefs) => {
+    setPrefs(next);
+    try {
+      localStorage.setItem(prefsKey, JSON.stringify(next));
+    } catch {
+      /* private mode: the change lasts until the page is closed */
+    }
+  };
 
   const reload = useCallback(async () => {
     const r = await api<{ collections: Collection[] }>("/collections");
@@ -81,6 +117,19 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     current,
     ready,
     invitations,
+    pinned: prefs.pinned,
+    archived: prefs.archived,
+    togglePin: (id) =>
+      savePrefs({
+        ...prefs,
+        pinned: prefs.pinned.includes(id) ? prefs.pinned.filter((x) => x !== id) : [...prefs.pinned, id],
+      }),
+    toggleArchive: (id) =>
+      savePrefs(
+        prefs.archived.includes(id)
+          ? { ...prefs, archived: prefs.archived.filter((x) => x !== id) }
+          : { pinned: prefs.pinned.filter((x) => x !== id), archived: [...prefs.archived, id] } // archiving also unpins
+      ),
     select: (id) => {
       localStorage.setItem(KEY, id);
       setCurrentId(id);

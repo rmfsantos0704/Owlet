@@ -8,6 +8,7 @@ import type { ResearchItem } from "../types";
 import ResearchCard from "../components/ResearchCard";
 import { useCollections } from "../context/CollectionContext";
 import CollectionExportMenu from "../components/CollectionExportMenu";
+import AiAssistantCard from "../components/AiAssistantCard";
 
 import RecentActivity from "../components/RecentActivity";
 
@@ -302,10 +303,10 @@ export default function Library({ all = false }: { all?: boolean }) {
                 <button onClick={() => fileRef.current?.click()} disabled={!!importing} className="btn-primary">
                   <Upload className="size-4" /> {importing || "Import PDF"}
                 </button>
-                 <CollectionExportMenu collectionId={current.id} collectionName={current.name} />
+                <CollectionExportMenu collectionId={current.id} collectionName={current.name} />
               </>
             )}
-            
+
             <Link to={`/Collection/${current.id}/settings`} className="btn-secondary">
               <Settings className="size-4" /> Settings
             </Link>
@@ -337,7 +338,8 @@ export default function Library({ all = false }: { all?: boolean }) {
           <div className="lg:col-span-2">
             {clipsCard}
           </div>
-          <div>
+          <div className="space-y-6">
+            <AiAssistantCard items={items} />
             <RecentActivity collectionId={current.id} reloadKey={reloadKey} />
           </div>
         </div>

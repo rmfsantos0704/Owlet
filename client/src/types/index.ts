@@ -50,6 +50,7 @@ export type ResearchItem = {
   highlights: Highlight[];
   comments: Comment[];
   createdAt: string;
+  snippet?: string; // only in search results: a short excerpt of the clip's text around the match
 };
 // an invitation waiting for the signed-in person to accept or decline
 export type Invitation = {
@@ -85,4 +86,18 @@ export type ActivityEntry = {
   item: { id: string; title: string; exists: boolean } | null;
   Collection?: { id: string; name: string }; // only in notifications
   unread?: boolean; // only in notifications
+};
+
+// a quote backing up one AI workspace finding; `verified` means the wording was checked against the source text
+export type AiEvidence = { source: number; quote: string; verified: boolean };
+
+export type AiSession = {
+  id: string;
+  collectionId: string;
+  mode: "Research brief" | "Summarize" | "Compare sources";
+  prompt: string;
+  summary: string;
+  findings: { title: string; text: string; sources: number[]; evidence?: AiEvidence[] }[]; // evidence is missing on older sessions
+  sources: { id: string; title: string }[];
+  createdAt: string;
 };

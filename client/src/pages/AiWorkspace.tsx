@@ -1,24 +1,46 @@
 import { useEffect, useState } from "react";
-import { Bot, Check, Copy, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowLeft, Bot, Check, ChevronRight, Copy, Plus, Sparkles, Trash2 } from "lucide-react";
 import { api } from "../services/api";
 import { useCollections } from "../context/CollectionContext";
-import type { ResearchItem } from "../types";
+import type { AiSession, ResearchItem } from "../types";
 
 const MODES = ["Research brief", "Summarize", "Compare sources"] as const;
+type Mode = (typeof MODES)[number];
 const MAX_SOURCES = 8;
+const DEFAULT_SELECTED = 6;
 
+type Evidence = { source: number; quote: string; verified: boolean };
 type Result = {
   summary: string;
-  findings: { title: string; text: string; sources: number[] }[];
+  findings: { title: string; text: string; sources: number[]; evidence?: Evidence[] }[];
   sources: { id: string; title: string }[];
   mode: string;
 };
 
+function ago(iso: string) {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "Yesterday" : days < 7 ? `${days}d ago` : new Date(iso).toLocaleDateString();
+}
+
+function sessionTitle(s: AiSession) {
+  const first = s.prompt.trim().split("\n")[0];
+  if (!first) return s.mode;
+  return first.length > 60 ? first.slice(0, 57) + "…" : first;
+}
+
 export default function AiWorkspace() {
   const { current, ready } = useCollections();
   const [items, setItems] = useState<ResearchItem[]>([]);
+  const [sessions, setSessions] = useState<AiSession[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const [mode, setMode] = useState<(typeof MODES)[number]>("Research brief");
+  const [mode, setMode] = useState<Mode>("Research brief");
   const [prompt, setPrompt] = useState("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
@@ -27,29 +49,84 @@ export default function AiWorkspace() {
 
   useEffect(() => {
     if (!ready) return;
+    let cancelled = false;
     setResult(null);
+    setActiveId(null);
+    setPrompt("");
+    setError("");
+    setSessions([]);
+
     const qs = current ? `?collectionId=${current.id}` : "";
     api<{ items: ResearchItem[] }>(`/research${qs}`)
       .then((r) => {
+        if (cancelled) return;
         setItems(r.items);
-        setSelected(r.items.slice(0, 6).map((i) => i._id));
+        setSelected(r.items.slice(0, DEFAULT_SELECTED).map((i) => i._id));
       })
-      .catch(() => setItems([]));
+      .catch(() => !cancelled && setItems([]));
+
+    if (current) {
+      api<{ sessions: AiSession[] }>(`/research/sessions?collectionId=${current.id}`)
+        .then((r) => !cancelled && setSessions(r.sessions))
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [ready, current?.id]);
 
   function toggle(id: string) {
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length >= MAX_SOURCES ? s : [...s, id]));
   }
 
+  function newSession() {
+    setActiveId(null);
+    setResult(null);
+    setPrompt("");
+    setError("");
+    setMode("Research brief");
+    setSelected(items.slice(0, DEFAULT_SELECTED).map((i) => i._id));
+  }
+
+  function openSession(s: AiSession) {
+    const existing = new Set(items.map((i) => i._id));
+    setActiveId(s.id);
+    setMode(s.mode);
+    setPrompt(s.prompt);
+    setSelected(s.sources.map((x) => x.id).filter((id) => existing.has(id)));
+    setResult({ summary: s.summary, findings: s.findings, sources: s.sources, mode: s.mode });
+    setError("");
+  }
+
+  async function deleteSession(s: AiSession) {
+    if (!confirm("Delete this session?")) return;
+    try {
+      await api(`/research/sessions/${s.id}`, { method: "DELETE" });
+      setSessions((list) => list.filter((x) => x.id !== s.id));
+      if (activeId === s.id) {
+        setActiveId(null);
+        setResult(null);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete the session");
+    }
+  }
+
   async function run() {
     setError("");
     setRunning(true);
     try {
-      const r = await api<Omit<Result, "mode">>("/research/ask", {
+      const r = await api<Omit<Result, "mode"> & { session: AiSession | null }>("/research/ask", {
         method: "POST",
         body: { itemIds: selected, mode, prompt },
       });
-      setResult({ ...r, mode });
+      setResult({ summary: r.summary, findings: r.findings, sources: r.sources, mode });
+      if (r.session) {
+        setSessions((list) => [r.session!, ...list].slice(0, 20));
+        setActiveId(r.session.id);
+      } else {
+        setActiveId(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
     } finally {
@@ -62,7 +139,9 @@ export default function AiWorkspace() {
     const text = [
       result.summary,
       ...result.findings.map(
-        (f, i) => `\n${i + 1}. ${f.title}\n${f.text}\nSources: ${f.sources.map((n) => result.sources[n - 1]?.title).filter(Boolean).join("; ")}`
+        (f, i) =>
+          `\n${i + 1}. ${f.title}\n${f.text}\nSources: ${f.sources.map((n) => result.sources[n - 1]?.title).filter(Boolean).join("; ")}` +
+          (f.evidence ?? []).map((e) => `\n> "${e.quote}" (${result.sources[e.source - 1]?.title ?? "source"})`).join("")
       ),
     ].join("\n");
     await navigator.clipboard.writeText(text);
@@ -70,17 +149,37 @@ export default function AiWorkspace() {
     setTimeout(() => setCopied(false), 1800);
   }
 
+  const itemIds = new Set(items.map((i) => i._id));
+  const removedSources = result ? result.sources.filter((s) => !itemIds.has(s.id)).length : 0;
+
   return (
     <div>
-      <section className="mb-8">
-        <div className="eyebrow mb-2 flex items-center gap-2 text-violet-600">
-          <Sparkles className="size-3.5" />
-          AI workspace
+      <Link
+        to="/"
+        className="mb-5 inline-flex max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-brand"
+      >
+        <ArrowLeft className="size-3.5 shrink-0" />
+        <span className="truncate">Back to {current?.name ?? "collection"}</span>
+      </Link>
+
+      <section className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div>
+          <div className="eyebrow mb-2 flex items-center gap-2 text-violet-600">
+            <Sparkles className="size-3.5" />
+            AI workspace
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Build from your research</h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+            Ask questions across your saved sources and turn evidence into citation-ready briefs.
+          </p>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Build from your research</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-500">
-          Ask questions across your saved sources and turn evidence into citation-ready briefs.
-        </p>
+        <button
+          onClick={newSession}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+        >
+          <Plus className="size-4" />
+          New session
+        </button>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -121,7 +220,7 @@ export default function AiWorkspace() {
             <div className="mt-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div className="flex items-center gap-2 text-[11px] text-blue-100/60">
                 <Check className="size-3.5 text-emerald-300" />
-                Answers cite the sources you select
+                Every run is saved to Recent sessions
               </div>
               <button
                 onClick={run}
@@ -140,7 +239,10 @@ export default function AiWorkspace() {
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-5">
                 <div>
                   <h2 className="font-semibold text-ink">{result.mode}</h2>
-                  <p className="mt-1 text-xs text-slate-400">Based on {result.sources.length} sources</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Based on {result.sources.length} sources
+                    {removedSources > 0 ? ` · ${removedSources} no longer in this collection` : ""}
+                  </p>
                 </div>
                 <button
                   onClick={copy}
@@ -167,6 +269,28 @@ export default function AiWorkspace() {
                         <p className="mt-2 text-xs font-semibold text-blue-700">
                           {f.sources.map((n) => result.sources[n - 1]?.title).filter(Boolean).join(" · ")}
                         </p>
+                        {(f.evidence ?? []).length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {(f.evidence ?? []).map((e, k) => {
+                              const src = result.sources[e.source - 1];
+                              return (
+                                <blockquote key={k} className="rounded-lg border-l-2 border-violet-300 bg-slate-50 px-3 py-2">
+                                  <p className="text-xs italic leading-5 text-slate-600">“{e.quote}”</p>
+                                  <p className="mt-1 text-[10px] text-slate-400">
+                                    {src && itemIds.has(src.id) ? (
+                                      <Link to={`/item/${src.id}`} className="font-semibold text-blue-700 hover:underline">
+                                        {src.title}
+                                      </Link>
+                                    ) : (
+                                      <span>{src?.title ?? "Source"}</span>
+                                    )}{" "}
+                                    · {e.verified ? "exact quote" : "passage excerpt"}
+                                  </p>
+                                </blockquote>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -176,40 +300,85 @@ export default function AiWorkspace() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 xl:self-start">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-ink">Sources</h2>
-            <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">
-              {selected.length}/{MAX_SOURCES}
-            </span>
+        <div className="space-y-6 xl:self-start">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-semibold text-ink">Sources</h2>
+              <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">
+                {selected.length}/{MAX_SOURCES}
+              </span>
+            </div>
+            {items.length === 0 ? (
+              <p className="text-xs text-slate-400">Clip some articles or import PDFs to analyze them here.</p>
+            ) : (
+              <div className="max-h-80 space-y-2 overflow-y-auto">
+                {items.map((i) => {
+                  const on = selected.includes(i._id);
+                  return (
+                    <label
+                      key={i._id}
+                      className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
+                        on ? "border-blue-200 bg-blue-50/50" : "border-slate-100 hover:bg-slate-50"
+                      }`}
+                    >
+                      <input type="checkbox" checked={on} onChange={() => toggle(i._id)} className="mt-0.5" />
+                      <span className="min-w-0">
+                        <span className="line-clamp-2 block text-xs font-semibold leading-5 text-slate-700">
+                          {i.source?.title ?? "Untitled"}
+                        </span>
+                        <span className="mt-1 block text-[10px] text-slate-400">
+                          {i.source?.domain ?? i.source?.fileName ?? "PDF"}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          {items.length === 0 ? (
-            <p className="text-xs text-slate-400">Clip some articles or import PDFs to analyze them here.</p>
-          ) : (
-            <div className="max-h-[28rem] space-y-2 overflow-y-auto">
-              {items.map((i) => {
-                const on = selected.includes(i._id);
-                return (
-                  <label
-                    key={i._id}
-                    className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
-                      on ? "border-blue-200 bg-blue-50/50" : "border-slate-100 hover:bg-slate-50"
+
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-semibold text-ink">Recent sessions</h2>
+              <span className="rounded-full bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700">
+                {sessions.length}
+              </span>
+            </div>
+            {sessions.length === 0 ? (
+              <p className="text-xs leading-5 text-slate-400">
+                Your analyses are saved here, so you can reopen a brief later.
+              </p>
+            ) : (
+              <div className="max-h-96 space-y-1.5 overflow-y-auto">
+                {sessions.map((s) => (
+                  <div
+                    key={s.id}
+                    className={`group flex items-center gap-1 rounded-xl border pr-1 transition ${
+                      activeId === s.id ? "border-violet-200 bg-violet-50/50" : "border-transparent hover:bg-slate-50"
                     }`}
                   >
-                    <input type="checkbox" checked={on} onChange={() => toggle(i._id)} className="mt-0.5" />
-                    <span className="min-w-0">
-                      <span className="line-clamp-2 block text-xs font-semibold leading-5 text-slate-700">
-                        {i.source?.title ?? "Untitled"}
+                    <button onClick={() => openSession(s)} className="flex min-w-0 flex-1 items-center gap-2 p-2.5 text-left">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-semibold text-slate-700">{sessionTitle(s)}</span>
+                        <span className="mt-1 block text-[10px] text-slate-400">
+                          {s.mode} · {s.sources.length} source{s.sources.length === 1 ? "" : "s"} · {ago(s.createdAt)}
+                        </span>
                       </span>
-                      <span className="mt-1 block text-[10px] text-slate-400">
-                        {i.source?.domain ?? i.source?.fileName ?? "PDF"}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          )}
+                      <ChevronRight className="size-4 shrink-0 text-slate-300" />
+                    </button>
+                    <button
+                      onClick={() => deleteSession(s)}
+                      title="Delete session"
+                      aria-label="Delete session"
+                      className="rounded-lg p-1.5 text-slate-300 opacity-0 hover:bg-slate-100 hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
     </div>

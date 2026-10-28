@@ -2,26 +2,27 @@ import { useState, type FormEvent } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Archive,
+  ChevronRight,
+  CircleHelp,
   Folder,
   Highlighter,
   LogOut,
   Menu,
   MessageSquareText,
+  Pin,
   Plus,
   Search,
-  Sparkles,
   Users,
   X,
   UserRound,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
-import InvitationsBanner from "./InvitationsBanner";
 import NotificationsBell from "./NotificationsBell";
+import CollectionMenu from "./CollectionMenu";
 
 const WORKSPACE_LINKS = [
   { to: "/all", label: "All clips", icon: Archive },
-  { to: "/ai", label: "AI workspace", icon: Sparkles },
   { to: "/highlights", label: "Highlights", icon: Highlighter },
   { to: "/comments", label: "Comments", icon: MessageSquareText },
 ];
@@ -31,13 +32,14 @@ const SEARCHABLE = ["/all", "/highlights", "/comments"];
 
 export default function Layout() {
   const { user, logout } = useAuth();
-  const { collections = [], current, select, create } = useCollections();
+  const { collections = [], current, select, create, pinned, archived } = useCollections();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [params] = useSearchParams();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const q = params.get("q") ?? "";
   const initials = (user?.email ?? "?").slice(0, 2).toUpperCase();
   const onCollectionPage = pathname === "/";
@@ -64,14 +66,50 @@ export default function Layout() {
     }
   }
 
+  // pinned collections first (the sort is stable, so the rest keep their order); archived ones sit under their own heading
+  const visible = collections
+    .filter((c: any) => !archived.includes(c.id))
+    .sort((a: any, b: any) => Number(pinned.includes(b.id)) - Number(pinned.includes(a.id)));
+  const archivedList = collections.filter((c: any) => archived.includes(c.id));
+
+  const row = (w: any) => {
+    const collectionId = w?.id || w?._id;
+    const active = onCollectionPage && current?.id && current.id === collectionId;
+    const isArchived = archived.includes(collectionId);
+    return (
+      <div key={collectionId ?? Math.random()} className="group relative">
+        <button
+          onClick={() => {
+            if (collectionId) {
+              select(collectionId);
+              navigate("/");
+              setOpen(false);
+            }
+          }}
+          className={`flex w-full items-center gap-3 rounded-xl py-2 pl-3 pr-9 text-sm transition ${
+            active
+              ? "bg-slate-100 font-medium text-brand"
+              : `${isArchived ? "text-slate-400" : "text-slate-600"} hover:bg-slate-100 hover:text-brand`
+          }`}
+        >
+          <Folder className={`size-4 shrink-0 ${active ? "text-blue-500" : "text-slate-400"}`} />
+          <span className="min-w-0 flex-1 truncate text-left">{w?.name ?? "Untitled Collection"}</span>
+          {pinned.includes(collectionId) && <Pin className="size-3 shrink-0 text-slate-400" />}
+          {(w?.memberCount ?? 0) > 1 && <Users className="size-3 shrink-0 text-slate-400" />}
+        </button>
+        {collectionId && <CollectionMenu collection={w} onNavigate={() => setOpen(false)} />}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-canvas text-slate-900">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col overflow-y-auto border-r border-slate-200 bg-white px-4 py-5 transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col overflow-hidden border-r border-slate-200 bg-white px-4 py-5 transition-transform lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="mb-8 flex items-center justify-between px-2">
+        <div className="mb-8 flex shrink-0 items-center justify-between px-2">
           <Link to="/" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
             <img src="/logo.png" alt="Owlet" className="size-9 rounded-[23.4%] shadow-md shadow-blue-950/15" />
             <div>
@@ -84,7 +122,7 @@ export default function Layout() {
           </button>
         </div>
 
-        <nav className="space-y-1">
+        <nav className="shrink-0 space-y-1">
           <div className="eyebrow mb-2 px-3">Workspaces</div>
           {WORKSPACE_LINKS.map(({ to, label, icon: Icon }) => (
             <NavLink
@@ -103,15 +141,15 @@ export default function Layout() {
           ))}
         </nav>
 
-        <nav className="mt-7 space-y-0.5">
-          <div className="mb-2 flex items-center justify-between px-3">
+        <nav className="mt-7 flex min-h-0 flex-1 flex-col">
+          <div className="mb-2 flex shrink-0 items-center justify-between px-3">
             <span className="eyebrow">Collections</span>
             <button onClick={() => setAdding((v) => !v)} className="text-slate-400 hover:text-brand" title="New Collection">
               <Plus className="size-3.5" />
             </button>
           </div>
           {adding && (
-            <form onSubmit={addCollection} className="px-1 pb-1">
+            <form onSubmit={addCollection} className="shrink-0 px-1 pb-1">
               <input
                 autoFocus
                 value={newName}
@@ -122,33 +160,25 @@ export default function Layout() {
               />
             </form>
           )}
-          {collections.map((w: any) => {
-            const collectionId = w?.id || w?._id;
-            const currentId = current?.id;
-            const active = onCollectionPage && currentId && currentId === collectionId;
-            return (
-              <button
-                key={collectionId ?? Math.random()}
-                onClick={() => {
-                  if (collectionId) {
-                    select(collectionId);
-                    navigate("/");
-                    setOpen(false);
-                  }
-                }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
-                  active ? "bg-slate-100 font-medium text-brand" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
-                }`}
-              >
-                <Folder className={`size-4 ${active ? "text-blue-500" : "text-slate-400"}`} />
-                <span className="min-w-0 flex-1 truncate text-left">{w?.name ?? "Untitled Collection"}</span>
-                {(w?.memberCount ?? 0) > 1 && <Users className="size-3 text-slate-400" />}
-              </button>
-            );
-          })}
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="space-y-0.5">{visible.map(row)}</div>
+            {archivedList.length > 0 && (
+              <div className="mt-4">
+                <button
+                  onClick={() => setShowArchived((v) => !v)}
+                  aria-expanded={showArchived}
+                  className="eyebrow flex w-full items-center gap-1.5 px-3 py-1.5 hover:text-slate-600"
+                >
+                  <ChevronRight className={`size-3 transition-transform ${showArchived ? "rotate-90" : ""}`} />
+                  Archived ({archivedList.length})
+                </button>
+                {showArchived && <div className="space-y-0.5">{archivedList.map(row)}</div>}
+              </div>
+            )}
+          </div>
         </nav>
 
-        <div className="mt-auto space-y-0.5 pt-6">
+        <div className="mt-3 shrink-0 space-y-0.5 border-t border-slate-200 pt-3">
           <NavLink
             to="/account"
             onClick={() => setOpen(false)}
@@ -161,13 +191,18 @@ export default function Layout() {
             <UserRound className="size-4.5" strokeWidth={1.8} />
             Account
           </NavLink>
-          <button
-            onClick={logout}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-brand"
+          <NavLink
+            to="/help"
+            onClick={() => setOpen(false)}
+            className={({ isActive }) =>
+              `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                isActive ? "bg-brand text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
+              }`
+            }
           >
-            <LogOut className="size-4.5" strokeWidth={1.8} />
-            Log out
-          </button>
+            <CircleHelp className="size-4.5" strokeWidth={1.8} />
+            Help &amp; support
+          </NavLink>
         </div>
       </aside>
 
@@ -199,11 +234,18 @@ export default function Layout() {
               </div>
               <span className="hidden max-w-48 truncate text-xs font-semibold text-slate-700 sm:block">{user?.email}</span>
             </Link>
+            <button
+              onClick={logout}
+              title="Log out"
+              aria-label="Log out"
+              className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-brand"
+            >
+              <LogOut className="size-5" strokeWidth={1.8} />
+            </button>
           </div>
         </header>
 
         <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 lg:py-9">
-          <InvitationsBanner />
           <Outlet />
         </div>
       </main>

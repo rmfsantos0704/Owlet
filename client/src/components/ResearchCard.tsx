@@ -41,6 +41,9 @@ export default function ResearchCard({ item, onTag, collectionName }: Props) {
         {item.aiOutput.summary && (
           <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">{item.aiOutput.summary}</p>
         )}
+        {item.snippet && (
+          <p className="mt-1.5 line-clamp-2 text-xs italic leading-5 text-slate-500">…{item.snippet}…</p>
+        )}
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           {item.tags.map((t) => (
             <button key={t} onClick={() => onTag(t)} className="chip hover:bg-slate-200">
