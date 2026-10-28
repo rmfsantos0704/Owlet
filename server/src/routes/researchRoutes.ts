@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import {
   clip, importPdf, list, getOne, remove,
   addHighlight, removeHighlight, addComment, removeComment, setTags,
-  updateSource, regenerate, pdf, exportItems, ask
+  updateSource, regenerate, pdf, exportItems, ask, listSessions, removeSession,
 } from "../controllers/researchController.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { uploadPdf } from "../middlewares/upload.js";
@@ -14,14 +14,16 @@ const router = Router();
 router.use(requireAuth);
 
 const regenLimit = rateLimit({ windowMs: 60 * 1000, limit: 15 });
+const askLimit = rateLimit({ windowMs: 60 * 1000, limit: 10 });
 
 // per-minute IP limits for clip/import are in app.ts; these add a daily cap per account
 router.post("/clip", clipDailyLimiter, trackActivity("clip_added"), clip);
 router.post("/import", importDailyLimiter, uploadPdf, trackActivity("pdf_imported"), importPdf);
+router.post("/ask", askLimit, ask);
+router.get("/sessions", listSessions);
+router.delete("/sessions/:id", writeLimiter, removeSession);
 router.get("/", list);
 router.get("/export", exportItems);
-const askLimit = rateLimit({ windowMs: 60 * 1000, limit: 10 });
-router.post("/ask", askLimit, ask); // put before the "/:id" routes
 router.get("/:id", getOne);
 router.delete("/:id", writeLimiter, remove);
 router.get("/:id/pdf", pdf);

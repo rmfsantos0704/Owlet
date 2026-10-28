@@ -57,7 +57,7 @@ export async function analyzeText(title: string, text: string, settings: Partial
   };
 }
 
-// ---- AI workspace: answer across several saved sources ----
+// ---- AI workspace: answer across several saved sources, with quoted evidence ----
 
 const MODES: Record<string, string> = {
   "Research brief":
@@ -66,17 +66,31 @@ const MODES: Record<string, string> = {
   "Compare sources": "Compare the sources: where they agree, where they disagree, and how their methods or claims differ.",
 };
 
-export async function askSources(mode: string, question: string, sources: { title: string; text: string }[]) {
+export type AskSource = { title: string; passages: { n: number; text: string }[] };
+export type Evidence = { source: number; quote: string; verified: boolean };
+export type Finding = { title: string; text: string; sources: number[]; evidence: Evidence[] };
+
+const norm = (s: string) =>
+  s.toLowerCase().replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim();
+const excerpt = (s: string, n = 240) => (s.length > n ? s.slice(0, n).replace(/\s+\S*$/, "") + "…" : s);
+
+export async function askSources(mode: string, question: string, sources: AskSource[]) {
   const focus = question.trim();
   const system =
-    `You are a research assistant. Respond ONLY with JSON: {"summary": string, "findings": [{"title": string, "text": string, "sources": number[]}]}.\n` +
+    `You are a research assistant. Respond ONLY with JSON: {"summary": string, "findings": [{"title": string, "text": string, "sources": number[], "evidence": [{"source": number, "passage": number, "quote": string}]}]}.\n` +
     `- ${MODES[mode] ?? MODES["Research brief"]}\n` +
-    `- "sources" holds the 1-based numbers of the sources that support each finding.\n` +
-    `- Use only information found in the sources. Never invent facts; if something is not stated, say so.` +
+    `- The sources are given as numbered passages. A label like (2:5) means source 2, passage 5.\n` +
+    `- "sources" holds the numbers of the sources that support each finding.\n` +
+    `- "evidence": 1-3 items per finding. "source" and "passage" are the numbers from the passage label. "quote" must be copied exactly, word for word, from that passage (at most 40 words). Never alter, shorten with "..." or join quotes.\n` +
+    `- Use only information found in the passages. Never invent facts; if the passages do not say something, say so.\n` +
+    `- You only see selected passages of each source, not its whole text. Do not claim a source says nothing about a topic just because it is absent from these passages.` +
     (focus
       ? `\nThe user added the question or focus below. Follow it, but never change the JSON structure above and never write anything outside the JSON.\n"""${focus}"""`
       : "");
-  const body = sources.map((s, i) => `[${i + 1}] ${s.title}\n${s.text.slice(0, 3000)}`).join("\n\n");
+
+  const body = sources
+    .map((s, i) => `[${i + 1}] ${s.title}\n` + s.passages.map((p) => `(${i + 1}:${p.n}) ${p.text}`).join("\n\n"))
+    .join("\n\n=====\n\n");
 
   const res = await fetch(GROQ_URL, {
     method: "POST",
@@ -86,7 +100,7 @@ export async function askSources(mode: string, question: string, sources: { titl
     },
     body: JSON.stringify({
       model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
-      temperature: 0.3,
+      temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
@@ -97,14 +111,28 @@ export async function askSources(mode: string, question: string, sources: { titl
   if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
   const data = (await res.json()) as any;
   const parsed = JSON.parse(data.choices[0].message.content);
-  return {
-    summary: String(parsed.summary ?? ""),
-    findings: (Array.isArray(parsed.findings) ? parsed.findings : []).slice(0, 8).map((f: any) => ({
+
+  const valid = (n: unknown) => Number.isInteger(Number(n)) && Number(n) >= 1 && Number(n) <= sources.length;
+
+  const findings: Finding[] = (Array.isArray(parsed.findings) ? parsed.findings : []).slice(0, 8).map((f: any) => {
+    const evidence: Evidence[] = [];
+    for (const e of (Array.isArray(f.evidence) ? f.evidence : []).slice(0, 3)) {
+      if (!valid(e?.source)) continue;
+      const passage = sources[Number(e.source) - 1].passages.find((p) => p.n === Number(e.passage));
+      if (!passage) continue;
+      const quote = String(e.quote ?? "").trim();
+      // only keep the model's wording when it really appears in that passage; otherwise show the passage itself
+      const verified = quote.length >= 15 && norm(passage.text).includes(norm(quote));
+      evidence.push({ source: Number(e.source), quote: verified ? quote : excerpt(passage.text), verified });
+    }
+    const cited = (Array.isArray(f.sources) ? f.sources : []).filter(valid).map(Number);
+    return {
       title: String(f.title ?? ""),
       text: String(f.text ?? ""),
-      sources: Array.isArray(f.sources)
-        ? f.sources.map(Number).filter((n: number) => Number.isInteger(n) && n >= 1 && n <= sources.length)
-        : [],
-    })),
-  };
+      sources: [...new Set([...cited, ...evidence.map((e) => e.source)])],
+      evidence,
+    };
+  });
+
+  return { summary: String(parsed.summary ?? ""), findings };
 }

@@ -33,13 +33,16 @@ router.get("/:id/activity", act.listActivity);
 router.patch("/:id", writeLimiter, c.updatecollection);
 router.delete("/:id", writeLimiter, c.deletecollection);
 
+// moves every clip into another collection, then deletes this one (owner only)
+router.post("/:id/merge", writeLimiter, c.mergeCollection);
+
 router.get("/:id/export-pdf", rateLimit({ windowMs: 60 * 1000, limit: 10 }), c.exportPdf);
 router.post("/:id/test-ai", rateLimit({ windowMs: 60 * 1000, limit: 10 }), c.testAi);
 
 // sends an invitation: 20 a minute and 30 an hour per owner, so invite -> cancel -> invite can't be used to spam
 router.post("/:id/members", inviteMinuteLimiter, inviteHourlyLimiter, c.addMember);
 router.patch("/:id/members/:userId", writeLimiter, c.setMemberRole);
-router.delete("/:id/members/:userId", writeLimiter, c.removeMember);
+router.delete("/:id/members/:userId", writeLimiter, c.removeMember); // ":userId" can also be "me" (leave)
 
 router.get("/:id/invitations", c.listInvitations);
 router.delete("/:id/invitations/:invId", writeLimiter, c.cancelInvitation);

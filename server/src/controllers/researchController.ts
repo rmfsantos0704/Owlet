@@ -5,7 +5,9 @@ import { z } from "zod";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { collection } from "../models/Collection.js";
 import { User } from "../models/User.js";
+import { AiSession } from "../models/AiSession.js";
 import { analyzeText, askSources } from "../services/groq.js";
+import { pickPassages } from "../services/passages.js";
 import { buildCitations } from "../services/citations.js";
 import { extractPdf, PdfImportError } from "../services/pdfImport.js";
 import { streamPdf } from "../services/pdf.js";
@@ -171,11 +173,60 @@ async function buildFilter(req: Request, userId: string) {
     collectionId: { $in: wid ? ids.filter((i) => String(i) === wid) : ids },
   };
   if (typeof req.query.tag === "string" && req.query.tag) filter.tags = req.query.tag;
-  if (typeof req.query.q === "string" && req.query.q.trim()) {
-    const rx = new RegExp(req.query.q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-    filter.$or = [{ "source.title": rx }, { "aiOutput.summary": rx }, { tags: rx }];
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (q) {
+    const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const or: Record<string, unknown>[] = [{ "source.title": rx }, { "aiOutput.summary": rx }, { tags: rx }];
+    // the clip's full text, through the text index on the model (every word must appear);
+    // if the index isn't there yet, search still works on titles, summaries and tags
+    const words = q.split(/\s+/).map((w) => w.replace(/"/g, "")).filter(Boolean).slice(0, 8);
+    if (words.length) {
+      try {
+        const hits = await ResearchItem.find({
+          $text: { $search: words.map((w) => `"${w}"`).join(" ") },
+          collectionId: filter.collectionId,
+        })
+          .select("_id")
+          .limit(500)
+          .lean();
+        if (hits.length) or.push({ _id: { $in: hits.map((h) => h._id) } });
+      } catch (err) {
+        console.error("Full-text search unavailable:", err);
+      }
+    }
+    filter.$or = or;
   }
   return filter;
+}
+
+// A short excerpt of the clip's text around the search term, computed in the database so the full text never travels.
+async function snippetsFor(ids: unknown[], q: string) {
+  const phrase = q.toLowerCase();
+  const first = phrase.split(/\s+/)[0];
+  try {
+    const rows = await ResearchItem.aggregate([
+      { $match: { _id: { $in: ids } } },
+      { $project: { raw: { $ifNull: ["$content.rawText", ""] } } },
+      { $addFields: { low: { $toLower: "$raw" } } },
+      {
+        $addFields: {
+          pos: {
+            $cond: [
+              { $gte: [{ $indexOfCP: ["$low", phrase] }, 0] },
+              { $indexOfCP: ["$low", phrase] },
+              { $indexOfCP: ["$low", first] },
+            ],
+          },
+        },
+      },
+      { $match: { pos: { $gte: 0 } } },
+      { $project: { snippet: { $substrCP: ["$raw", { $max: [0, { $subtract: ["$pos", 80] }] }, 260] } } },
+    ]);
+    return new Map<string, string>(rows.map((r: any) => [String(r._id), String(r.snippet).replace(/\s+/g, " ").trim()]));
+  } catch (err) {
+    console.error("Snippet lookup failed:", err);
+    return new Map<string, string>();
+  }
 }
 
 export async function list(req: Request, res: Response) {
@@ -183,7 +234,10 @@ export async function list(req: Request, res: Response) {
     .select("-content.rawText")
     .sort({ createdAt: -1 })
     .limit(100);
-  res.json({ items });
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (!q || !items.length) return res.json({ items });
+  const snippets = await snippetsFor(items.map((i) => i._id), q);
+  res.json({ items: items.map((i) => ({ ...i.toJSON(), snippet: snippets.get(String(i._id)) })) });
 }
 
 export async function getOne(req: Request, res: Response) {
@@ -362,6 +416,17 @@ export async function regenerate(req: Request, res: Response) {
 }
 
 // AI workspace: a brief / summary / comparison across up to 8 saved sources the user can view.
+// what each mode looks for when the person doesn't type a question
+const MODE_HINT: Record<string, string> = {
+  "Research brief": "main findings results conclusions limitations future research",
+  Summarize: "main argument findings conclusions",
+  "Compare sources": "method methodology sample participants results findings limitations",
+};
+const CHAR_BUDGET = 24000; // total passage text sent to the AI per request
+const PASSAGE_CHARS = 900;
+
+// AI workspace: a brief / summary / comparison across up to 8 saved sources the user can view,
+// built from the passages of each source that best match the question, with quoted evidence.
 export async function ask(req: Request, res: Response) {
   const p = askSchema.safeParse(req.body);
   if (!p.success || !p.data.itemIds.every((i) => mongoose.isValidObjectId(i))) {
@@ -369,21 +434,95 @@ export async function ask(req: Request, res: Response) {
   }
   const ids = await collectionIds(res.locals.userId, "viewer");
   const items = await ResearchItem.find({ _id: { $in: p.data.itemIds }, collectionId: { $in: ids } })
-    .select("source.title aiOutput.summary content.rawText")
+    .select("collectionId source.title aiOutput.summary content.rawText")
     .lean();
   if (!items.length) return res.status(404).json({ error: "Sources not found" });
 
-  const sources = items.map((i: any) => ({
-    id: String(i._id),
-    title: i.source?.title ?? "Untitled",
-    text: i.content?.rawText || i.aiOutput?.summary || "",
-  }));
+  const query = p.data.prompt?.trim() || MODE_HINT[p.data.mode];
+  const perSource = Math.max(2, Math.min(10, Math.floor(CHAR_BUDGET / (PASSAGE_CHARS * items.length))));
 
+  const sources = items
+    .map((i: any) => ({
+      id: String(i._id),
+      title: i.source?.title ?? "Untitled",
+      passages: pickPassages(i.content?.rawText || i.aiOutput?.summary || "", query, perSource),
+    }))
+    .filter((s) => s.passages.length > 0);
+  if (!sources.length) return res.status(422).json({ error: "These sources have no readable text to analyze" });
+
+  let out;
   try {
-    const out = await askSources(p.data.mode, p.data.prompt ?? "", sources);
-    res.json({ ...out, sources: sources.map(({ id, title }) => ({ id, title })) });
+    out = await askSources(p.data.mode, p.data.prompt ?? "", sources);
   } catch (err) {
     console.error("Groq failed:", err);
-    res.status(502).json({ error: "The AI service failed. Try again." });
+    return res.status(502).json({ error: "The AI service failed. Try again." });
   }
+
+  const refs = sources.map(({ id, title }) => ({ id, title }));
+  // a failed save never loses the result the person just waited for
+  const session = await saveSession(res.locals.userId, String(items[0].collectionId), p.data.mode, p.data.prompt ?? "", refs, out);
+  res.json({ ...out, sources: refs, session });
+}
+
+// ---- AI workspace sessions: private to the person who ran them, newest 20 kept per collection ----
+
+const MAX_SESSIONS = 20;
+
+function sessionView(s: any) {
+  return {
+    id: String(s._id),
+    collectionId: String(s.collectionId),
+    mode: s.mode,
+    prompt: s.prompt ?? "",
+    summary: s.summary ?? "",
+    findings: (s.findings ?? []).map((f: any) => ({
+      title: f.title,
+      text: f.text,
+      sources: f.sources ?? [],
+      evidence: (f.evidence ?? []).map((e: any) => ({ source: e.source, quote: e.quote, verified: !!e.verified })),
+    })),
+    sources: (s.sources ?? []).map((x: any) => ({ id: x.id, title: x.title })),
+    createdAt: s.createdAt,
+  };
+}
+
+async function saveSession(
+  userId: string,
+  collectionId: string,
+  mode: string,
+  prompt: string,
+  sources: { id: string; title: string }[],
+  out: { summary: string; findings: { title: string; text: string; sources: number[]; evidence: { source: number; quote: string; verified: boolean }[] }[] }
+) {
+  try {
+    const doc = await AiSession.create({ userId, collectionId, mode, prompt, sources, summary: out.summary, findings: out.findings });
+    const stale = await AiSession.find({ userId, collectionId })
+      .sort({ createdAt: -1 })
+      .skip(MAX_SESSIONS)
+      .select("_id")
+      .lean();
+    if (stale.length) await AiSession.deleteMany({ _id: { $in: stale.map((s) => s._id) } });
+    return sessionView(doc);
+  } catch (err) {
+    console.error("Saving AI session failed:", err);
+    return null;
+  }
+}
+
+export async function listSessions(req: Request, res: Response) {
+  const wid = typeof req.query.collectionId === "string" ? req.query.collectionId : "";
+  if (!mongoose.isValidObjectId(wid)) return res.status(400).json({ error: "Bad collection id" });
+  const userId = res.locals.userId;
+  const ids = await collectionIds(userId, "viewer");
+  if (!ids.some((i) => String(i) === wid)) return res.json({ sessions: [] });
+  const sessions = await AiSession.find({ userId, collectionId: wid }).sort({ createdAt: -1 }).limit(MAX_SESSIONS).lean();
+  res.json({ sessions: sessions.map(sessionView) });
+}
+
+export async function removeSession(req: Request, res: Response) {
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const r = await AiSession.deleteOne({ _id: id, userId: res.locals.userId });
+  if (!r.deletedCount) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
 }

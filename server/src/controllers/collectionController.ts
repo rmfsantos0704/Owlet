@@ -5,10 +5,11 @@ import { collection } from "../models/Collection.js";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { User } from "../models/User.js";
 import { Invitation } from "../models/Invitation.js";
+import { AiSession } from "../models/AiSession.js";
 import {
   DECLINE_COOLDOWN_MS, INVITE_TTL_MS, MAX_MEMBERS, MAX_PENDING_PER_USER, MAX_PENDING_PER_collection,
 } from "../services/invitations.js";
-import { ensureDefaultcollection, roleIn, type Role } from "../services/access.js";
+import { atLeast, ensureDefaultcollection, roleIn, type Role } from "../services/access.js";
 import { analyzeText } from "../services/groq.js";
 import { publicLink } from "./joinLinkController.js";
 import { Activity } from "../models/Activity.js";
@@ -37,6 +38,7 @@ const addMemberSchema = z.object({
   role: z.enum(["editor", "viewer"]),
 });
 const roleSchema = z.object({ role: z.enum(["editor", "viewer"]) });
+const mergeSchema = z.object({ targetId: z.string() });
 
 function summary(w: any, role: Role) {
   return {
@@ -132,8 +134,50 @@ export async function deletecollection(req: Request, res: Response) {
   await ResearchItem.deleteMany({ collectionId: found.ws._id });
   await Invitation.deleteMany({ collectionId: found.ws._id });
   await Activity.deleteMany({ collectionId: found.ws._id });
+  await AiSession.deleteMany({ collectionId: found.ws._id });
   await collection.deleteOne({ _id: found.ws._id });
   res.json({ ok: true });
+}
+
+// Moves every clip from this collection into another one, then deletes this collection.
+// Clips the target already holds (same page or same PDF) are skipped, not copied twice.
+// Only the owner can do it (and not for Personal), and they need to be an owner or editor of the target.
+export async function mergeCollection(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  if (found.role !== "owner") return res.status(403).json({ error: "Only the owner can merge a collection into another" });
+  if (found.ws.isDefault) return res.status(400).json({ error: "Your Personal collection can't be merged away" });
+
+  const p = mergeSchema.safeParse(req.body);
+  if (!p.success || !mongoose.isValidObjectId(p.data.targetId)) return res.status(400).json({ error: "Bad collection id" });
+  if (String(found.ws._id) === p.data.targetId) {
+    return res.status(400).json({ error: "Pick a different collection to merge into" });
+  }
+
+  const target = await collection.findById(p.data.targetId);
+  if (!target || !atLeast(roleIn(target, res.locals.userId), "editor")) {
+    return res.status(403).json({ error: "You can't add clips to that collection" });
+  }
+
+  try {
+    const targetKeys = await ResearchItem.distinct("source.dedupeKey", { collectionId: target._id });
+    const moved = await ResearchItem.updateMany(
+      { collectionId: found.ws._id, "source.dedupeKey": { $nin: targetKeys } },
+      { $set: { collectionId: target._id } }
+    );
+    // whatever is still here is a duplicate of something the target already holds
+    const skipped = await ResearchItem.deleteMany({ collectionId: found.ws._id });
+
+    await AiSession.updateMany({ collectionId: found.ws._id }, { $set: { collectionId: target._id } });
+    await Invitation.deleteMany({ collectionId: found.ws._id });
+    await Activity.deleteMany({ collectionId: found.ws._id });
+    await collection.deleteOne({ _id: found.ws._id });
+
+    res.json({ ok: true, moved: moved.modifiedCount, skipped: skipped.deletedCount, targetId: String(target._id) });
+  } catch (err) {
+    console.error("Merge failed:", err);
+    res.status(500).json({ error: "The merge failed part-way. Check both collections, then try again." });
+  }
 }
 
 // Sends an invitation. Nobody joins until they accept it, and no email is sent (it shows up in their Owlet).
@@ -253,7 +297,8 @@ export async function setMemberRole(req: Request, res: Response) {
 export async function removeMember(req: Request, res: Response) {
   const found = await load(req, res);
   if (!found) return;
-  const target = String(req.params.userId);
+  // "me" stands for the signed-in person, so the sidebar's Leave option doesn't need to know its own id
+  const target = req.params.userId === "me" ? String(res.locals.userId) : String(req.params.userId);
   if (!mongoose.isValidObjectId(target)) return res.status(400).json({ error: "Bad id" });
   // the owner can remove anyone; members can remove only themselves (leave)
   if (found.role !== "owner" && target !== String(res.locals.userId)) {

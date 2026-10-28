@@ -47,5 +47,9 @@ researchItemSchema.index(
   { collectionId: 1, "source.dedupeKey": 1 },
   { unique: true, partialFilterExpression: { "source.dedupeKey": { $type: "string" } } }
 );
+researchItemSchema.index(
+  { "source.title": "text", "aiOutput.summary": "text", "content.rawText": "text" },
+  { name: "fulltext", weights: { "source.title": 10, "aiOutput.summary": 3, "content.rawText": 1 }, default_language: "none" }
+);
 
 export const ResearchItem = model("ResearchItem", researchItemSchema);
