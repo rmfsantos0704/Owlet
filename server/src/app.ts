@@ -1,4 +1,3 @@
-console.log("app.ts loaded", new Date().toISOString());
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -7,6 +6,7 @@ import authRoutes from "./routes/authRoutes.js";
 import accountRoutes from "./routes/accountRoutes.js";
 import researchRoutes from "./routes/researchRoutes.js";
 import collectionRoutes from "./routes/collectionRoutes.js";
+import supportRoutes from "./routes/supportRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
@@ -51,13 +51,12 @@ app.use(["/api/account/password", "/api/account/email", "/api/account/delete"], 
 app.use("/api/account/export", rateLimit({ windowMs: minutes(60), limit: 5 }));
 app.use("/api/research/clip", rateLimit({ windowMs: minutes(1), limit: 10 }));
 app.use("/api/research/import", rateLimit({ windowMs: minutes(1), limit: 15 }));
-
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/research", researchRoutes);
 app.use("/api/collections", collectionRoutes);
-
+app.use("/api/support", supportRoutes);
 
 app.use(errorHandler);
 

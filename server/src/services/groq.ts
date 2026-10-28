@@ -16,6 +16,17 @@ const LENGTHS: Record<string, string> = {
   detailed: "about 8-10 sentences (or 8-10 bullets)",
 };
 
+// gpt-oss models "think" before answering, and that thinking counts against the completion limit.
+// Without a generous limit and low reasoning effort, the JSON gets cut off mid-way and Groq returns a 400.
+function modelParams(maxTokens: number) {
+  const model = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+  return {
+    model,
+    max_completion_tokens: maxTokens,
+    ...(model.includes("gpt-oss") ? { reasoning_effort: "low", include_reasoning: false } : {}),
+  };
+}
+
 export async function analyzeText(title: string, text: string, settings: Partial<AiSettings> = {}) {
   const format = FORMATS[settings.format ?? ""] ?? FORMATS.paragraph;
   const length = LENGTHS[settings.length ?? ""] ?? LENGTHS.medium;
@@ -38,7 +49,7 @@ export async function analyzeText(title: string, text: string, settings: Partial
       Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
+      ...modelParams(4096),
       temperature: 0.3,
       response_format: { type: "json_object" },
       messages: [
@@ -99,7 +110,8 @@ export async function askSources(mode: string, question: string, sources: AskSou
       Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
+      // findings + quoted evidence make this a long answer, so it gets a bigger budget than analyzeText
+      ...modelParams(8192),
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [

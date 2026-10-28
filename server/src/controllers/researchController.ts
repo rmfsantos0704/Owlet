@@ -14,6 +14,8 @@ import { streamPdf } from "../services/pdf.js";
 import { toBibtex, toCsv } from "../services/export.js";
 import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../services/access.js";
 
+const MAX_TITLE = 100;
+
 const clipSchema = z.object({
   url: z.string().url(),
   title: z.string().min(1).max(500),
@@ -43,6 +45,13 @@ const askSchema = z.object({
   itemIds: z.array(z.string()).min(1).max(8),
   mode: z.enum(["Research brief", "Summarize", "Compare sources"]),
   prompt: z.string().trim().max(1000).optional(),
+  // user-chosen session name; empty means "fall back to the prompt" in the UI
+  title: z.string().trim().max(MAX_TITLE).optional(),
+  // present = re-run: update that session in place instead of creating a new one
+  sessionId: z.string().optional(),
+});
+const renameSchema = z.object({
+  title: z.string().trim().max(MAX_TITLE),
 });
 
 // Resolves the collection a clip/import goes into; answers the request itself and returns null on failure.
@@ -415,7 +424,6 @@ export async function regenerate(req: Request, res: Response) {
   res.json({ aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase } });
 }
 
-// AI workspace: a brief / summary / comparison across up to 8 saved sources the user can view.
 // what each mode looks for when the person doesn't type a question
 const MODE_HINT: Record<string, string> = {
   "Research brief": "main findings results conclusions limitations future research",
@@ -432,13 +440,20 @@ export async function ask(req: Request, res: Response) {
   if (!p.success || !p.data.itemIds.every((i) => mongoose.isValidObjectId(i))) {
     return res.status(400).json({ error: "Pick 1-8 sources and a valid mode" });
   }
+  const { mode, sessionId } = p.data;
+  if (sessionId && !mongoose.isValidObjectId(sessionId)) {
+    return res.status(400).json({ error: "Bad session id" });
+  }
+  const prompt = p.data.prompt ?? "";
+  const title = (p.data.title ?? "").slice(0, MAX_TITLE);
+
   const ids = await collectionIds(res.locals.userId, "viewer");
   const items = await ResearchItem.find({ _id: { $in: p.data.itemIds }, collectionId: { $in: ids } })
     .select("collectionId source.title aiOutput.summary content.rawText")
     .lean();
   if (!items.length) return res.status(404).json({ error: "Sources not found" });
 
-  const query = p.data.prompt?.trim() || MODE_HINT[p.data.mode];
+  const query = prompt.trim() || MODE_HINT[mode];
   const perSource = Math.max(2, Math.min(10, Math.floor(CHAR_BUDGET / (PASSAGE_CHARS * items.length))));
 
   const sources = items
@@ -452,7 +467,7 @@ export async function ask(req: Request, res: Response) {
 
   let out;
   try {
-    out = await askSources(p.data.mode, p.data.prompt ?? "", sources);
+    out = await askSources(mode, prompt, sources);
   } catch (err) {
     console.error("Groq failed:", err);
     return res.status(502).json({ error: "The AI service failed. Try again." });
@@ -460,7 +475,16 @@ export async function ask(req: Request, res: Response) {
 
   const refs = sources.map(({ id, title }) => ({ id, title }));
   // a failed save never loses the result the person just waited for
-  const session = await saveSession(res.locals.userId, String(items[0].collectionId), p.data.mode, p.data.prompt ?? "", refs, out);
+  const session = await saveSession({
+    userId: res.locals.userId,
+    collectionId: String(items[0].collectionId),
+    sessionId,
+    title,
+    mode,
+    prompt,
+    sources: refs,
+    out,
+  });
   res.json({ ...out, sources: refs, session });
 }
 
@@ -472,6 +496,7 @@ function sessionView(s: any) {
   return {
     id: String(s._id),
     collectionId: String(s.collectionId),
+    title: s.title ?? "",
     mode: s.mode,
     prompt: s.prompt ?? "",
     summary: s.summary ?? "",
@@ -486,16 +511,35 @@ function sessionView(s: any) {
   };
 }
 
-async function saveSession(
-  userId: string,
-  collectionId: string,
-  mode: string,
-  prompt: string,
-  sources: { id: string; title: string }[],
-  out: { summary: string; findings: { title: string; text: string; sources: number[]; evidence: { source: number; quote: string; verified: boolean }[] }[] }
-) {
+type SaveSessionInput = {
+  userId: string;
+  collectionId: string;
+  sessionId?: string; // present = re-run of an existing session
+  title: string;
+  mode: string;
+  prompt: string;
+  sources: { id: string; title: string }[];
+  out: {
+    summary: string;
+    findings: { title: string; text: string; sources: number[]; evidence: { source: number; quote: string; verified: boolean }[] }[];
+  };
+};
+
+async function saveSession(input: SaveSessionInput) {
+  const { userId, collectionId, sessionId, title, mode, prompt, sources, out } = input;
   try {
-    const doc = await AiSession.create({ userId, collectionId, mode, prompt, sources, summary: out.summary, findings: out.findings });
+    // re-run: update the existing session in place (it keeps its place in Recent sessions)
+    if (sessionId) {
+      const updated = await AiSession.findOneAndUpdate(
+        { _id: sessionId, userId, collectionId },
+        { $set: { title, mode, prompt, sources, summary: out.summary, findings: out.findings } },
+        { new: true }
+      );
+      if (updated) return sessionView(updated);
+      // the session was deleted in the meantime: save this run as a new one instead
+    }
+
+    const doc = await AiSession.create({ userId, collectionId, title, mode, prompt, sources, summary: out.summary, findings: out.findings });
     const stale = await AiSession.find({ userId, collectionId })
       .sort({ createdAt: -1 })
       .skip(MAX_SESSIONS)
@@ -517,6 +561,21 @@ export async function listSessions(req: Request, res: Response) {
   if (!ids.some((i) => String(i) === wid)) return res.json({ sessions: [] });
   const sessions = await AiSession.find({ userId, collectionId: wid }).sort({ createdAt: -1 }).limit(MAX_SESSIONS).lean();
   res.json({ sessions: sessions.map(sessionView) });
+}
+
+// Renames one of the person's own sessions. An empty title clears the name (the UI falls back to the prompt).
+export async function renameSession(req: Request, res: Response) {
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const p = renameSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: `Title must be at most ${MAX_TITLE} characters` });
+  const session = await AiSession.findOneAndUpdate(
+    { _id: id, userId: res.locals.userId },
+    { $set: { title: p.data.title } },
+    { new: true }
+  );
+  if (!session) return res.status(404).json({ error: "Not found" });
+  res.json({ session: sessionView(session) });
 }
 
 export async function removeSession(req: Request, res: Response) {

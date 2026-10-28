@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import {
   clip, importPdf, list, getOne, remove,
   addHighlight, removeHighlight, addComment, removeComment, setTags,
-  updateSource, regenerate, pdf, exportItems, ask, listSessions, removeSession,
+  updateSource, regenerate, pdf, exportItems, ask, listSessions, removeSession, renameSession,
 } from "../controllers/researchController.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { uploadPdf } from "../middlewares/upload.js";
@@ -21,6 +21,7 @@ router.post("/clip", clipDailyLimiter, trackActivity("clip_added"), clip);
 router.post("/import", importDailyLimiter, uploadPdf, trackActivity("pdf_imported"), importPdf);
 router.post("/ask", askLimit, ask);
 router.get("/sessions", listSessions);
+router.patch("/sessions/:id", writeLimiter, renameSession);
 router.delete("/sessions/:id", writeLimiter, removeSession);
 router.get("/", list);
 router.get("/export", exportItems);

@@ -5,6 +5,8 @@ const aiSessionSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     collectionId: { type: Schema.Types.ObjectId, ref: "Collection", required: true },
+    // user-chosen name shown in Recent sessions; empty means "fall back to the prompt"
+    title: { type: String, default: "", trim: true, maxlength: 100 },
     mode: { type: String, enum: ["Research brief", "Summarize", "Compare sources"], required: true },
     prompt: { type: String, default: "", maxlength: 1000 },
     // snapshot of what was used, so the session still reads correctly if a clip is deleted later
