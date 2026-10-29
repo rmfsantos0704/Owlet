@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-  getAccount, updateProfile, changePassword, requestEmailChange, cancelEmailChange,
+  getAccount, changePassword, requestEmailChange, cancelEmailChange,
   signOutEverywhere, exportData, deleteAccount,
 } from "../controllers/accountController.js";
 import { requireAuth } from "../middlewares/auth.js";
@@ -10,7 +10,6 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/", getAccount);
-router.patch("/profile", updateProfile);
 router.post("/password", accountSensitiveLimiter, changePassword); // per-account, on top of the IP limit in app.ts
 router.post("/email", accountSensitiveLimiter, requestEmailChange);
 router.delete("/email", cancelEmailChange);

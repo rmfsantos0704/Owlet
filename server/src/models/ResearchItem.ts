@@ -2,8 +2,8 @@ import { Schema, model } from "mongoose";
 
 const researchItemSchema = new Schema(
   {
-// who clipped it; becomes null if that person deletes their account (the clip stays with the collection)
-userId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
+    // who clipped it; becomes null if that person deletes their account (the clip stays with the collection)
+    userId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     collectionId: { type: Schema.Types.ObjectId, ref: "collection", required: true },
     source: {
       kind: { type: String, enum: ["web", "pdf"], default: "web" },
@@ -17,6 +17,12 @@ userId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true }
     },
     content: { rawText: String, wordCount: Number },
     aiOutput: { summary: String, paraphrase: String },
+    // per-clip summary settings (set from the AI settings modal on the clip page)
+    aiSettings: {
+      format: { type: String, enum: ["paragraph", "bullets", "academic", "simple"], default: "paragraph" },
+      length: { type: String, enum: ["short", "medium", "detailed"], default: "medium" },
+      instructions: { type: String, default: "" },
+    },
     citations: { apa: String, mla: String, chicago: String },
     tags: [String],
     highlights: [
@@ -33,6 +39,7 @@ userId: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true }
         authorEmail: String,
         text: String,
         highlightId: Schema.Types.ObjectId,
+        parentId: Schema.Types.ObjectId, // set on replies: the _id of the comment being answered
         createdAt: { type: Date, default: Date.now },
         updatedAt: { type: Date, default: Date.now },
       },

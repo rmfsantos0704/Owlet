@@ -34,13 +34,15 @@ export async function analyzeText(title: string, text: string, settings: Partial
 
   const system =
     `You are a research assistant. Respond ONLY with JSON: {"summary": string, "paraphrase": string, "tags": string[]}.\n` +
-    `- summary: ${format}; length ${length}. Separate lines with \\n.\n` +
-    `- paraphrase: the key arguments restated in your own words, one short paragraph.\n` +
-    `- tags: 3-5 lowercase topic tags.\n` +
-    `- Use only information found in the text. Never invent facts; if something is not stated, say so.` +
     (extra
-      ? `\nThe user added the instructions below. Follow them when writing the summary, paraphrase and tags, but never change the JSON structure above and never write anything outside the JSON.\n"""${extra}"""`
-      : "");
+      ? `\nTOP PRIORITY: the user's instructions below. Build the summary, paraphrase and tags around them. ` +
+        `If they name a section or topic (for example "the objective" or "the methods"), base the summary mainly on that part of the text and mention other parts only briefly, or not at all. ` +
+        `Never change the JSON structure and never write anything outside the JSON.\n"""${extra}"""\n\n`
+      : "\n") +
+    `- summary: ${format}; length ${length}. Separate lines with \\n.\n` +
+    `- paraphrase: ${extra ? "the key points of the user's focus above" : "the key arguments"} restated in your own words, one short paragraph.\n` +
+    `- tags: 3-5 lowercase topic tags.\n` +
+    `- Use only information found in the text. Never invent facts; if something is not stated, say so.`;
 
   const res = await fetch(GROQ_URL, {
     method: "POST",
@@ -54,7 +56,12 @@ export async function analyzeText(title: string, text: string, settings: Partial
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
-        { role: "user", content: `Title: ${title}\n\n${text.slice(0, 12000)}` },
+        {
+          role: "user",
+          content:
+            `Title: ${title}\n\n${text.slice(0, 12000)}` +
+            (extra ? `\n\n---\nReminder: follow the user's instructions for the summary, paraphrase and tags:\n"""${extra}"""` : ""),
+        },
       ],
     }),
   });

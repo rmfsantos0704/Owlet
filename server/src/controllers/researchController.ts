@@ -15,6 +15,17 @@ import { toBibtex, toCsv } from "../services/export.js";
 import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../services/access.js";
 
 const MAX_TITLE = 100;
+const HIGHLIGHT_COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green"] as const;
+
+// per-clip AI summary settings (sent by the extension popup and the AI settings modal)
+const aiSettingsSchema = z.object({
+  format: z.enum(["paragraph", "bullets", "academic", "simple"]),
+  length: z.enum(["short", "medium", "detailed"]),
+  instructions: z.string().trim().max(500).default(""),
+});
+const setAiSettingsSchema = z.object({ aiSettings: aiSettingsSchema });
+const regenerateSchema = z.object({ aiSettings: aiSettingsSchema.optional() });
+const testAiSchema = z.object({ aiSettings: aiSettingsSchema, sample: z.boolean().optional() });
 
 const clipSchema = z.object({
   url: z.string().url(),
@@ -23,15 +34,24 @@ const clipSchema = z.object({
   publishedDate: z.string().max(100).optional(),
   rawText: z.string().min(50).max(200000),
   collectionId: z.string().optional(),
+  aiSettings: aiSettingsSchema.optional(), // the settings chosen in the extension popup
 });
 const highlightSchema = z.object({
   text: z.string().trim().min(1).max(2000),
-  color: z.enum(["yellow", "green", "blue", "pink"]).default("yellow"),
+  color: z.enum(HIGHLIGHT_COLORS).default("yellow"),
   note: z.string().trim().max(1000).optional(),
+});
+const highlightUpdateSchema = z.object({
+  color: z.enum(HIGHLIGHT_COLORS),
+  note: z.string().trim().max(1000).default(""), // empty clears the note
 });
 const commentSchema = z.object({
   text: z.string().trim().min(1).max(2000),
   highlightId: z.string().optional(),
+  parentId: z.string().optional(),
+});
+const commentUpdateSchema = z.object({
+  text: z.string().trim().min(1).max(2000),
 });
 const tagsSchema = z.object({
   tags: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(20),
@@ -54,6 +74,15 @@ const renameSchema = z.object({
   title: z.string().trim().max(MAX_TITLE),
 });
 
+const SAMPLE_ARTICLE = {
+  title: "Sample article: Sleep and memory",
+  text:
+    "Researchers followed 120 university students over four weeks to study how sleep affects memory. " +
+    "Students who slept at least seven hours recalled about 20% more words in a recall test than students who slept five hours or less. " +
+    "The authors note that the sample was small, came from one university, and relied on self-reported sleep times. " +
+    "They suggest larger studies using wearable sleep trackers.",
+};
+
 // Resolves the collection a clip/import goes into; answers the request itself and returns null on failure.
 async function targetcollection(res: Response, userId: string, collectionId?: string) {
   if (!collectionId) return ensureDefaultcollection(userId);
@@ -69,14 +98,19 @@ async function targetcollection(res: Response, userId: string, collectionId?: st
   return ws;
 }
 
-// Runs the AI summary with the collection's settings; a failure never blocks saving.
-async function runAi(ws: { aiSettings?: any }, title: string, text: string) {
+// The collection's AI settings as plain values, used when a clip arrives without its own.
+function settingsFrom(ws: { aiSettings?: any }) {
+  return {
+    format: ws.aiSettings?.format ?? "paragraph",
+    length: ws.aiSettings?.length ?? "medium",
+    instructions: ws.aiSettings?.instructions ?? "",
+  };
+}
+
+// Runs the AI summary with the given settings; a failure never blocks saving.
+async function runAi(settings: { format?: string; length?: string; instructions?: string }, title: string, text: string) {
   try {
-    const ai = await analyzeText(title, text, {
-      format: ws.aiSettings?.format,
-      length: ws.aiSettings?.length,
-      instructions: ws.aiSettings?.instructions,
-    });
+    const ai = await analyzeText(title, text, settings);
     return { ai, aiFailed: false };
   } catch (err) {
     console.error("Groq failed:", err);
@@ -97,7 +131,9 @@ export async function clip(req: Request, res: Response) {
   if (existing) return res.status(409).json({ error: "Already clipped", id: existing.id });
 
   const domain = new URL(d.url).hostname;
-  const { ai, aiFailed } = await runAi(ws, d.title, d.rawText);
+  // the popup's settings win; clips from elsewhere fall back to the collection's
+  const aiSettings = d.aiSettings ?? settingsFrom(ws);
+  const { ai, aiFailed } = await runAi(aiSettings, d.title, d.rawText);
 
   const item = await ResearchItem.create({
     userId,
@@ -113,6 +149,7 @@ export async function clip(req: Request, res: Response) {
     },
     content: { rawText: d.rawText, wordCount: d.rawText.split(/\s+/).length },
     aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
+    aiSettings,
     citations: buildCitations({ author: d.author, title: d.title, url: d.url, domain, publishedDate: d.publishedDate }),
     tags: ai.tags,
   });
@@ -153,8 +190,9 @@ export async function importPdf(req: Request, res: Response) {
   }
 
   const rawText = pdf.text.slice(0, 200000);
+  const aiSettings = settingsFrom(ws);
   // long documents: give the AI the start (abstract/intro) and the end (conclusions)
-  const { ai, aiFailed } = await runAi(ws, pdf.title, forAi(rawText));
+  const { ai, aiFailed } = await runAi(aiSettings, pdf.title, forAi(rawText));
 
   const item = await ResearchItem.create({
     userId,
@@ -168,6 +206,7 @@ export async function importPdf(req: Request, res: Response) {
     },
     content: { rawText, wordCount: rawText.split(/\s+/).length },
     aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
+    aiSettings,
     citations: buildCitations({ author: pdf.author, title: pdf.title }),
     tags: ai.tags,
   });
@@ -284,33 +323,104 @@ export async function addHighlight(req: Request, res: Response) {
   return mutate(req, res, { $push: { highlights: p.data } }, 201);
 }
 
+// PATCH /research/:id/highlights/:highlightId: changes a highlight's color and note.
+export async function updateHighlight(req: Request, res: Response) {
+  const p = highlightUpdateSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: "Invalid highlight" });
+  const id = String(req.params.id);
+  const hid = String(req.params.highlightId);
+  if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(hid)) {
+    return res.status(400).json({ error: "Bad id" });
+  }
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const item = await ResearchItem.findOneAndUpdate(
+    { _id: id, collectionId: { $in: ids }, "highlights._id": hid },
+    { $set: { "highlights.$.color": p.data.color, "highlights.$.note": p.data.note } },
+    { new: true }
+  );
+  if (!item) return res.status(404).json({ error: "Highlight not found" });
+  res.json({ highlights: item.highlights });
+}
+
 export async function removeHighlight(req: Request, res: Response) {
   const hid = String(req.params.highlightId);
   if (!mongoose.isValidObjectId(hid)) return res.status(400).json({ error: "Bad id" });
-  // also removes comments anchored to this highlight
+  // also removes comments (and their replies) anchored to this highlight
   return mutate(req, res, { $pull: { highlights: { _id: hid }, comments: { highlightId: hid } } });
 }
 
 export async function addComment(req: Request, res: Response) {
   const p = commentSchema.safeParse(req.body);
   if (!p.success) return res.status(400).json({ error: "Invalid comment" });
-  const { text, highlightId } = p.data;
+  const { text, parentId } = p.data;
+  let highlightId = p.data.highlightId;
   if (highlightId && !mongoose.isValidObjectId(highlightId)) {
     return res.status(400).json({ error: "Bad highlight id" });
   }
+
+  if (parentId) {
+    const id = String(req.params.id);
+    if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(parentId)) {
+      return res.status(400).json({ error: "Bad id" });
+    }
+    const ids = await collectionIds(res.locals.userId, "editor");
+    const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("comments").lean();
+    if (!item) return res.status(404).json({ error: "Not found" });
+    const parent = ((item.comments ?? []) as any[]).find((c) => String(c._id) === parentId);
+    if (!parent) return res.status(404).json({ error: "The comment you're replying to no longer exists" });
+    if (parent.parentId) return res.status(400).json({ error: "You can only reply to a top-level comment" });
+    // a reply sits under the same highlight as its parent
+    highlightId = parent.highlightId ? String(parent.highlightId) : undefined;
+  }
+
   const me = await User.findById(res.locals.userId).select("email");
   return mutate(
     req,
     res,
-    { $push: { comments: { userId: res.locals.userId, authorEmail: me?.email, text, highlightId } } },
+    { $push: { comments: { userId: res.locals.userId, authorEmail: me?.email, text, highlightId, parentId } } },
     201
   );
 }
 
-export async function removeComment(req: Request, res: Response) {
+// PATCH /research/:id/comments/:commentId: only the author can edit their own comment or reply.
+export async function updateComment(req: Request, res: Response) {
+  const p = commentUpdateSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: "Invalid comment" });
+  const id = String(req.params.id);
   const cid = String(req.params.commentId);
-  if (!mongoose.isValidObjectId(cid)) return res.status(400).json({ error: "Bad id" });
-  return mutate(req, res, { $pull: { comments: { _id: cid, userId: res.locals.userId } } });
+  if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(cid)) {
+    return res.status(400).json({ error: "Bad id" });
+  }
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const item = await ResearchItem.findOneAndUpdate(
+    {
+      _id: id,
+      collectionId: { $in: ids },
+      comments: { $elemMatch: { _id: cid, userId: res.locals.userId } },
+    },
+    { $set: { "comments.$.text": p.data.text, "comments.$.updatedAt": new Date() } },
+    { new: true }
+  );
+  if (!item) return res.status(404).json({ error: "Comment not found, or it isn't yours" });
+  res.json({ highlights: item.highlights, comments: item.comments, tags: item.tags });
+}
+
+// Only the author can delete a comment. Deleting a comment also deletes the replies under it.
+export async function removeComment(req: Request, res: Response) {
+  const id = String(req.params.id);
+  const cid = String(req.params.commentId);
+  if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(cid)) {
+    return res.status(400).json({ error: "Bad id" });
+  }
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const own = await ResearchItem.exists({
+    _id: id,
+    collectionId: { $in: ids },
+    comments: { $elemMatch: { _id: cid, userId: res.locals.userId } },
+  });
+  if (!own) return res.status(404).json({ error: "Comment not found, or it isn't yours" });
+  const oid = new mongoose.Types.ObjectId(cid);
+  return mutate(req, res, { $pull: { comments: { $or: [{ _id: oid }, { parentId: oid }] } } });
 }
 
 export async function setTags(req: Request, res: Response) {
@@ -385,21 +495,78 @@ export async function exportItems(req: Request, res: Response) {
   res.send(body);
 }
 
-// Re-runs the AI summary with the collection's CURRENT settings. Tags are left alone.
-export async function regenerate(req: Request, res: Response) {
+// PUT /research/:id/ai-settings: saves the clip's AI summary settings. Does not regenerate.
+export async function setAiSettings(req: Request, res: Response) {
+  const p = setAiSettingsSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: "Invalid AI settings" });
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
   const ids = await collectionIds(res.locals.userId, "editor");
-  const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select(
-    "collectionId source.kind source.title content.rawText"
-  );
+  const item = await ResearchItem.findOneAndUpdate(
+    { _id: id, collectionId: { $in: ids } },
+    { $set: { aiSettings: p.data.aiSettings } },
+    { new: true }
+  ).select("aiSettings");
+  if (!item) return res.status(404).json({ error: "Not found" });
+  // the client merges this response into its item state
+  res.json({ aiSettings: item.aiSettings });
+}
+
+// POST /research/:id/test-ai: tries settings on the clip or a built-in sample. Saves nothing.
+export async function testAi(req: Request, res: Response) {
+  const p = testAiSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: "Invalid AI settings" });
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } })
+    .select("source.kind source.title content.rawText")
+    .lean();
+  if (!item) return res.status(404).json({ error: "Not found" });
+
+  let title = SAMPLE_ARTICLE.title;
+  let text = SAMPLE_ARTICLE.text;
+  let source = "the built-in sample article";
+  if (!p.data.sample) {
+    const raw = item.content?.rawText ?? "";
+    if (raw.length < 50) return res.status(422).json({ error: "This clip has no text to test on" });
+    title = item.source?.title ?? "Untitled";
+    text = item.source?.kind === "pdf" ? forAi(raw) : raw;
+    source = "this clip";
+  }
+
+  try {
+    const ai = await analyzeText(title, text, p.data.aiSettings);
+    res.json({ ...ai, source });
+  } catch (err) {
+    console.error("Groq failed:", err);
+    res.status(502).json({ error: "The AI service failed. Try again." });
+  }
+}
+
+// Rewrites the AI summary. Settings sent in the body (from the modal) are used and saved on the clip
+// once the AI succeeds. Without a body, it uses the clip's saved settings, then the collection's.
+export async function regenerate(req: Request, res: Response) {
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const body = regenerateSchema.safeParse(req.body ?? {});
+  if (!body.success) return res.status(400).json({ error: "Invalid AI settings" });
+
+  const ids = await collectionIds(res.locals.userId, "editor");
+  // lean() so clips saved before per-clip settings existed show no aiSettings instead of schema defaults
+  const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } })
+    .select("collectionId aiSettings source.kind source.title content.rawText")
+    .lean();
   if (!item) return res.status(404).json({ error: "Not found" });
 
   const text = item.content?.rawText ?? "";
   if (text.length < 50) return res.status(422).json({ error: "This clip has no text to summarize" });
 
-  const ws = await collection.findById(item.collectionId).select("aiSettings");
-  const settings: any = ws?.aiSettings ?? {};
+  let settings: any = body.data.aiSettings ?? item.aiSettings;
+  if (!settings) {
+    const ws = await collection.findById(item.collectionId).select("aiSettings");
+    settings = ws?.aiSettings ?? {};
+  }
   const input = item.source?.kind === "pdf" ? forAi(text) : text;
 
   let ai;
@@ -417,11 +584,17 @@ export async function regenerate(req: Request, res: Response) {
     return res.status(502).json({ error: "The AI returned an empty summary. Your existing summary is unchanged." });
   }
 
-  await ResearchItem.updateOne(
-    { _id: item._id },
-    { $set: { "aiOutput.summary": ai.summary, "aiOutput.paraphrase": ai.paraphrase } }
-  );
-  res.json({ aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase } });
+  const $set: Record<string, unknown> = {
+    "aiOutput.summary": ai.summary,
+    "aiOutput.paraphrase": ai.paraphrase,
+  };
+  if (body.data.aiSettings) $set.aiSettings = body.data.aiSettings; // saved only after the AI succeeded
+  await ResearchItem.updateOne({ _id: item._id }, { $set });
+
+  res.json({
+    aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
+    ...(body.data.aiSettings ? { aiSettings: body.data.aiSettings } : {}),
+  });
 }
 
 // what each mode looks for when the person doesn't type a question

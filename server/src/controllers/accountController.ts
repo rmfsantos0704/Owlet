@@ -10,7 +10,7 @@ import { Activity, NotificationState } from "../models/Activity.js";
 import { sendMail } from "../services/mailer.js";
 import * as tpl from "../services/emailTemplates.js";
 import {
-  ageField, occupationField, emailField, passwordField, signToken, sha256, newToken, fire, claimEmailSlot,
+  ageField, emailField, passwordField, signToken, sha256, newToken, fire, claimEmailSlot,
 } from "./authController.js";
 
 const EMAIL_CHANGE_TTL_MS = 60 * 60 * 1000;
@@ -41,7 +41,7 @@ const passwordBody = z.string().min(1, "Enter your current password").max(1000);
 export async function getAccount(_req: Request, res: Response) {
   const id = res.locals.userId;
   const user = await User.findById(id).select(
-    "email age occupation emailVerified pendingEmail createdAt termsVersion termsAcceptedAt"
+    "email age emailVerified pendingEmail createdAt termsVersion termsAcceptedAt"
   );
   if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -55,7 +55,6 @@ export async function getAccount(_req: Request, res: Response) {
     account: {
       email: user.email,
       age: user.age,
-      occupation: user.occupation,
       pendingEmail: user.pendingEmail ?? null,
       createdAt: user.createdAt,
       termsVersion: user.termsVersion ?? null,
@@ -67,15 +66,6 @@ export async function getAccount(_req: Request, res: Response) {
       members: w.members.map((m) => ({ userId: String(m.userId), email: emailOf(m.userId), role: m.role })),
     })),
   });
-}
-
-// ---------- profile ----------
-
-export async function updateProfile(req: Request, res: Response) {
-  const p = z.object({ age: ageField, occupation: occupationField }).safeParse(req.body);
-  if (!p.success) return res.status(400).json({ error: firstError(p.error) });
-  await User.updateOne({ _id: res.locals.userId }, { $set: { age: p.data.age, occupation: p.data.occupation } });
-  res.json({ ok: true, age: p.data.age, occupation: p.data.occupation });
 }
 
 // ---------- password ----------
@@ -186,7 +176,7 @@ export async function signOutEverywhere(_req: Request, res: Response) {
 export async function exportData(_req: Request, res: Response) {
   const id = String(res.locals.userId);
   const user = await User.findById(id).select(
-    "email age occupation emailVerified createdAt termsVersion termsAcceptedAt"
+    "email age emailVerified createdAt termsVersion termsAcceptedAt"
   );
   if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -215,7 +205,6 @@ export async function exportData(_req: Request, res: Response) {
     account: {
       email: user.email,
       age: user.age,
-      occupation: user.occupation,
       createdAt: user.createdAt,
       agreedToTermsVersion: user.termsVersion ?? null,
       agreedToTermsAt: user.termsAcceptedAt ?? null,

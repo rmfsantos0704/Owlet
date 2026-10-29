@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { User, OCCUPATIONS } from "../models/User.js";
+import { User } from "../models/User.js";
 import { sendMail } from "../services/mailer.js";
 import * as tpl from "../services/emailTemplates.js";
 
@@ -40,7 +40,6 @@ export const ageField = z.coerce
   .int("Enter your age as a whole number")
   .min(13, "You must be at least 13 to use Owlet")
   .max(120, "Enter a valid age");
-export const occupationField = z.enum(OCCUPATIONS, "Choose what best describes you");
 
 const registerSchema = z
   .object({
@@ -48,7 +47,6 @@ const registerSchema = z
     password: passwordField,
     confirmPassword: z.string(),
     age: ageField,
-    occupation: occupationField,
     acceptTerms: z.any().refine((v) => v === true, "You need to agree to the Terms and Privacy Policy to continue"),
   })
   .refine((d) => d.password === d.confirmPassword, { message: "Passwords don't match", path: ["confirmPassword"] })
@@ -96,7 +94,7 @@ async function issueReset(user: { _id: unknown; email: string }) {
 export async function register(req: Request, res: Response) {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: firstError(parsed.error) });
-  const { email, password, age, occupation } = parsed.data;
+  const { email, password, age} = parsed.data;
 
   // Hash first, in every case, so response time doesn't reveal whether the email is already registered.
   const passwordHash = await bcrypt.hash(password, 12);
@@ -109,13 +107,13 @@ export async function register(req: Request, res: Response) {
     // Never-verified registration: the newest submission wins, so nobody can pre-claim someone else's address.
     await User.updateOne(
       { _id: existing._id },
-      { $set: { passwordHash, age, occupation, termsVersion: TERMS_VERSION, termsAcceptedAt: new Date() } }
+      { $set: { passwordHash, age, termsVersion: TERMS_VERSION, termsAcceptedAt: new Date() } }
     );
     if (await claimEmailSlot(existing._id)) fire(issueVerification(existing));
   } else {
     try {
       const user = await User.create({
-        email, passwordHash, age, occupation,
+        email, passwordHash, age,
         emailVerified: false,
         lastEmailAt: new Date(),
         termsVersion: TERMS_VERSION,
@@ -200,14 +198,13 @@ export async function login(req: Request, res: Response) {
 }
 
 export async function me(_req: Request, res: Response) {
-  const user = await User.findById(res.locals.userId).select("email age occupation emailVerified createdAt");
+  const user = await User.findById(res.locals.userId).select("email age  emailVerified createdAt");
   if (!user) return res.status(404).json({ error: "User not found" });
   res.json({
     user: {
       id: user.id,
       email: user.email,
       age: user.age,
-      occupation: user.occupation,
       emailVerified: user.emailVerified !== false,
       createdAt: user.createdAt,
     },

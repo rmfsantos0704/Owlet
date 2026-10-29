@@ -1,14 +1,11 @@
 import { Schema, model } from "mongoose";
 
-export const OCCUPATIONS = ["student", "teacher", "researcher", "professional", "other"] as const;
-export type Occupation = (typeof OCCUPATIONS)[number];
 
 const userSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     age: { type: Number, min: 13, max: 120 },
-    occupation: { type: String, enum: OCCUPATIONS },
 
     // No schema default on purpose: accounts created before verification existed have no value
     // here and must keep working. Only an explicit `false` means "not verified yet".
