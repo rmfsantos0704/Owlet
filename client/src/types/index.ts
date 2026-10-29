@@ -1,11 +1,25 @@
 export type Highlight = { _id: string; text: string; color: string; note?: string; createdAt: string };
-export type Comment = { _id: string; text: string; highlightId?: string; authorEmail?: string; createdAt: string };
+export type Comment = {
+  _id: string;
+  text: string;
+  highlightId?: string;
+  parentId?: string; // set on replies: the _id of the comment being answered
+  authorEmail?: string;
+  createdAt: string;
+  updatedAt?: string;
+};
 
 export type Role = "owner" | "editor" | "viewer";
 export type AiSettings = {
   format: "paragraph" | "bullets" | "academic" | "simple";
   length: "short" | "medium" | "detailed";
   instructions: string;
+};
+// fallback for clips that have no settings saved yet; keep in sync with the server default
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  format: "paragraph",
+  length: "medium",
+  instructions: "",
 };
 export type Collection = {
   id: string;
@@ -45,6 +59,7 @@ export type ResearchItem = {
   };
   content?: { rawText?: string; wordCount?: number };
   aiOutput: { summary?: string; paraphrase?: string };
+  aiSettings?: AiSettings; // per-clip summary settings; missing on clips saved before this existed
   citations: { apa?: string; mla?: string; chicago?: string };
   tags: string[];
   highlights: Highlight[];

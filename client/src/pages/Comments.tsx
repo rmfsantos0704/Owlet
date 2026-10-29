@@ -3,8 +3,9 @@ import { Link, useSearchParams } from "react-router-dom";
 import { MessageSquareText, Trash2 } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { useCollections } from "../context/CollectionContext";
+import { useCollectionScope } from "../hooks/useCollectionScope";
 import { useDialog } from "../context/DialogContext";
+import FilterBar, { type FilterSelect } from "../components/FilterBar";
 import type { ResearchItem } from "../types";
 
 const FILTERS = ["All", "On highlights", "General"] as const;
@@ -19,7 +20,7 @@ function tint(email = "") {
 export default function Comments() {
   const { user } = useAuth();
   const dialog = useDialog();
-  const { current, ready } = useCollections();
+  const { ready, scope, setScope, scopeCollection, qs, options: collectionOptions } = useCollectionScope();
   const [params] = useSearchParams();
   const q = (params.get("q") ?? "").toLowerCase();
   const [items, setItems] = useState<ResearchItem[]>([]);
@@ -27,15 +28,30 @@ export default function Comments() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
 
+  // search + filters
+  const [search, setSearch] = useState("");
+  const [clipId, setClipId] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+
   useEffect(() => {
     if (!ready) return;
+    let cancelled = false;
     setLoading(true);
-    const qs = current ? `?collectionId=${current.id}` : "";
+    setError("");
     api<{ items: ResearchItem[] }>(`/research${qs}`)
-      .then((r) => setItems(r.items))
-      .catch((e) => setError(e instanceof Error ? e.message : "Could not load comments"))
-      .finally(() => setLoading(false));
-  }, [ready, current?.id]);
+      .then((r) => !cancelled && setItems(r.items))
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Could not load comments"))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, qs]);
+
+  // the clip and user filters only make sense inside the collection they were picked in
+  useEffect(() => {
+    setClipId("");
+    setUserEmail("");
+  }, [scope]);
 
   const threads = useMemo(
     () =>
@@ -51,11 +67,59 @@ export default function Comments() {
     [items]
   );
 
+  const clipOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    threads.forEach((t) => m.set(t.item._id, t.item.source?.title ?? "Untitled"));
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [threads]);
+
+  const authors = useMemo(
+    () => [...new Set(threads.map((t) => t.authorEmail).filter((e): e is string => !!e))].sort(),
+    [threads]
+  );
+
+  const needle = search.trim().toLowerCase();
+  const matches = (c: (typeof threads)[number], s: string) =>
+    !s ||
+    c.text.toLowerCase().includes(s) ||
+    (c.authorEmail ?? "").toLowerCase().includes(s) ||
+    (c.item.source?.title ?? "").toLowerCase().includes(s) ||
+    (c.highlight?.text ?? "").toLowerCase().includes(s);
+
   const shown = threads.filter(
     (c) =>
       (filter === "All" || (filter === "On highlights" ? !!c.highlightId : !c.highlightId)) &&
-      (!q || c.text.toLowerCase().includes(q) || (c.authorEmail ?? "").toLowerCase().includes(q) || (c.item.source?.title ?? "").toLowerCase().includes(q))
+      (!clipId || c.item._id === clipId) &&
+      (!userEmail || c.authorEmail === userEmail) &&
+      matches(c, q) &&
+      matches(c, needle)
   );
+
+  const filtersActive = !!(needle || clipId || userEmail);
+
+  function clearFilters() {
+    setSearch("");
+    setClipId("");
+    setUserEmail("");
+  }
+
+  const selects: FilterSelect[] = [
+    { id: "collection", label: "Collection", value: scope, onChange: setScope, options: collectionOptions },
+    {
+      id: "clip",
+      label: "Clip",
+      value: clipId,
+      onChange: setClipId,
+      options: [{ value: "", label: "All clips" }, ...clipOptions.map(([id, title]) => ({ value: id, label: title }))],
+    },
+    {
+      id: "user",
+      label: "User",
+      value: userEmail,
+      onChange: setUserEmail,
+      options: [{ value: "", label: "All users" }, ...authors.map((a) => ({ value: a, label: a }))],
+    },
+  ];
 
   async function remove(itemId: string, commentId: string) {
     const ok = await dialog.confirm({ title: "Delete this comment?", message: "This can't be undone.", confirmLabel: "Delete", danger: true });
@@ -80,13 +144,13 @@ export default function Comments() {
         <div className="eyebrow mb-2 text-blue-600">Team collaboration</div>
         <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Comments</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Questions, feedback, and decisions across {current ? current.name : "your research"}.
+          Questions, feedback, and decisions across {scopeCollection ? scopeCollection.name : "all your collections"}.
         </p>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
         <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
-          <div className="border-b border-slate-100 p-4">
+          <div className="space-y-4 border-b border-slate-100 p-4">
             <div className="inline-flex gap-1 rounded-lg bg-slate-100 p-1">
               {FILTERS.map((f) => (
                 <button
@@ -100,6 +164,18 @@ export default function Comments() {
                 </button>
               ))}
             </div>
+
+            <FilterBar
+              search={search}
+              onSearch={setSearch}
+              placeholder="Search comments, people, or sources"
+              selects={selects}
+              active={filtersActive}
+              onClear={clearFilters}
+              shown={shown.length}
+              total={threads.length}
+              noun="comments"
+            />
           </div>
 
           {loading ? (
@@ -109,8 +185,12 @@ export default function Comments() {
           ) : shown.length === 0 ? (
             <div className="px-5 py-16 text-center">
               <MessageSquareText className="mx-auto mb-3 size-6 text-slate-300" />
-              <div className="text-sm font-medium text-slate-600">No comments yet</div>
-              <div className="mt-1 text-xs text-slate-400">Open a clip to start a discussion.</div>
+              <div className="text-sm font-medium text-slate-600">
+                {filtersActive || q ? "No comments match your search" : "No comments yet"}
+              </div>
+              <div className="mt-1 text-xs text-slate-400">
+                {filtersActive || q ? "Try a different search or clear the filters." : "Open a clip to start a discussion."}
+              </div>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">

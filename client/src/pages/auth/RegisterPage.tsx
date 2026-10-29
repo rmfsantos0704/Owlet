@@ -1,24 +1,21 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, Check, GraduationCap, LockKeyhole, Mail, MailCheck } from "lucide-react";
+import { CalendarDays, Check, LockKeyhole, Mail, MailCheck } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../services/api";
 import { useCooldown } from "../../hooks/useCooldown";
-import { OCCUPATIONS } from "../../utils/occupations";
 import { passwordProblem } from "../../utils/password";
 import AuthShell, { AuthCard, Banner } from "../../components/auth/AuthShell";
 import AuthField from "../../components/auth/AuthField";
-import AuthSelect from "../../components/auth/AuthSelect";
 import PasswordStrength from "../../components/auth/PasswordStrength";
 import { PrimaryButton, TextButton } from "../../components/auth/AppButton";
 
-type Form = { email: string; occupation: string; age: string; password: string; confirm: string };
+type Form = { email: string; age: string; password: string; confirm: string };
 type Errors = Partial<Record<keyof Form | "agree", string>>;
 
 function validate(f: Form, agree: boolean): Errors {
   const e: Errors = {};
   if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) e.email = "Enter a valid email address.";
-  if (!f.occupation) e.occupation = "Choose what best describes you.";
 
   const age = Number(f.age);
   if (!f.age.trim()) e.age = "Enter your age.";
@@ -36,7 +33,7 @@ function validate(f: Form, agree: boolean): Errors {
 
 export default function RegisterPage() {
   const { register } = useAuth();
-  const [form, setForm] = useState<Form>({ email: "", occupation: "", age: "", password: "", confirm: "" });
+  const [form, setForm] = useState<Form>({ email: "", age: "", password: "", confirm: "" });
   const [agree, setAgree] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [error, setError] = useState("");
@@ -46,14 +43,14 @@ export default function RegisterPage() {
   const cooldown = useCooldown();
 
   const set = (key: keyof Form) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
-  const errors = attempted ? validate(form, agree)  : {};
+  const errors = attempted ? validate(form, agree) : {};
   const matches = form.confirm.length > 0 && form.confirm === form.password;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setAttempted(true);
     setError("");
-if (Object.keys(validate(form, agree)).length > 0) return;
+    if (Object.keys(validate(form, agree)).length > 0) return;
 
     setBusy(true);
     try {
@@ -63,7 +60,6 @@ if (Object.keys(validate(form, agree)).length > 0) return;
         password: form.password,
         confirmPassword: form.confirm,
         age: Number(form.age),
-        occupation: form.occupation,
         acceptTerms: agree,
       });
       setSentTo(email);
@@ -143,29 +139,19 @@ if (Object.keys(validate(form, agree)).length > 0) return;
               inputMode="email"
               autoFocus
             />
-            <div className="grid gap-4 sm:grid-cols-[1fr_7.5rem]">
-              <AuthSelect
-                placeholder="I am a…"
-                icon={GraduationCap}
-                value={form.occupation}
-                onChange={set("occupation")}
-                options={OCCUPATIONS}
-                error={errors.occupation}
-              />
-              <AuthField
-                type="number"
-                placeholder="Age"
-                icon={CalendarDays}
-                value={form.age}
-                onChange={set("age")}
-                error={errors.age}
-                inputMode="numeric"
-                min={13}
-                max={120}
-              />
-            </div>
+            <AuthField
+              type="number"
+              placeholder="Age"
+              icon={CalendarDays}
+              value={form.age}
+              onChange={set("age")}
+              error={errors.age}
+              inputMode="numeric"
+              min={13}
+              max={120}
+            />
             <p className="-mt-2 text-xs text-slate-400">
-              You must be 13 or older. Other Owlet users can't see your age or role.
+              You must be 13 or older. Other Owlet users can't see your age.
             </p>
 
             <AuthField
@@ -194,7 +180,8 @@ if (Object.keys(validate(form, agree)).length > 0) return;
                 <Check className="size-3.5" /> Passwords match
               </p>
             ) : null}
-                        <div>
+
+            <div>
               <label className="flex items-start gap-2.5 text-sm leading-6 text-slate-600">
                 <input
                   type="checkbox"
@@ -204,11 +191,11 @@ if (Object.keys(validate(form, agree)).length > 0) return;
                 />
                 <span>
                   I agree to the{" "}
-                  <Link to="/terms" target="_blank" rel="noreferrer" className="font-semibold text-blue-700 hover:underline">
+                  <Link to="/terms" target="_blank" rel="noopener" className="font-semibold text-blue-700 hover:underline">
                     Terms of Service
                   </Link>{" "}
                   and{" "}
-                  <Link to="/privacy" target="_blank" rel="noreferrer" className="font-semibold text-blue-700 hover:underline">
+                  <Link to="/privacy" target="_blank" rel="noopener" className="font-semibold text-blue-700 hover:underline">
                     Privacy Policy
                   </Link>
                   .

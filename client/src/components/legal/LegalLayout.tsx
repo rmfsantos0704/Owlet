@@ -1,5 +1,5 @@
-import { Fragment } from "react";
-import { Link } from "react-router-dom";
+import { Fragment, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { TriangleAlert } from "lucide-react";
 import { LEGAL, hasPlaceholders } from "../../legal/config";
 import type { Section } from "../../legal/types";
@@ -32,6 +32,22 @@ export default function LegalLayout({
   sections: Section[];
   other: { label: string; to: string };
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Decided once on first render: "default" means this was the first entry in the session
+  const canGoBack = useRef(location.key !== "default");
+
+  const handleBack = () => {
+    if (canGoBack.current) {
+      navigate(-1);
+      return;
+    }
+    // Opened directly or in a new tab: try to close the tab, which returns to the page that opened it
+    window.close();
+    // If the browser refused to close it, fall back to home
+    setTimeout(() => navigate("/", { replace: true }), 100);
+  };
+
   return (
     <div className="min-h-screen bg-[#f3f6fa] text-slate-900">
       <header className="border-b border-slate-200 bg-white">
@@ -40,9 +56,13 @@ export default function LegalLayout({
             <img src="/logo.png" alt="" className="size-8 rounded-[23.4%] shadow-md shadow-blue-950/15" />
             <span className="text-[15px] font-bold tracking-tight text-[#0a234d]">Owlet</span>
           </Link>
-          <Link to="/" className="text-sm font-medium text-slate-500 hover:text-[#102b5c]">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="text-sm font-medium text-slate-500 hover:text-[#102b5c]"
+          >
             Back to Owlet
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -69,7 +89,14 @@ export default function LegalLayout({
             <ol className="mt-2 columns-1 gap-6 text-sm sm:columns-2">
               {sections.map((s, i) => (
                 <li key={s.id} className="py-0.5">
-                  <a href={`#${s.id}`} className="text-blue-700 hover:underline">
+                  <a
+                    href={`#${s.id}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="text-blue-700 hover:underline"
+                  >
                     {i + 1}. {s.title}
                   </a>
                 </li>
@@ -107,7 +134,7 @@ export default function LegalLayout({
 
         <p className="mt-6 text-center text-sm text-slate-500">
           Also read our{" "}
-          <Link to={other.to} className="font-semibold text-blue-700 hover:underline">
+          <Link to={other.to} replace className="font-semibold text-blue-700 hover:underline">
             {other.label}
           </Link>
           .

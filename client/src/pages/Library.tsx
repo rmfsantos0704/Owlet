@@ -6,6 +6,7 @@ import {
 import { api, download, upload } from "../services/api";
 import type { ResearchItem } from "../types";
 import ResearchCard from "../components/ResearchCard";
+import SelectableClips from "../components/SelectableClips";
 import { useCollections } from "../context/CollectionContext";
 import CollectionExportMenu from "../components/CollectionExportMenu";
 import AiAssistantCard from "../components/AiAssistantCard";
@@ -207,40 +208,49 @@ export default function Library({ all = false }: { all?: boolean }) {
   }
 
   const clipsCard = (
-    <div className="card overflow-hidden">
-      <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-semibold text-ink">{filtering ? "Results" : "Recent clips"}</h2>
-          <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-            <span>{items.length} {items.length === 1 ? "clip" : "clips"}</span>
-            {tag && (
-              <button onClick={() => setTag("")} className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
-                {tag} <X className="size-3" />
-              </button>
-            )}
-          </div>
+    <SelectableClips
+      clips={items}
+      getId={(it) => it._id}
+getLabel={(it) => it.source.title ?? "clip"}
+      renderClip={(it) => (
+        <ResearchCard item={it} onTag={setTag} collectionName={all ? wsName(it.collectionId) : undefined} />
+      )}
+      onDeleted={(ids) => {
+        setItems((prev) => prev.filter((it) => !ids.includes(it._id)));
+        setReloadKey((k) => k + 1); // refresh Recent activity
+      }}
+      onNotice={setNotice}
+      title={filtering ? "Results" : "Recent clips"}
+      subtitle={
+        <>
+          <span>{items.length} {items.length === 1 ? "clip" : "clips"}</span>
+          {tag && (
+            <button onClick={() => setTag("")} className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
+              {tag} <X className="size-3" />
+            </button>
+          )}
+        </>
+      }
+      actions={
+        <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+          <FileDown className="ml-2 size-3.5 text-slate-400" />
+          {(["bibtex", "csv", "json"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => exportAs(f)}
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-white hover:text-brand hover:shadow-sm"
+            >
+              {f === "bibtex" ? "BibTeX" : f.toUpperCase()}
+            </button>
+          ))}
         </div>
-        {items.length > 0 && (
-          <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-            <FileDown className="ml-2 size-3.5 text-slate-400" />
-            {(["bibtex", "csv", "json"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => exportAs(f)}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-white hover:text-brand hover:shadow-sm"
-              >
-                {f === "bibtex" ? "BibTeX" : f.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {error && <p className="px-5 py-3 text-sm text-red-600">{error}</p>}
-
-      {loading ? (
-        <p className="px-5 py-16 text-center text-sm text-slate-400">Loading…</p>
-      ) : items.length === 0 ? (
+      }
+      // viewers can't delete; in "All clips" the role differs per clip, so the server decides
+      canSelect={all || (!!current && current.role !== "viewer")}
+      loading={loading}
+      error={error}
+      resetKey={`${q}|${tag}|${wid ?? ""}|${all}`}
+      empty={
         <div className="px-5 py-16 text-center">
           <Search className="mx-auto mb-3 size-6 text-slate-300" />
           <div className="text-sm font-medium text-slate-600">{filtering ? "No matching clips" : "No clips yet"}</div>
@@ -252,14 +262,8 @@ export default function Library({ all = false }: { all?: boolean }) {
                 : "Clip a page with the Owlet extension."}
           </div>
         </div>
-      ) : (
-        <div className="divide-y divide-slate-100">
-          {items.map((it) => (
-            <ResearchCard key={it._id} item={it} onTag={setTag} collectionName={all ? wsName(it.collectionId) : undefined} />
-          ))}
-        </div>
-      )}
-    </div>
+      }
+    />
   );
 
   return (

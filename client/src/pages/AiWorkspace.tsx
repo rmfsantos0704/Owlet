@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Bot, Check, ChevronRight, Copy, FileText, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Bot, Check, Copy, FileText, Plus, Sparkles, X } from "lucide-react";
 import { api } from "../services/api";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
 import Modal from "../components/Modal";
+import RecentSessions, { sessionTitle } from "../components/RecentSessions";
+import Sources from "../components/Sources";
 import type { AiSession, ResearchItem } from "../types";
 
 const MODES = ["Research brief", "Summarize", "Compare sources"] as const;
@@ -22,30 +24,13 @@ type Result = {
   mode: string;
 };
 
-function ago(iso: string) {
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return days === 1 ? "Yesterday" : days < 7 ? `${days}d ago` : new Date(iso).toLocaleDateString();
-}
-
-// A saved title wins; older sessions without one fall back to the first line of the prompt.
-function sessionTitle(s: AiSession) {
-  if (s.title?.trim()) return s.title.trim();
-  const first = s.prompt.trim().split("\n")[0];
-  if (!first) return s.mode;
-  return first.length > 60 ? first.slice(0, 57) + "…" : first;
-}
-
 export default function AiWorkspace() {
   const { current, ready } = useCollections();
   const dialog = useDialog();
   const [items, setItems] = useState<ResearchItem[]>([]);
   const [sessions, setSessions] = useState<AiSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [newId, setNewId] = useState<string | null>(null); // a session created this visit that hasn't been seen in the list yet
   const [selected, setSelected] = useState<string[]>([]);
   const [mode, setMode] = useState<Mode>("Research brief");
   const [title, setTitle] = useState("");
@@ -55,6 +40,14 @@ export default function AiWorkspace() {
   const [result, setResult] = useState<Result | null>(null);
   const [showResult, setShowResult] = useState(false); // the results modal
   const [copied, setCopied] = useState(false);
+  const [startedAt, setStartedAt] = useState<number | null>(null); // set when "New session" is clicked; drives the notice
+
+  // Hide the "new session started" notice after a few seconds. Clicking again restarts the timer.
+  useEffect(() => {
+    if (startedAt === null) return;
+    const t = setTimeout(() => setStartedAt(null), 3000);
+    return () => clearTimeout(t);
+  }, [startedAt]);
 
   useEffect(() => {
     if (!ready) return;
@@ -62,6 +55,7 @@ export default function AiWorkspace() {
     setResult(null);
     setShowResult(false);
     setActiveId(null);
+    setNewId(null);
     setTitle("");
     setPrompt("");
     setError("");
@@ -92,6 +86,7 @@ export default function AiWorkspace() {
 
   function newSession() {
     setActiveId(null);
+    setNewId(null);
     setResult(null);
     setShowResult(false);
     setTitle("");
@@ -99,6 +94,7 @@ export default function AiWorkspace() {
     setError("");
     setMode("Research brief");
     setSelected(items.slice(0, DEFAULT_SELECTED).map((i) => i._id));
+    setStartedAt(Date.now());
   }
 
   function openSession(s: AiSession) {
@@ -143,6 +139,7 @@ export default function AiWorkspace() {
     try {
       await api(`/research/sessions/${s.id}`, { method: "DELETE" });
       setSessions((list) => list.filter((x) => x.id !== s.id));
+      if (newId === s.id) setNewId(null);
       if (activeId === s.id) {
         setActiveId(null);
         setResult(null);
@@ -172,12 +169,15 @@ export default function AiWorkspace() {
       });
       setShowResult(true); // open the results as soon as they are ready
       if (saved) {
+        const isNew = !sessions.some((x) => x.id === saved.id);
         setSessions((list) =>
           list.some((x) => x.id === saved.id)
             ? list.map((x) => (x.id === saved.id ? saved : x))
             : [saved, ...list].slice(0, 20)
         );
         setActiveId(saved.id);
+        // Only a freshly created session gets the "new" indicator, not an in-place re-run
+        if (isNew) setNewId(saved.id);
       } else {
         setActiveId(null);
       }
@@ -205,6 +205,7 @@ export default function AiWorkspace() {
 
   const itemIds = new Set(items.map((i) => i._id));
   const removedSources = result ? result.sources.filter((s) => !itemIds.has(s.id)).length : 0;
+  const justCreated = !!result && !!activeId && activeId === newId;
 
   return (
     <div>
@@ -295,13 +296,27 @@ export default function AiWorkspace() {
             </div>
             {error && <p className="mt-3 text-xs font-medium text-red-300">{error}</p>}
           </div>
+        </div>
+
+        <div className="space-y-6 xl:self-start">
+          <Sources items={items} selected={selected} max={MAX_SOURCES} onToggle={toggle} />
+
+          <RecentSessions
+            sessions={sessions}
+            activeId={activeId}
+            newId={newId}
+            onSeen={() => setNewId(null)}
+            onOpen={openSession}
+            onRename={renameSession}
+            onDelete={deleteSession}
+          />
 
           {/* Compact result card: the full brief opens in a modal so the page doesn't grow */}
           {result && (
-            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
-                  <FileText className="size-5" />
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+                  <FileText className="size-4" />
                 </div>
                 <div className="min-w-0">
                   <h2 className="truncate font-semibold text-ink">{result.title || result.mode}</h2>
@@ -309,11 +324,17 @@ export default function AiWorkspace() {
                     {result.title ? `${result.mode} · ` : ""}Based on {result.sources.length} sources
                     {removedSources > 0 ? ` · ${removedSources} no longer in this collection` : ""}
                   </p>
+                  {justCreated && (
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                      <Check className="size-3" />
+                      New session saved
+                    </span>
+                  )}
                 </div>
               </div>
               <button
                 onClick={() => setShowResult(true)}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#173b77]"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#173b77]"
               >
                 <FileText className="size-4" />
                 View results
@@ -321,96 +342,32 @@ export default function AiWorkspace() {
             </div>
           )}
         </div>
-
-        <div className="space-y-6 xl:self-start">
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-semibold text-ink">Sources</h2>
-              <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">
-                {selected.length}/{MAX_SOURCES}
-              </span>
-            </div>
-            {items.length === 0 ? (
-              <p className="text-xs text-slate-400">Clip some articles or import PDFs to analyze them here.</p>
-            ) : (
-              <div className="max-h-80 space-y-2 overflow-y-auto">
-                {items.map((i) => {
-                  const on = selected.includes(i._id);
-                  return (
-                    <label
-                      key={i._id}
-                      className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
-                        on ? "border-blue-200 bg-blue-50/50" : "border-slate-100 hover:bg-slate-50"
-                      }`}
-                    >
-                      <input type="checkbox" checked={on} onChange={() => toggle(i._id)} className="mt-0.5" />
-                      <span className="min-w-0">
-                        <span className="line-clamp-2 block text-xs font-semibold leading-5 text-slate-700">
-                          {i.source?.title ?? "Untitled"}
-                        </span>
-                        <span className="mt-1 block text-[10px] text-slate-400">
-                          {i.source?.domain ?? i.source?.fileName ?? "PDF"}
-                        </span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold text-ink">Recent sessions</h2>
-              <span className="rounded-full bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700">
-                {sessions.length}
-              </span>
-            </div>
-            {sessions.length === 0 ? (
-              <p className="text-xs leading-5 text-slate-400">
-                Your analyses are saved here, so you can reopen a brief later.
-              </p>
-            ) : (
-              <div className="max-h-[180px] space-y-1.5 overflow-y-auto pr-1">
-                {sessions.map((s) => (
-                  <div
-                    key={s.id}
-                    className={`group flex h-14 items-center gap-1 rounded-xl border pr-1 transition ${
-                      activeId === s.id ? "border-violet-200 bg-violet-50/50" : "border-transparent hover:bg-slate-50"
-                    }`}
-                  >
-                    <button onClick={() => openSession(s)} className="flex h-full min-w-0 flex-1 items-center gap-2 px-2.5 text-left">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs font-semibold text-slate-700">{sessionTitle(s)}</span>
-                        <span className="mt-1 block text-[10px] text-slate-400">
-                          {s.mode} · {s.sources.length} source{s.sources.length === 1 ? "" : "s"} · {ago(s.createdAt)}
-                        </span>
-                      </span>
-                      <ChevronRight className="size-4 shrink-0 text-slate-300" />
-                    </button>
-                    <button
-                      onClick={() => renameSession(s)}
-                      title="Rename session"
-                      aria-label="Rename session"
-                      className="rounded-lg p-1.5 text-slate-300 opacity-0 hover:bg-slate-100 hover:text-blue-700 focus:opacity-100 group-hover:opacity-100"
-                    >
-                      <Pencil className="size-3.5" />
-                    </button>
-                    <button
-                      onClick={() => deleteSession(s)}
-                      title="Delete session"
-                      aria-label="Delete session"
-                      className="rounded-lg p-1.5 text-slate-300 opacity-0 hover:bg-slate-100 hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
       </section>
+
+      {/* Small popup pinned to the bottom-right corner when "New session" is clicked; closes itself after a few seconds */}
+      {startedAt !== null && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-4 right-4 z-50 flex w-72 max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg shadow-slate-900/10"
+        >
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+            <Check className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-800">New session started</p>
+            <p className="mt-0.5 text-xs leading-5 text-slate-500">Pick your sources and run an analysis.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStartedAt(null)}
+            aria-label="Dismiss"
+            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
 
       {result && (
         <Modal

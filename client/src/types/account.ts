@@ -1,7 +1,6 @@
 export type Account = {
   email: string;
   age?: number;
-  occupation?: string;
   pendingEmail: string | null;
   createdAt: string;
   termsVersion: string | null;

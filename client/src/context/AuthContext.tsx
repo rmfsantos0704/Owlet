@@ -8,8 +8,7 @@ export type RegisterInput = {
   password: string;
   confirmPassword: string;
   age: number;
-  occupation: string;
-    acceptTerms: boolean;
+  acceptTerms: boolean;
 };
 
 type AuthValue = {

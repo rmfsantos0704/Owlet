@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../services/api";
 import type { AccountData } from "../../types/account";
-import ProfileCard from "../../components/account/ProfileCard";
 import EmailCard from "../../components/account/EmailCard";
 import PasswordCard from "../../components/account/PasswordCard";
 import SessionsCard from "../../components/account/SessionsCard";
@@ -45,7 +44,6 @@ export default function AccountPage() {
         </p>
       </div>
 
-      <ProfileCard account={account} onSaved={load} />
       <EmailCard account={account} onChanged={load} />
       <PasswordCard />
       <SessionsCard />

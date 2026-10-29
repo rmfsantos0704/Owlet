@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, FileDown, RefreshCw, Settings, Sparkles, Trash2 } from "lucide-react";
+import {
+  ChevronLeft, FileDown, Highlighter, MessageSquareText, RefreshCw, Settings, Sparkles, Trash2,
+} from "lucide-react";
 import { api, download } from "../services/api";
 import CitationBox from "../components/CitationBox";
 import TagInput from "../components/TagInput";
 import HighlightList from "../components/HighlightList";
 import ClippedText from "../components/ClippedText";
-import CommentThread from "../components/CommentThread";
+import CommentsModal from "../components/CommentsModal";
 import SourceEditor from "../components/SourceEditor";
 import AiSettingsModal from "../components/AiSettingsModal";
+import RegenerateModal from "../components/RegenerateModal";
+import Modal from "../components/Modal";
+import { styleFor } from "../utils/colors";
+import { DEFAULT_AI_SETTINGS } from "../types";
 import type { AiSettings, ResearchItem, Role } from "../types";
 
 export default function ItemDetail() {
@@ -20,6 +26,9 @@ export default function ItemDetail() {
   const [actionError, setActionError] = useState("");
   const [regenerating, setRegenerating] = useState(false);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [regenOpen, setRegenOpen] = useState(false);
+  const [highlightsOpen, setHighlightsOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   useEffect(() => {
     api<{ item: ResearchItem; role: Role | null }>(`/research/${id}`)
@@ -51,19 +60,21 @@ export default function ItemDetail() {
     setRegenerating(false);
   }
 
-  async function regenerateClicked() {
-    if (!confirm("Replace the summary and key arguments using this clip's AI settings?")) return;
-    await regenerate();
-  }
-
   // throws on failure so the modal can show the error
   const saveAiSettings = (aiSettings: AiSettings) => act("/ai-settings", "PUT", { aiSettings });
+
+  // navigate(-1) does nothing when this page was opened in a fresh tab (e.g. from the extension),
+  // because there is no earlier history entry. React Router stores the entry index in history.state.idx.
+  function goBack() {
+    if (window.history.state?.idx > 0) navigate(-1);
+    else navigate("/"); // change to your collection route, e.g. `/collections/${item?.collectionId}`
+  }
 
   async function remove() {
     if (!confirm("Delete this clip?")) return;
     try {
       await api(`/research/${id}`, { method: "DELETE" });
-      navigate(-1);
+      goBack();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Could not delete");
     }
@@ -83,10 +94,12 @@ export default function ItemDetail() {
 
   const canEdit = role === "owner" || role === "editor";
   const isPdf = item.source.kind === "pdf";
+  const aiSettings = item.aiSettings ?? DEFAULT_AI_SETTINGS;
+  const highlightColors = [...new Set(item.highlights.map((h) => h.color))].slice(0, 5);
 
   return (
     <div className="space-y-6">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand">
+      <button onClick={goBack} className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand">
         <ChevronLeft className="size-4" /> Back
       </button>
 
@@ -138,7 +151,7 @@ export default function ItemDetail() {
                 </button>
                 {canEdit && (
                   <button
-                    onClick={regenerateClicked}
+                    onClick={() => setRegenOpen(true)}
                     disabled={regenerating}
                     title="Rewrite using this clip's AI settings"
                     className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
@@ -169,25 +182,26 @@ export default function ItemDetail() {
             <div className="mt-4">
               <ClippedText
                 text={item.content?.rawText ?? ""}
+                highlights={item.highlights}
                 readOnly={!canEdit}
                 onHighlight={(text, color, note) => act("/highlights", "POST", { text, color, note })}
               />
             </div>
           </details>
-
-          <section className="card p-5">
-            <h2 className="mb-4 font-semibold text-ink">Comments</h2>
-            <CommentThread
-              comments={item.comments}
-              highlights={item.highlights}
-              readOnly={!canEdit}
-              onAdd={(text, highlightId) => act("/comments", "POST", { text, highlightId })}
-              onDelete={(cid) => run(`/comments/${cid}`, "DELETE")}
-            />
-          </section>
         </div>
 
         <div className="min-w-0 space-y-6">
+          <div className="flex gap-2">
+            <button onClick={downloadPdf} className="btn-secondary flex-1">
+              <FileDown className="size-4" /> Download PDF
+            </button>
+            {canEdit && (
+              <button onClick={remove} className="btn-danger" title="Delete clip">
+                <Trash2 className="size-4" />
+              </button>
+            )}
+          </div>
+
           <section className="card space-y-3 p-5">
             <h2 className="font-semibold text-ink">Citations</h2>
             <CitationBox label="APA" text={item.citations.apa ?? ""} />
@@ -200,35 +214,98 @@ export default function ItemDetail() {
           </section>
 
           <section className="card p-5">
-            <h2 className="mb-3 font-semibold text-ink">Highlights</h2>
-            <HighlightList
-              highlights={item.highlights}
-              readOnly={!canEdit}
-              onDelete={(hid) => run(`/highlights/${hid}`, "DELETE")}
-            />
+            <button
+              type="button"
+              onClick={() => setHighlightsOpen(true)}
+              aria-label="View highlights"
+              className="flex w-full items-center gap-3 text-left"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <Highlighter className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-ink">Highlights</span>
+                <span className="block text-xs text-slate-500">
+                  {item.highlights.length === 0 ? "None yet" : `${item.highlights.length} saved · View and edit`}
+                </span>
+              </span>
+              <span className="flex -space-x-1">
+                {highlightColors.map((c) => (
+                  <span key={c} className={`size-3.5 rounded-full ring-2 ring-white ${styleFor(c).dot}`} />
+                ))}
+              </span>
+            </button>
           </section>
 
-          <div className="flex gap-2">
-            <button onClick={downloadPdf} className="btn-secondary flex-1">
-              <FileDown className="size-4" /> Download PDF
+          <section className="card p-5">
+            <button
+              type="button"
+              onClick={() => setCommentsOpen(true)}
+              aria-label="Open comments"
+              className="flex w-full items-center gap-3 text-left"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                <MessageSquareText className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-ink">Comments</span>
+                <span className="block text-xs text-slate-500">
+                  {item.comments.length === 0 ? "None yet" : `${item.comments.length} · Open thread`}
+                </span>
+              </span>
             </button>
-            {canEdit && (
-              <button onClick={remove} className="btn-danger" title="Delete clip">
-                <Trash2 className="size-4" />
-              </button>
-            )}
-          </div>
+          </section>
         </div>
       </div>
+
+      <CommentsModal
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        comments={item.comments}
+        highlights={item.highlights}
+        readOnly={!canEdit}
+        onAdd={(text, highlightId, parentId) => act("/comments", "POST", { text, highlightId, parentId })}
+        onEdit={(cid, text) => act(`/comments/${cid}`, "PATCH", { text })}
+        onDelete={(cid) => run(`/comments/${cid}`, "DELETE")}
+      />
 
       <AiSettingsModal
         open={aiSettingsOpen}
         onClose={() => setAiSettingsOpen(false)}
         itemId={id}
-        settings={item.aiSettings}
+        settings={aiSettings}
         canEdit={canEdit}
         onSave={saveAiSettings}
         onRegenerate={regenerate}
+      />
+
+      <Modal
+        open={highlightsOpen}
+        onClose={() => setHighlightsOpen(false)}
+        title={`Highlights (${item.highlights.length})`}
+        maxWidth="max-w-xl"
+      >
+        <HighlightList
+          highlights={item.highlights}
+          comments={item.comments}
+          readOnly={!canEdit}
+          onEdit={(hid, color, note) => act(`/highlights/${hid}`, "PATCH", { color, note })}
+          onDelete={(hid) => run(`/highlights/${hid}`, "DELETE")}
+        />
+      </Modal>
+
+      <RegenerateModal
+        open={regenOpen}
+        onClose={() => setRegenOpen(false)}
+        settings={aiSettings}
+        onConfirm={() => {
+          setRegenOpen(false);
+          void regenerate();
+        }}
+        onEditSettings={() => {
+          setRegenOpen(false);
+          setAiSettingsOpen(true);
+        }}
       />
     </div>
   );
