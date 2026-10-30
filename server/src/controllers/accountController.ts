@@ -9,6 +9,7 @@ import { Invitation } from "../models/Invitation.js";
 import { Activity, NotificationState } from "../models/Activity.js";
 import { sendMail } from "../services/mailer.js";
 import * as tpl from "../services/emailTemplates.js";
+import { AiSession } from "../models/AiSession.js";
 import {
   ageField, emailField, passwordField, signToken, sha256, newToken, fire, claimEmailSlot,
 } from "./authController.js";
@@ -195,8 +196,9 @@ export async function exportData(_req: Request, res: Response) {
   const commented = await ResearchItem.find({ "comments.userId": id }).select("collectionId source.title comments").lean();
 
   const strip = <T extends Record<string, unknown>>(o: T) => {
-    const { __v, ...rest } = o as T & { __v?: unknown };
+    const { __v, joinLink, ...rest } = o as T & { __v?: unknown; joinLink?: unknown };
     void __v;
+    void joinLink;
     return rest;
   };
 
@@ -278,6 +280,7 @@ export async function deleteAccount(req: Request, res: Response) {
       await ResearchItem.deleteMany({ collectionId: step.ws._id });
       await Invitation.deleteMany({ collectionId: step.ws._id });
       await Activity.deleteMany({ collectionId: step.ws._id });
+      await AiSession.deleteMany({ collectionId: step.ws._id });
       await collection.deleteOne({ _id: step.ws._id });
     } else {
       // isDefault off: the new owner may already have their own Personal collection (one per owner)
@@ -299,6 +302,8 @@ export async function deleteAccount(req: Request, res: Response) {
 
   // invitations sent to or by this person go with the account
   await Invitation.deleteMany({ $or: [{ inviteeId: id }, { inviterId: id }] });
+
+  await AiSession.deleteMany({ userId: id });
 
   // their activity and notification state go with the account
   await Activity.deleteMany({ $or: [{ actorId: id }, { targetUserId: id }] });

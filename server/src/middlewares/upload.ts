@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 15 * 1024 * 1024, files: 1, fields: 5, fieldSize: 1024, parts: 6 },
   fileFilter: (_req, file, cb) => {
     const ok = file.mimetype === "application/pdf" || /\.pdf$/i.test(file.originalname);
     cb(null, ok); // a rejected file simply leaves req.file empty

@@ -1,6 +1,5 @@
 import { Schema, model } from "mongoose";
 
-
 const userSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -12,14 +11,14 @@ const userSchema = new Schema(
     emailVerified: { type: Boolean },
 
     // only SHA-256 hashes of the emailed tokens are stored, and never returned by queries
-    verifyTokenHash: { type: String, select: false },
+    verifyTokenHash: { type: String, select: false, index: { sparse: true } },
     verifyTokenExpires: { type: Date, select: false },
-    resetTokenHash: { type: String, select: false },
+    resetTokenHash: { type: String, select: false, index: { sparse: true } },
     resetTokenExpires: { type: Date, select: false },
 
     // email change: the new address only replaces the old one after its owner clicks the emailed link
     pendingEmail: { type: String, lowercase: true, trim: true },
-    emailChangeTokenHash: { type: String, select: false },
+    emailChangeTokenHash: { type: String, select: false, index: { sparse: true } },
     emailChangeExpires: { type: Date, select: false },
 
     lastEmailAt: Date, // throttles every account email to one per minute

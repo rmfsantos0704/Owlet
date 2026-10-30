@@ -1,5 +1,4 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
 import {
   clip, importPdf, list, getOne, remove,
   addHighlight, updateHighlight, removeHighlight,
@@ -10,19 +9,18 @@ import {
 } from "../controllers/researchController.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { uploadPdf } from "../middlewares/upload.js";
-import { clipDailyLimiter, importDailyLimiter, writeLimiter } from "../middlewares/rateLimits.js";
+import {
+  aiDailyLimiter, aiMinuteLimiter, clipDailyLimiter, importDailyLimiter, writeLimiter,
+} from "../middlewares/rateLimits.js";
 import { trackActivity } from "../middlewares/trackActivity.js";
 
 const router = Router();
-router.use(requireAuth);
-
-const regenLimit = rateLimit({ windowMs: 60 * 1000, limit: 15 });
-const askLimit = rateLimit({ windowMs: 60 * 1000, limit: 10 });
+router.use(requireAuth); // the per-account limiters below rely on this having run first
 
 // per-minute IP limits for clip/import are in app.ts; these add a daily cap per account
 router.post("/clip", clipDailyLimiter, trackActivity("clip_added"), clip);
 router.post("/import", importDailyLimiter, uploadPdf, trackActivity("pdf_imported"), importPdf);
-router.post("/ask", askLimit, ask);
+router.post("/ask", aiMinuteLimiter, aiDailyLimiter, ask);
 router.get("/sessions", listSessions);
 router.patch("/sessions/:id", writeLimiter, renameSession);
 router.delete("/sessions/:id", writeLimiter, removeSession);
@@ -32,8 +30,8 @@ router.get("/:id", getOne);
 router.delete("/:id", writeLimiter, remove);
 router.get("/:id/pdf", pdf);
 
-router.post("/:id/regenerate", regenLimit, regenerate);
-router.post("/:id/test-ai", regenLimit, testAi);
+router.post("/:id/regenerate", aiMinuteLimiter, aiDailyLimiter, regenerate);
+router.post("/:id/test-ai", aiMinuteLimiter, aiDailyLimiter, testAi);
 router.patch("/:id/source", writeLimiter, updateSource);
 router.post("/:id/highlights", writeLimiter, trackActivity("highlight_added"), addHighlight);
 router.patch("/:id/highlights/:highlightId", writeLimiter, updateHighlight);

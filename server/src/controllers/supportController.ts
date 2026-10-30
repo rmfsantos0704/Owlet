@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { Request, Response } from "express";
-import nodemailer, { type Transporter } from "nodemailer";
 import { z } from "zod";
 import { User } from "../models/User.js";
+import { sendMail } from "../services/mailer.js";
 
 const schema = z.object({
   topic: z.string().trim().min(1).max(80),
@@ -25,25 +25,6 @@ const lastSent = new Map<string, { at: number; hash: string }>();
 function prune(now: number) {
   if (lastSent.size < 1000) return;
   for (const [key, v] of lastSent) if (now - v.at > DUPLICATE_MS) lastSent.delete(key);
-}
-
-let transport: Transporter | null = null;
-
-// Built once from the environment. Returns null when email isn't configured.
-// With only SMTP_USER and SMTP_PASS set it uses Gmail (the account + app password you already use for other emails);
-// set SMTP_HOST (and SMTP_PORT) to use any other SMTP server instead.
-function mailer() {
-  if (transport) return transport;
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  if (!SMTP_USER || !SMTP_PASS) return null;
-  const auth = { user: SMTP_USER, pass: SMTP_PASS.replace(/\s+/g, "") }; // app passwords are shown with spaces
-  if (SMTP_HOST) {
-    const port = Number(SMTP_PORT ?? 587);
-    transport = nodemailer.createTransport({ host: SMTP_HOST, port, secure: port === 465, auth });
-  } else {
-    transport = nodemailer.createTransport({ service: "gmail", auth });
-  }
-  return transport;
 }
 
 // POST /support  { topic, message, page?, browser?, website?, elapsedMs? }
@@ -77,16 +58,14 @@ export async function sendSupport(req: Request, res: Response) {
   }
 
   const to = process.env.SUPPORT_EMAIL;
-  const t = mailer();
-  if (!to || !t) {
-    console.error("Support email isn't configured: set SUPPORT_EMAIL, SMTP_USER and SMTP_PASS");
+  if (!to) {
+    console.error("Support email isn't configured: set SUPPORT_EMAIL (and SMTP settings in production)");
     return res.status(503).json({ error: "Support email isn't available right now. Please try again later." });
   }
 
   const topic = p.data.topic.replace(/[\r\n]+/g, " "); // keeps a pasted newline out of the subject line
   try {
-    await t.sendMail({
-      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    await sendMail({
       to,
       replyTo: me.email,
       subject: `[Owlet support] ${topic}`,

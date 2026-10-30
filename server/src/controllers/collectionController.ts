@@ -168,7 +168,13 @@ export async function mergeCollection(req: Request, res: Response) {
     // whatever is still here is a duplicate of something the target already holds
     const skipped = await ResearchItem.deleteMany({ collectionId: found.ws._id });
 
-    await AiSession.updateMany({ collectionId: found.ws._id }, { $set: { collectionId: target._id } });
+    // AI sessions are private to whoever ran them: keep the ones whose owner can open the target, drop the rest
+    const canOpenTarget = [target.ownerId, ...target.members.map((m: any) => m.userId)];
+    await AiSession.updateMany(
+      { collectionId: found.ws._id, userId: { $in: canOpenTarget } },
+      { $set: { collectionId: target._id } }
+    );
+    await AiSession.deleteMany({ collectionId: found.ws._id });
     await Invitation.deleteMany({ collectionId: found.ws._id });
     await Activity.deleteMany({ collectionId: found.ws._id });
     await collection.deleteOne({ _id: found.ws._id });

@@ -14,7 +14,8 @@ const invitationSchema = new Schema(
   },
   { timestamps: true }
 );
-
+// delete invitations 30 days after they expire (the 7-day decline cooldown has long ended by then)
+invitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 invitationSchema.index({ collectionId: 1, inviteeId: 1 }, { unique: true });
 invitationSchema.index({ inviteeId: 1, status: 1 });
 

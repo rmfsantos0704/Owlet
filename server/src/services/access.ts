@@ -1,4 +1,4 @@
-import { collection } from "../models/collection.js";
+import { collection } from "../models/Collection.js";
 import { ResearchItem } from "../models/ResearchItem.js";
 
 export type Role = "owner" | "editor" | "viewer";
@@ -31,10 +31,10 @@ export async function ensureDefaultcollection(userId: string) {
   }
   if (!ws) throw new Error("Could not create default collection");
   // adopt clips made before collections existed
-await ResearchItem.updateMany(
-  { userId, collectionId: { $exists: false } },
-  [{ $set: { collectionId: ws._id, "source.dedupeKey": "$source.url", "source.kind": "web" } }],
-  { updatePipeline: true }
-);
+  await ResearchItem.updateMany(
+    { userId, collectionId: { $exists: false } },
+    [{ $set: { collectionId: ws._id, "source.dedupeKey": "$source.url", "source.kind": "web" } }],
+    { updatePipeline: true }
+  );
   return ws;
 }

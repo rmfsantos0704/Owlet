@@ -18,8 +18,9 @@ const activitySchema = new Schema({
   count: { type: Number, default: 1 }, // bursts (ten highlights in a row) are merged into one row
   createdAt: { type: Date, default: Date.now },
 });
+activitySchema.index({ actorId: 1 });
 activitySchema.index({ collectionId: 1, createdAt: -1 });
-activitySchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
+activitySchema.index({ createdAt: 1 }, { expireAfterSeconds: 180 * 24 * 60 * 60 });
 
 export const Activity = model("Activity", activitySchema);
 

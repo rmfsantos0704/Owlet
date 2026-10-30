@@ -17,6 +17,23 @@ import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../serv
 const MAX_TITLE = 100;
 const HIGHLIGHT_COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green"] as const;
 
+// MongoDB error code for a unique index violation (two quick clicks can both pass the "already clipped" check)
+const isDuplicateKey = (e: unknown) => (e as { code?: number })?.code === 11000;
+const MAX_HIGHLIGHTS = 500;
+const MAX_COMMENTS = 500; // replies count too
+
+// true when the person can edit the clip and it already holds the maximum
+async function isFull(req: Request, res: Response, field: "highlights" | "comments", max: number) {
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return false; // the next step answers "Bad id"
+  const ids = await collectionIds(res.locals.userId, "editor");
+  return !!(await ResearchItem.exists({
+    _id: id,
+    collectionId: { $in: ids },
+    [`${field}.${max - 1}`]: { $exists: true },
+  }));
+}
+
 // per-clip AI summary settings (sent by the extension popup and the AI settings modal)
 const aiSettingsSchema = z.object({
   format: z.enum(["paragraph", "bullets", "academic", "simple"]),
@@ -27,14 +44,21 @@ const setAiSettingsSchema = z.object({ aiSettings: aiSettingsSchema });
 const regenerateSchema = z.object({ aiSettings: aiSettingsSchema.optional() });
 const testAiSchema = z.object({ aiSettings: aiSettingsSchema, sample: z.boolean().optional() });
 
+// only real web addresses: z.string().url() alone also accepts javascript: links
+const httpUrl = z
+  .string()
+  .max(2000)
+  .url()
+  .refine((u) => /^https?:\/\//i.test(u), "Only http and https links are allowed");
+
 const clipSchema = z.object({
-  url: z.string().url(),
+  url: httpUrl,
   title: z.string().min(1).max(500),
   author: z.string().max(200).optional(),
   publishedDate: z.string().max(100).optional(),
   rawText: z.string().min(50).max(200000),
   collectionId: z.string().optional(),
-  aiSettings: aiSettingsSchema.optional(), // the settings chosen in the extension popup
+  aiSettings: aiSettingsSchema.optional(),
 });
 const highlightSchema = z.object({
   text: z.string().trim().min(1).max(2000),
@@ -135,26 +159,31 @@ export async function clip(req: Request, res: Response) {
   const aiSettings = d.aiSettings ?? settingsFrom(ws);
   const { ai, aiFailed } = await runAi(aiSettings, d.title, d.rawText);
 
-  const item = await ResearchItem.create({
-    userId,
-    collectionId: ws._id,
-    source: {
-      kind: "web",
-      url: d.url,
-      dedupeKey: d.url,
-      domain,
-      title: d.title,
-      author: d.author,
-      publishedDate: d.publishedDate,
-    },
-    content: { rawText: d.rawText, wordCount: d.rawText.split(/\s+/).length },
-    aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
-    aiSettings,
-    citations: buildCitations({ author: d.author, title: d.title, url: d.url, domain, publishedDate: d.publishedDate }),
-    tags: ai.tags,
-  });
-
-  res.status(201).json({ item, aiFailed });
+  try {
+    const item = await ResearchItem.create({
+      userId,
+      collectionId: ws._id,
+      source: {
+        kind: "web",
+        url: d.url,
+        dedupeKey: d.url,
+        domain,
+        title: d.title,
+        author: d.author,
+        publishedDate: d.publishedDate,
+      },
+      content: { rawText: d.rawText, wordCount: d.rawText.split(/\s+/).length },
+      aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
+      aiSettings,
+      citations: buildCitations({ author: d.author, title: d.title, url: d.url, domain, publishedDate: d.publishedDate }),
+      tags: ai.tags,
+    });
+    res.status(201).json({ item, aiFailed });
+  } catch (e) {
+    // two quick clicks can both pass the check above; the unique index stops the second one
+    if (isDuplicateKey(e)) return res.status(409).json({ error: "Already clipped" });
+    throw e;
+  }
 }
 
 // long documents: give the AI the start (abstract/intro) and the end (conclusions)
@@ -190,28 +219,35 @@ export async function importPdf(req: Request, res: Response) {
   }
 
   const rawText = pdf.text.slice(0, 200000);
+  // the title and author come from inside the file, so cap their length
+  const title = String(pdf.title ?? "").slice(0, 500) || "Untitled";
+  const author = pdf.author ? String(pdf.author).slice(0, 200) : undefined;
   const aiSettings = settingsFrom(ws);
   // long documents: give the AI the start (abstract/intro) and the end (conclusions)
-  const { ai, aiFailed } = await runAi(aiSettings, pdf.title, forAi(rawText));
+  const { ai, aiFailed } = await runAi(aiSettings, title, forAi(rawText));
 
-  const item = await ResearchItem.create({
-    userId,
-    collectionId: ws._id,
-    source: {
-      kind: "pdf",
-      dedupeKey,
-      fileName: file.originalname.slice(0, 200),
-      title: pdf.title,
-      author: pdf.author,
-    },
-    content: { rawText, wordCount: rawText.split(/\s+/).length },
-    aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
-    aiSettings,
-    citations: buildCitations({ author: pdf.author, title: pdf.title }),
-    tags: ai.tags,
-  });
-
-  res.status(201).json({ item, aiFailed, truncated: pdf.text.length > rawText.length });
+  try {
+    const item = await ResearchItem.create({
+      userId,
+      collectionId: ws._id,
+      source: {
+        kind: "pdf",
+        dedupeKey,
+        fileName: file.originalname.slice(0, 200),
+        title,
+        author,
+      },
+      content: { rawText, wordCount: rawText.split(/\s+/).length },
+      aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
+      aiSettings,
+      citations: buildCitations({ author, title }),
+      tags: ai.tags,
+    });
+    res.status(201).json({ item, aiFailed, truncated: pdf.text.length > rawText.length });
+  } catch (e) {
+    if (isDuplicateKey(e)) return res.status(409).json({ error: "This PDF is already in the collection" });
+    throw e;
+  }
 }
 
 async function buildFilter(req: Request, userId: string) {
@@ -319,6 +355,9 @@ async function mutate(req: Request, res: Response, update: UpdateQuery<any>, sta
 
 export async function addHighlight(req: Request, res: Response) {
   const p = highlightSchema.safeParse(req.body);
+    if (await isFull(req, res, "highlights", MAX_HIGHLIGHTS)) {
+    return res.status(409).json({ error: `A clip can have up to ${MAX_HIGHLIGHTS} highlights.` });
+  }
   if (!p.success) return res.status(400).json({ error: "Invalid highlight" });
   return mutate(req, res, { $push: { highlights: p.data } }, 201);
 }
@@ -357,7 +396,9 @@ export async function addComment(req: Request, res: Response) {
   if (highlightId && !mongoose.isValidObjectId(highlightId)) {
     return res.status(400).json({ error: "Bad highlight id" });
   }
-
+    if (await isFull(req, res, "comments", MAX_COMMENTS)) {
+    return res.status(409).json({ error: `A clip can have up to ${MAX_COMMENTS} comments.` });
+  }
   if (parentId) {
     const id = String(req.params.id);
     if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(parentId)) {

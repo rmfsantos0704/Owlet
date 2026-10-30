@@ -42,7 +42,7 @@ export async function listMine(_req: Request, res: Response) {
 export async function accept(req: Request, res: Response) {
   const id = String(req.params.invId);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
-  const uid = res.locals.userId;
+  const uid = new mongoose.Types.ObjectId(String(res.locals.userId));
   const now = new Date();
 
   const inv = await Invitation.findOne({ _id: id, inviteeId: uid, status: "pending", expiresAt: { $gt: now } });
@@ -54,26 +54,38 @@ export async function accept(req: Request, res: Response) {
     return res.status(404).json({ error: GONE });
   }
 
+  const close = () =>
+    Invitation.updateOne({ _id: inv._id, status: "pending" }, { $set: { status: "accepted", respondedAt: now } });
+
   // already in (e.g. became the owner through a transfer): just close the invitation
-  if (roleIn(ws, uid)) {
-    await Invitation.updateOne({ _id: inv._id }, { $set: { status: "accepted", respondedAt: now } });
+  if (roleIn(ws, String(uid))) {
+    await close();
     return res.json({ ok: true, collectionId: String(ws._id) });
   }
-  if (ws.members.length >= MAX_MEMBERS) {
+
+  // one atomic step: only if they aren't in yet and there is still room
+  const added = await collection.findOneAndUpdate(
+    {
+      _id: ws._id,
+      ownerId: { $ne: uid },
+      "members.userId": { $ne: uid },
+      $expr: { $lt: [{ $size: "$members" }, MAX_MEMBERS] },
+    },
+    { $push: { members: { userId: uid, role: inv.role } } },
+    { new: true }
+  );
+
+  if (!added) {
+    // a parallel click may have added them a moment ago; otherwise the collection is full
+    const fresh = await collection.findById(ws._id);
+    if (fresh && roleIn(fresh, String(uid))) {
+      await close();
+      return res.json({ ok: true, collectionId: String(ws._id) });
+    }
     return res.status(409).json({ error: "This collection is full, so you can't join it right now." });
   }
 
-  // claim the invitation first so a double click can't add the member twice
-  const claimed = await Invitation.findOneAndUpdate(
-    { _id: inv._id, status: "pending" },
-    { $set: { status: "accepted", respondedAt: now } }
-  );
-  if (!claimed) return res.status(404).json({ error: GONE });
-
-  await collection.updateOne(
-    { _id: ws._id, "members.userId": { $ne: new mongoose.Types.ObjectId(String(uid)) } },
-    { $push: { members: { userId: uid, role: inv.role } } }
-  );
+  await close();
   await recordActivity({ collectionId: ws._id, actorId: uid, type: "member_joined" });
   res.json({ ok: true, collectionId: String(ws._id) });
 }

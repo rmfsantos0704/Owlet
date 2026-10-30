@@ -1,6 +1,6 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
-export type Mail = { to: string; subject: string; text: string; html: string };
+export type Mail = { to: string; subject: string; text: string; html?: string; replyTo?: string };
 
 // Development only (no SMTP configured): emails are printed to the server console and kept here.
 export const outbox: Mail[] = [];
@@ -10,14 +10,25 @@ let transport: Transporter | null | undefined;
 function getTransport() {
   if (transport !== undefined) return transport;
   const host = process.env.SMTP_HOST;
-  transport = host
-    ? nodemailer.createTransport({
-        host,
-        port: Number(process.env.SMTP_PORT ?? 587),
-        secure: process.env.SMTP_SECURE === "true", // true for port 465, false for 587 (STARTTLS)
-        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
-      })
-    : null;
+  if (!host) {
+    transport = null;
+    return transport;
+  }
+  const port = Number(process.env.SMTP_PORT ?? 587);
+  const secure = process.env.SMTP_SECURE === "true"; // true for port 465, false for 587 (STARTTLS)
+  transport = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    // in production, never send on port 587 unless the connection upgrades to TLS
+    requireTLS: !secure && process.env.NODE_ENV === "production",
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+    auth: process.env.SMTP_USER
+      ? { user: process.env.SMTP_USER, pass: (process.env.SMTP_PASS ?? "").replace(/\s+/g, "") } // Gmail shows app passwords with spaces
+      : undefined,
+  });
   return transport;
 }
 

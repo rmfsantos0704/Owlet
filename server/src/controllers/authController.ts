@@ -32,6 +32,7 @@ export const passwordField = z
   .string()
   .min(8, "Password must be at least 8 characters")
   .max(72, "Password must be 72 characters or fewer")
+  .refine((p) => Buffer.byteLength(p, "utf8") <= 72, "Password is too long. Try fewer special characters.")
   .refine((p) => !COMMON_PASSWORDS.has(p.toLowerCase()), "That password is too common. Choose a different one.");
 const tokenField = z.string().regex(/^[a-f0-9]{64}$/, LINK_ERROR);
 

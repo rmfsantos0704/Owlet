@@ -71,7 +71,9 @@ export async function analyzeText(title: string, text: string, settings: Partial
   return {
     summary: String(parsed.summary ?? ""),
     paraphrase: String(parsed.paraphrase ?? ""),
-    tags: Array.isArray(parsed.tags) ? parsed.tags.map(String).slice(0, 5) : [],
+    tags: Array.isArray(parsed.tags)
+      ? parsed.tags.map((t: unknown) => String(t).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 5)
+      : [],
   };
 }
 

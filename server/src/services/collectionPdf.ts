@@ -13,6 +13,11 @@ const B = "Helvetica-Bold";
 const I = "Helvetica-Oblique";
 const UNCAT = "Uncategorized";
 
+// keeps one export from growing without limit
+const MAX_PAGES = 400;
+const MAX_PER_ITEM = 100; // highlights and comments shown per clip
+const MAX_TEXT = 1500; // characters shown per highlight, note or comment
+
 const STYLES = [
   { key: "apa", label: "APA" },
   { key: "mla", label: "MLA" },
@@ -22,6 +27,14 @@ const STYLES = [
 // Built-in PDF fonts only cover Latin text, so anything else becomes "?".
 const clean = (s: unknown) =>
   String(s ?? "").replace(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\u00FF\u2018\u2019\u201C\u201D\u2013\u2014\u2026\u2022]/g, "?");
+
+const cut = (s: unknown, n = MAX_TEXT) => {
+  const t = clean(s);
+  return t.length > n ? t.slice(0, n) + "..." : t;
+};
+
+// only real web addresses become clickable
+const webLink = (u: unknown) => (typeof u === "string" && /^https?:\/\//i.test(u) ? u : undefined);
 
 const titleCase = (s: string) =>
   s.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -126,7 +139,11 @@ export function streamcollectionPdf(
   const body = (t: unknown) =>
     doc.font(R).fontSize(10).fillColor(BODY).text(clean(t) || "-", L, doc.y, { width: W, lineGap: 2 });
 
+  const more = (n: number, what: string) =>
+    doc.font(I).fontSize(9).fillColor(LIGHT).text(`... and ${n} more ${what}`, L + 6, doc.y, { width: W - 6 });
+
   const topics = groupByTopic(items);
+  let cutShort = false; // set when the report part hits the page limit
 
   // ---------- cover + contents ----------
   doc.font(B).fontSize(26).fillColor(NAVY).text(clean(ws.name) || "collection", L, doc.y, { width: W });
@@ -174,6 +191,7 @@ export function streamcollectionPdf(
     partTitle("Sources by topic");
 
     topics.forEach((t, i) => {
+      if (cutShort) return;
       ensure(110);
       mark(`p1:${i}`);
       o1.addItem(clean(t.topic));
@@ -181,13 +199,20 @@ export function streamcollectionPdf(
 
       const sorted = [...t.items].sort((a, b) => sortKey(a.source?.title ?? "").localeCompare(sortKey(b.source?.title ?? "")));
       for (const it of sorted) {
+        if (pageIdx() >= MAX_PAGES) {
+          cutShort = true;
+          break;
+        }
         const s = it.source ?? {};
         ensure(90);
         doc.font(B).fontSize(11.5).fillColor(INK).text(clean(s.title || s.fileName || s.url || "Untitled"), L, doc.y, { width: W });
         const origin = s.kind === "pdf" ? `PDF${s.fileName ? ` \u00B7 ${s.fileName}` : ""}` : s.domain;
         const meta = [s.author, s.publishedDate, origin].filter(Boolean).map(clean).join("  \u00B7  ");
         if (meta) doc.font(R).fontSize(9).fillColor(MUTED).text(meta, L, doc.y + 1, { width: W });
-        if (s.url) doc.font(R).fontSize(9).fillColor(LINK).text(clean(s.url), L, doc.y, { width: W, link: s.url, underline: true });
+        if (s.url) {
+          const href = webLink(s.url);
+          doc.font(R).fontSize(9).fillColor(href ? LINK : MUTED).text(clean(s.url), L, doc.y, { width: W, link: href, underline: !!href });
+        }
         if (it.tags?.length) {
           doc.font(R).fontSize(9).fillColor(LIGHT).text(it.tags.map((x: string) => "#" + clean(x)).join("  "), L, doc.y + 1, { width: W });
         }
@@ -195,22 +220,24 @@ export function streamcollectionPdf(
         if (it.aiOutput?.paraphrase) { label("Key arguments"); body(it.aiOutput.paraphrase); }
         if (it.highlights?.length) {
           label("Highlights");
-          for (const h of it.highlights) {
+          for (const h of it.highlights.slice(0, MAX_PER_ITEM)) {
             ensure(30);
-            doc.font(R).fontSize(10).fillColor(BODY).text(`\u2022 "${clean(h.text)}"`, L + 6, doc.y, { width: W - 6, lineGap: 2 });
-            if (h.note) doc.font(I).fontSize(9).fillColor(MUTED).text(`Note: ${clean(h.note)}`, L + 16, doc.y, { width: W - 16 });
+            doc.font(R).fontSize(10).fillColor(BODY).text(`\u2022 "${cut(h.text)}"`, L + 6, doc.y, { width: W - 6, lineGap: 2 });
+            if (h.note) doc.font(I).fontSize(9).fillColor(MUTED).text(`Note: ${cut(h.note)}`, L + 16, doc.y, { width: W - 16 });
             doc.moveDown(0.2);
           }
+          if (it.highlights.length > MAX_PER_ITEM) more(it.highlights.length - MAX_PER_ITEM, "highlights");
         }
         if (it.comments?.length) {
           label("Comments");
-          for (const c of it.comments) {
+          for (const c of it.comments.slice(0, MAX_PER_ITEM)) {
             ensure(28);
-            doc.font(R).fontSize(10).fillColor(BODY).text(clean(c.text), L + 6, doc.y, { width: W - 6, lineGap: 2 });
+            doc.font(R).fontSize(10).fillColor(BODY).text(cut(c.text), L + 6, doc.y, { width: W - 6, lineGap: 2 });
             const by = [c.authorEmail, c.createdAt ? fmtDate(new Date(c.createdAt)) : ""].filter(Boolean).map(clean).join(" \u00B7 ");
             if (by) doc.font(R).fontSize(8.5).fillColor(LIGHT).text(by, L + 6, doc.y, { width: W - 6 });
             doc.moveDown(0.25);
           }
+          if (it.comments.length > MAX_PER_ITEM) more(it.comments.length - MAX_PER_ITEM, "comments");
         }
         doc.moveDown(0.5);
         rule();
@@ -218,6 +245,14 @@ export function streamcollectionPdf(
       }
       doc.moveDown(0.6);
     });
+
+    if (cutShort) {
+      ensure(50);
+      doc.font(I).fontSize(9.5).fillColor(MUTED).text(
+        "This report was cut short to keep the file a manageable size. The citation lists that follow are complete.",
+        L, doc.y, { width: W }
+      );
+    }
   }
 
   // ---------- part 2: citations by style, then by topic ----------
