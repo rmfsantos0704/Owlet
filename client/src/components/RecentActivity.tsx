@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, ChevronRight } from "lucide-react";
+import { History } from "lucide-react";
 import { api } from "../services/api";
 import type { ActivityEntry } from "../types";
 import ActivityRow from "./ActivityRow";
@@ -8,10 +8,28 @@ import Modal from "./Modal";
 
 const REFRESH_MS = 60 * 1000;
 
-// "Recent activity" card for the open Collection. It opens the full list in a modal.
-// reloadKey changes after the page itself adds something (an import).
+// the newest entry the person has seen, remembered per Collection in this browser
+const seenKey = (collectionId: string) => `owlet:activity-seen:${collectionId}`;
+const readSeen = (collectionId: string) => {
+  try {
+    return localStorage.getItem(seenKey(collectionId));
+  } catch {
+    return null;
+  }
+};
+const writeSeen = (collectionId: string, id: string) => {
+  try {
+    localStorage.setItem(seenKey(collectionId), id);
+  } catch {
+    /* storage unavailable: the badge just won't persist */
+  }
+};
+
+// "Recent activity" button for the open Collection, with a count of what's new since it was last opened.
+// It opens the full list in a modal. reloadKey changes after the page itself adds something (an import).
 export default function RecentActivity({ collectionId, reloadKey = 0 }: { collectionId: string; reloadKey?: number }) {
   const [rows, setRows] = useState<ActivityEntry[] | null>(null);
+  const [seenId, setSeenId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -23,10 +41,16 @@ export default function RecentActivity({ collectionId, reloadKey = 0 }: { collec
     const load = () =>
       api<{ activity: ActivityEntry[] }>(`/collections/${collectionId}/activity?limit=8`)
         .then((r) => {
-          if (!cancelled) {
-            setRows(r.activity);
-            setError("");
+          if (cancelled) return;
+          // first time in this Collection: start from "everything seen" so old history isn't counted as new
+          let seen = readSeen(collectionId);
+          if (seen === null && r.activity.length > 0) {
+            seen = r.activity[0].id;
+            writeSeen(collectionId, seen);
           }
+          setSeenId(seen);
+          setRows(r.activity);
+          setError("");
         })
         .catch((e) => {
           if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load activity");
@@ -45,35 +69,33 @@ export default function RecentActivity({ collectionId, reloadKey = 0 }: { collec
     };
   }, [collectionId, reloadKey]);
 
-  // the line under the card title
-  const subtitle =
-    error && rows === null
-      ? "Couldn't load. Open to see why"
-      : rows === null
-        ? "Loading…"
-        : rows.length === 0
-          ? "Nothing yet"
-          : `${rows.length} recent update${rows.length === 1 ? "" : "s"} · View`;
+  // while the list is open, everything in it counts as seen (including updates that arrive meanwhile)
+  useEffect(() => {
+    if (!open || !rows || rows.length === 0) return;
+    writeSeen(collectionId, rows[0].id);
+    setSeenId(rows[0].id);
+  }, [open, rows, collectionId]);
+
+  // entries are newest first, so the unread ones are those above the last one seen
+  const seenIndex = rows && seenId !== null ? rows.findIndex((a) => a.id === seenId) : -1;
+  const unread = !rows || rows.length === 0 || seenId === null ? 0 : seenIndex === -1 ? rows.length : seenIndex;
+  const badge = seenIndex === -1 ? `${unread}+` : String(unread); // seen entry scrolled out of the list: "8+"
 
   return (
     <>
-      <section className="card mb-8" aria-label="Recent activity">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="View recent activity"
-          className="flex w-full items-center gap-3 rounded-2xl px-5 py-4 text-left transition hover:bg-slate-50"
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-            <Activity className="size-5" strokeWidth={1.9} />
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={unread > 0 ? `Recent activity, ${badge} new` : "Recent activity"}
+        className="btn-secondary relative"
+      >
+        <History className="size-4 text-blue-600" strokeWidth={1.9} />
+        {unread > 0 && (
+          <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
+            {badge}
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold text-ink">Recent activity</span>
-            <span className="block text-xs text-slate-500">{subtitle}</span>
-          </span>
-          <ChevronRight className="size-5 shrink-0 text-slate-300" />
-        </button>
-      </section>
+        )}
+      </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Recent activity" maxWidth="max-w-xl">
         {/* the negative margins let the rows run edge to edge inside the modal */}

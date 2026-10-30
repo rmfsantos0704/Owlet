@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, Library } from "lucide-react";
-import Modal from "./Modal";
+import DraggableModal from "./DraggableModal";
 import type { ResearchItem } from "../types";
 
 type Props = {
@@ -51,11 +51,11 @@ export default function Sources({ items, selected, max, onToggle }: Props) {
         </p>
       </button>
 
-      <Modal
+      <DraggableModal
         open={open}
         onClose={() => setOpen(false)}
         title="Sources"
-        maxWidth="max-w-lg"
+        align="right"
         footer={
           <>
             <span className="mr-auto self-center text-xs text-slate-400">
@@ -107,7 +107,7 @@ export default function Sources({ items, selected, max, onToggle }: Props) {
             })}
           </div>
         )}
-      </Modal>
+      </DraggableModal>
     </>
   );
 }

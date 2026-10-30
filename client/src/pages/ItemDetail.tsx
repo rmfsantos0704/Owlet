@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronLeft, FileDown, Highlighter, MessageSquareText, RefreshCw, Settings, Sparkles, Trash2,
+  Check, ChevronLeft, ChevronRight, FileDown, FileText, Highlighter, Loader2, MessageSquareText,
+  RefreshCw, Settings, Sparkles, Trash2,
 } from "lucide-react";
 import { api, download } from "../services/api";
 import CitationBox from "../components/CitationBox";
 import TagInput from "../components/TagInput";
 import HighlightList from "../components/HighlightList";
 import ClippedText from "../components/ClippedText";
-import CommentsModal from "../components/CommentsModal";
+import DraggableModal from "../components/DraggableModal";
+
+import CommentThread from "../components/CommentThread";
 import SourceEditor from "../components/SourceEditor";
 import AiSettingsModal from "../components/AiSettingsModal";
 import RegenerateModal from "../components/RegenerateModal";
 import Modal from "../components/Modal";
-import { styleFor } from "../utils/colors";
 import { DEFAULT_AI_SETTINGS } from "../types";
 import type { AiSettings, ResearchItem, Role } from "../types";
 
@@ -29,6 +31,8 @@ export default function ItemDetail() {
   const [regenOpen, setRegenOpen] = useState(false);
   const [highlightsOpen, setHighlightsOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [textOpen, setTextOpen] = useState(false);
+  const [pdfState, setPdfState] = useState<"idle" | "loading" | "done">("idle"); // drives the Download PDF button
 
   useEffect(() => {
     api<{ item: ResearchItem; role: Role | null }>(`/research/${id}`)
@@ -81,10 +85,16 @@ export default function ItemDetail() {
   }
 
   async function downloadPdf() {
+    if (pdfState === "loading") return;
     const name = (item?.source.title ?? "owlet-brief").replace(/[^\w]+/g, "-").slice(0, 60);
+    setPdfState("loading");
+    setActionError("");
     try {
       await download(`/research/${id}/pdf`, `${name}.pdf`);
+      setPdfState("done");
+      setTimeout(() => setPdfState("idle"), 2500); // show "Downloaded" briefly
     } catch (e) {
+      setPdfState("idle");
       setActionError(e instanceof Error ? e.message : "Download failed");
     }
   }
@@ -95,24 +105,81 @@ export default function ItemDetail() {
   const canEdit = role === "owner" || role === "editor";
   const isPdf = item.source.kind === "pdf";
   const aiSettings = item.aiSettings ?? DEFAULT_AI_SETTINGS;
-  const highlightColors = [...new Set(item.highlights.map((h) => h.color))].slice(0, 5);
+  const textLabel = isPdf ? "Extracted text" : "Clipped text";
+  const wordCount = item.content?.wordCount ?? 0;
+  // only real web links become clickable; anything else (e.g. a javascript: address) is shown as plain text
+  const safeUrl = item.source.url && /^https?:\/\//i.test(item.source.url) ? item.source.url : "";
 
   return (
     <div className="space-y-6">
-      <button onClick={goBack} className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand">
-        <ChevronLeft className="size-4" /> Back
-      </button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button onClick={goBack} className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand">
+          <ChevronLeft className="size-4" /> Back
+        </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setHighlightsOpen(true)}
+            title={`Highlights (${item.highlights.length})`}
+            aria-label={`View highlights (${item.highlights.length})`}
+            className="relative flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition hover:bg-amber-100"
+          >
+            <Highlighter className="size-5" />
+            {item.highlights.length > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-amber-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                {item.highlights.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCommentsOpen(true)}
+            title={`Comments (${item.comments.length})`}
+            aria-label={`Open comments (${item.comments.length})`}
+            className="relative flex size-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
+          >
+            <MessageSquareText className="size-5" />
+            {item.comments.length > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-emerald-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                {item.comments.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={downloadPdf}
+            disabled={pdfState === "loading"}
+            aria-live="polite"
+            className="btn-secondary disabled:cursor-wait disabled:opacity-80"
+          >
+            {pdfState === "loading" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : pdfState === "done" ? (
+              <Check className="size-4 text-emerald-600" />
+            ) : (
+              <FileDown className="size-4" />
+            )}
+            {pdfState === "loading" ? "Downloading…" : pdfState === "done" ? "Downloaded" : "Download PDF"}
+          </button>
+          {canEdit && (
+            <button type="button" onClick={remove} className="btn-danger" title="Delete clip">
+              <Trash2 className="size-4" /> Delete
+            </button>
+          )}
+        </div>
+      </div>
 
       {actionError && <p className="text-sm text-red-600">{actionError}</p>}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="min-w-0 space-y-6">
           <section className="card p-5 sm:p-6">
-            {item.source.url ? (
+            {safeUrl ? (
               <a
-                href={item.source.url}
+                href={safeUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noreferrer noopener"
                 className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600 hover:underline"
               >
                 {item.source.domain}
@@ -174,34 +241,9 @@ export default function ItemDetail() {
               </>
             )}
           </section>
-
-          <details className="card p-5">
-            <summary className="cursor-pointer font-semibold text-ink">
-              {isPdf ? "Extracted text" : "Clipped text"} ({item.content?.wordCount ?? 0} words)
-            </summary>
-            <div className="mt-4">
-              <ClippedText
-                text={item.content?.rawText ?? ""}
-                highlights={item.highlights}
-                readOnly={!canEdit}
-                onHighlight={(text, color, note) => act("/highlights", "POST", { text, color, note })}
-              />
-            </div>
-          </details>
         </div>
 
         <div className="min-w-0 space-y-6">
-          <div className="flex gap-2">
-            <button onClick={downloadPdf} className="btn-secondary flex-1">
-              <FileDown className="size-4" /> Download PDF
-            </button>
-            {canEdit && (
-              <button onClick={remove} className="btn-danger" title="Delete clip">
-                <Trash2 className="size-4" />
-              </button>
-            )}
-          </div>
-
           <section className="card space-y-3 p-5">
             <h2 className="font-semibold text-ink">Citations</h2>
             <CitationBox label="APA" text={item.citations.apa ?? ""} />
@@ -216,58 +258,55 @@ export default function ItemDetail() {
           <section className="card p-5">
             <button
               type="button"
-              onClick={() => setHighlightsOpen(true)}
-              aria-label="View highlights"
-              className="flex w-full items-center gap-3 text-left"
+              onClick={() => setTextOpen(true)}
+              aria-label={`Open ${textLabel.toLowerCase()}`}
+              className="group flex w-full items-center gap-3 text-left"
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                <Highlighter className="size-5" />
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                <FileText className="size-5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-ink">Highlights</span>
+                <span className="block font-semibold text-ink">{textLabel}</span>
                 <span className="block text-xs text-slate-500">
-                  {item.highlights.length === 0 ? "None yet" : `${item.highlights.length} saved · View and edit`}
+                  {wordCount} words · {canEdit ? "Read and highlight" : "Read"}
                 </span>
               </span>
-              <span className="flex -space-x-1">
-                {highlightColors.map((c) => (
-                  <span key={c} className={`size-3.5 rounded-full ring-2 ring-white ${styleFor(c).dot}`} />
-                ))}
-              </span>
-            </button>
-          </section>
-
-          <section className="card p-5">
-            <button
-              type="button"
-              onClick={() => setCommentsOpen(true)}
-              aria-label="Open comments"
-              className="flex w-full items-center gap-3 text-left"
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                <MessageSquareText className="size-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-ink">Comments</span>
-                <span className="block text-xs text-slate-500">
-                  {item.comments.length === 0 ? "None yet" : `${item.comments.length} · Open thread`}
-                </span>
-              </span>
+              <ChevronRight className="size-4 text-slate-300 transition group-hover:text-blue-500" />
             </button>
           </section>
         </div>
       </div>
 
-      <CommentsModal
+      <Modal
+        open={textOpen}
+        onClose={() => setTextOpen(false)}
+        title={`${textLabel} (${wordCount} words)`}
+        maxWidth="max-w-5xl"
+      >
+        <ClippedText
+          text={item.content?.rawText ?? ""}
+          highlights={item.highlights}
+          readOnly={!canEdit}
+          onHighlight={(text, color, note) => act("/highlights", "POST", { text, color, note })}
+        />
+      </Modal>
+
+      <DraggableModal
         open={commentsOpen}
         onClose={() => setCommentsOpen(false)}
-        comments={item.comments}
-        highlights={item.highlights}
-        readOnly={!canEdit}
-        onAdd={(text, highlightId, parentId) => act("/comments", "POST", { text, highlightId, parentId })}
-        onEdit={(cid, text) => act(`/comments/${cid}`, "PATCH", { text })}
-        onDelete={(cid) => run(`/comments/${cid}`, "DELETE")}
-      />
+        title={`Comments (${item.comments.length})`}
+        scroll={false}
+      >
+        {/* CommentThread pins its composer and scrolls its own list */}
+        <CommentThread
+          comments={item.comments}
+          highlights={item.highlights}
+          readOnly={!canEdit}
+          onAdd={(text, highlightId, parentId) => act("/comments", "POST", { text, highlightId, parentId })}
+          onEdit={(cid, text) => act(`/comments/${cid}`, "PATCH", { text })}
+          onDelete={(cid) => run(`/comments/${cid}`, "DELETE")}
+        />
+      </DraggableModal>
 
       <AiSettingsModal
         open={aiSettingsOpen}

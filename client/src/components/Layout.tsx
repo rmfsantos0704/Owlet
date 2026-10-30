@@ -308,18 +308,6 @@ export default function Layout() {
 
         <div className="mt-3 shrink-0 space-y-0.5 border-t border-slate-200 pt-3">
           <NavLink
-            to="/account"
-            onClick={() => setOpen(false)}
-            className={({ isActive }) =>
-              `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                isActive ? "bg-brand text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
-              }`
-            }
-          >
-            <UserRound className="size-4.5" strokeWidth={1.8} />
-            Account
-          </NavLink>
-          <NavLink
             to="/help"
             onClick={() => setOpen(false)}
             className={({ isActive }) =>

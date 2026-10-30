@@ -24,6 +24,7 @@ export const privacySections: Section[] = [
       [
         "web pages and PDFs you save: their text, title, author, date, and web address or file name;",
         "the AI summaries, key arguments, tags, and citations generated for them;",
+        "AI workspace results, including the questions you type there;",
         "your highlights, notes, comments, and your collections' names, descriptions, and settings;",
         "who belongs to your collections, and their roles.",
       ],
@@ -48,7 +49,11 @@ export const privacySections: Section[] = [
     id: "ai",
     title: "AI processing",
     body: [
-      "When you save a page or PDF, Owlet sends its text (up to about 12,000 characters; for long PDFs, the beginning and the end), its title, and your Collection's custom instructions to Groq, our AI provider, to create the summary, key arguments, and tags. The Regenerate button and the Test panel in Collection settings do the same. Groq handles this under its own terms and privacy policy.",
+      "Owlet uses Groq, our AI provider, in two places. Groq handles this under its own terms and privacy policy.",
+      [
+        "When you save a page or PDF, and when you press Regenerate or Run test in a clip's AI summary settings, Owlet sends the clip's text (up to about 12,000 characters; for long PDFs, the beginning and the end), its title, and that clip's custom instructions to Groq to create the summary, key arguments, and tags.",
+        "When you use the AI workspace, Owlet sends passages from the saved sources you select (up to about 24,000 characters in total), their titles, and the question or focus you type to Groq to write the brief, summary, or comparison.",
+      ],
       "Don't save anything confidential or that you are not allowed to share with a third-party AI provider.",
     ],
   },

@@ -10,6 +10,7 @@ import SelectableClips from "../components/SelectableClips";
 import { useCollections } from "../context/CollectionContext";
 import CollectionExportMenu from "../components/CollectionExportMenu";
 import AiAssistantCard from "../components/AiAssistantCard";
+import Toast, { type Notice } from "../components/Toast";
 
 import RecentActivity from "../components/RecentActivity";
 
@@ -44,7 +45,7 @@ export default function Library({ all = false }: { all?: boolean }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [importing, setImporting] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const busyRef = useRef(false);
   const importRef = useRef<(files: File[]) => void>(() => {});
@@ -211,7 +212,7 @@ export default function Library({ all = false }: { all?: boolean }) {
     <SelectableClips
       clips={items}
       getId={(it) => it._id}
-getLabel={(it) => it.source.title ?? "clip"}
+      getLabel={(it) => it.source.title ?? "clip"}
       renderClip={(it) => (
         <ResearchCard item={it} onTag={setTag} collectionName={all ? wsName(it.collectionId) : undefined} />
       )}
@@ -311,25 +312,14 @@ getLabel={(it) => it.source.title ?? "clip"}
               </>
             )}
 
+            <RecentActivity collectionId={current.id} reloadKey={reloadKey} />
+
             <Link to={`/Collection/${current.id}/settings`} className="btn-secondary">
-              <Settings className="size-4" /> Settings
+              <Settings className="size-4" />
             </Link>
           </div>
         )}
       </section>
-
-      {notice && (
-        <div
-          className={`mb-6 flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
-            notice.error ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"
-          }`}
-        >
-          <span className="min-w-0 break-words">{notice.text}</span>
-          <button onClick={() => setNotice(null)} aria-label="Dismiss">
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
 
       {!filtering && items.length > 0 && (
         <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -344,12 +334,13 @@ getLabel={(it) => it.source.title ?? "clip"}
           </div>
           <div className="space-y-6">
             <AiAssistantCard items={items} />
-            <RecentActivity collectionId={current.id} reloadKey={reloadKey} />
           </div>
         </div>
       ) : (
         clipsCard
       )}
+
+      <Toast notice={notice} onClose={() => setNotice(null)} />
     </div>
   );
 }

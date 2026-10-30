@@ -39,7 +39,7 @@ export const termsSections: Section[] = [
   },
   {
     id: "sharing",
-    title: "collections and sharing",
+    title: "Collections and sharing",
     body: [
       "The owner of a Collection decides who can join it and what each person can do (owner, editor, or viewer). Members can see everything in the Collection and the email addresses of its other members. Editors can add and change clips, highlights, comments, and tags.",
       "If a Collection owner deletes their account, they must choose, for each shared Collection, whether to transfer it to a member or delete it. Clips and comments you add to a Collection owned by someone else stay with that Collection if you later delete your account, but without your name or email.",

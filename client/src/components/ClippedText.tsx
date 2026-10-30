@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Highlighter } from "lucide-react";
 import type { Highlight } from "../types";
 import ColorPicker from "./ColorPicker";
@@ -51,6 +51,7 @@ function buildSegments(text: string, highlights: Highlight[]): Segment[] {
 
 export default function ClippedText({ text, highlights = [], readOnly, onHighlight }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState("");
   const [color, setColor] = useState<string>("yellow");
   const [note, setNote] = useState("");
@@ -58,6 +59,13 @@ export default function ClippedText({ text, highlights = [], readOnly, onHighlig
   const [error, setError] = useState("");
 
   const segments = useMemo(() => buildSegments(text, highlights), [text, highlights]);
+
+  // on small screens the panel sits below the text, so bring it into view after a selection
+  useEffect(() => {
+    if (pending && window.innerWidth < 768) {
+      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [pending]);
 
   // remember the selected text, because clicking a color button clears the browser's selection
   function captureSelection() {
@@ -103,18 +111,13 @@ export default function ClippedText({ text, highlights = [], readOnly, onHighlig
   if (!text) return <p className="text-sm text-slate-400">No text saved for this clip.</p>;
 
   return (
-    <div>
-      {!readOnly && (
-        <p className="mb-2 flex items-center gap-1.5 text-xs text-slate-400">
-          <Highlighter className="size-3.5" /> Select any text below to highlight it.
-        </p>
-      )}
-
+<div className={`grid gap-4 ${readOnly ? "" : "md:grid-cols-[minmax(0,1fr)_15rem]"}`}>
+      {/* Left: the text, scrolling on its own */}
       <div
         ref={boxRef}
         onMouseUp={captureSelection}
         onTouchEnd={captureSelection}
-        className="max-h-[28rem] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700"
+        className="max-h-[50vh] min-w-0 overflow-y-auto whitespace-pre-wrap break-words pr-2 text-sm leading-relaxed text-slate-700 md:max-h-[65vh]"
       >
         {segments.map((s, i) =>
           s.h ? (
@@ -127,30 +130,43 @@ export default function ClippedText({ text, highlights = [], readOnly, onHighlig
         )}
       </div>
 
-      {!readOnly && pending && (
-        <div className="mt-3 space-y-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <p className="break-words text-xs italic text-slate-600">“{clip(pending)}”</p>
-          <ColorPicker value={color} onChange={setColor} disabled={saving} />
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            maxLength={1000}
-            placeholder="Add a note (optional)"
-            aria-label="Highlight note"
-            className="field"
-          />
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={cancel} disabled={saving} className="btn-secondary">
-              Cancel
-            </button>
-            <button type="button" onClick={save} disabled={saving} className="btn-primary">
-              {saving ? "Saving…" : "Add highlight"}
-            </button>
-          </div>
+      {/* Right: the highlight panel */}
+      {!readOnly && (
+<div ref={panelRef} className="self-start rounded-xl border border-slate-200 bg-slate-50 p-3">
+          {pending ? (
+            <div className="space-y-3">
+              <p className="break-words text-xs italic leading-5 text-slate-600">“{clip(pending)}”</p>
+              <ColorPicker value={color} onChange={setColor} disabled={saving} />
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                maxLength={1000}
+                placeholder="Add a note (optional)"
+                aria-label="Highlight note"
+                className="field"
+              />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={cancel} disabled={saving} className="btn-secondary">
+                  Cancel
+                </button>
+                <button type="button" onClick={save} disabled={saving} className="btn-primary">
+                  {saving ? "Saving…" : "Add highlight"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2 py-6 text-center">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <Highlighter className="size-5" />
+              </span>
+              <p className="text-sm font-medium text-slate-600">Select text to highlight</p>
+<p className="text-xs text-slate-400">Pick a color, add a note.</p>
+            </div>
+          )}
+
+          {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
         </div>
       )}
-
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
