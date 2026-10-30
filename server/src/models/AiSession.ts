@@ -24,7 +24,7 @@ const aiSessionSchema = new Schema(
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
-
 aiSessionSchema.index({ userId: 1, collectionId: 1, createdAt: -1 });
+aiSessionSchema.index({ collectionId: 1 }); // collection deletes and merges remove sessions by collection
 
 export const AiSession = mongoose.model("AiSession", aiSessionSchema);
