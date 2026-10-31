@@ -6,7 +6,9 @@
     "rootDir": "src",
     "strict": true,
     "skipLibCheck": true,
+    "noEmitOnError": true,
     "types": ["node"]
   },
-  "include": ["src", "src/routessrc/servicessrc/modelssrc/middlewaressrc/controllerss", "controllers"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
 }
