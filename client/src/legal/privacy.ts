@@ -23,8 +23,8 @@ export const privacySections: Section[] = [
       "Content you create:",
       [
         "web pages and PDFs you save: their text, title, author, date, and web address or file name;",
-        "the AI summaries, key arguments, tags, and citations generated for them;",
-        "AI workspace results, including the questions you type there;",
+        "the tags and citations created for them and, when AI features are on, AI summaries and key arguments;",
+        "when AI features are on, AI workspace results, including the questions you type there;",
         "your highlights, notes, comments, and your collections' names, descriptions, and settings;",
         "who belongs to your collections, and their roles.",
       ],
@@ -45,16 +45,17 @@ export const privacySections: Section[] = [
       "We do not sell your personal data and we do not show advertising.",
     ],
   },
-  {
+    {
     id: "ai",
-    title: "AI processing",
+    title: "AI features (optional)",
     body: [
-      "Owlet uses Groq, our AI provider, in two places. Groq handles this under its own terms and privacy policy.",
+      "Owlet can use Groq, an AI provider, for summaries, tags, and the AI workspace. These features can be switched off. When they are off, Owlet does not send your content to any AI provider, and its Quick summary and Build a brief tools run in your own browser.",
+      "When AI features are on, Owlet sends the following to Groq, which handles it under its own terms and privacy policy:",
       [
-        "When you save a page or PDF, and when you press Regenerate or Run test in a clip's AI summary settings, Owlet sends the clip's text (up to about 12,000 characters; for long PDFs, the beginning and the end), its title, and that clip's custom instructions to Groq to create the summary, key arguments, and tags.",
-        "When you use the AI workspace, Owlet sends passages from the saved sources you select (up to about 24,000 characters in total), their titles, and the question or focus you type to Groq to write the brief, summary, or comparison.",
+        "when you save a page or PDF, and when you press Regenerate or Run test in a clip's AI summary settings: the clip's text (up to about 12,000 characters; for long PDFs, the beginning and the end), its title, and that clip's custom instructions;",
+        "when you use the AI workspace: passages from the saved sources you select (up to about 24,000 characters in total), their titles, and the question or focus you type.",
       ],
-      "Don't save anything confidential or that you are not allowed to share with a third-party AI provider.",
+      "While AI features are on, don't save anything confidential or that you are not allowed to share with a third-party AI provider.",
     ],
   },
   {
@@ -62,7 +63,7 @@ export const privacySections: Section[] = [
     title: "Who sees your information",
     body: [
       "Members of a Collection can see its content and each other's email addresses. Comments show their author's email. Other Owlet users cannot see your age or your role.",
-      `Service providers help us run Owlet: hosting (${LEGAL.hostingProviders}), our database (MongoDB Atlas), email delivery (${LEGAL.emailProvider}), and AI summaries (Groq). They process data only to provide those services.`,
+      `Service providers help us run Owlet: hosting (${LEGAL.hostingProviders}), our database (MongoDB Atlas), email delivery (${LEGAL.emailProvider}), and, when AI features are on, Groq. They process data only to provide those services.`,
       "We may disclose information if the law requires it or to protect people's safety or rights.",
     ],
   },

@@ -12,7 +12,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export default function CollectionSettings() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, aiEnabled } = useAuth();
   const { reload, select } = useCollections();
   const dialog = useDialog();
   const [ws, setWs] = useState<collectionDetail | null>(null);
@@ -277,9 +277,11 @@ export default function CollectionSettings() {
                 className="field"
               />
             </div>
-<p className="text-xs text-slate-400">
-  AI summary settings are set per clip, in the AI summary card on each clip.
-</p>
+            {aiEnabled && (
+              <p className="text-xs text-slate-400">
+                AI summary settings are set per clip, in the AI summary card on each clip.
+              </p>
+            )}
           </section>
         </fieldset>
 

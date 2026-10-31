@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  Archive, Bot, FileDown, Highlighter, MessageSquareText, Search, Settings, Upload, X, type LucideIcon,
+  Archive, Bot, FileDown, Highlighter, MessageSquareText, Search, Settings, Tag, Upload, X, type LucideIcon,
 } from "lucide-react";
 import { api, download, upload } from "../services/api";
 import type { ResearchItem } from "../types";
@@ -11,7 +11,7 @@ import { useCollections } from "../context/CollectionContext";
 import CollectionExportMenu from "../components/CollectionExportMenu";
 import AiAssistantCard from "../components/AiAssistantCard";
 import Toast, { type Notice } from "../components/Toast";
-
+import { useAuth } from "../context/AuthContext";
 import RecentActivity from "../components/RecentActivity";
 
 const MAX_FILES = 10;
@@ -33,6 +33,7 @@ function StatCard({ label, value, icon: Icon, accent }: { label: string; value: 
 }
 
 export default function Library({ all = false }: { all?: boolean }) {
+  const { aiEnabled } = useAuth();
   const { current, ready, collections } = useCollections();
   const wid = all ? undefined : current?.id;
   const wsName = (id: string) => collections.find((w) => w.id === id)?.name;
@@ -199,7 +200,9 @@ export default function Library({ all = false }: { all?: boolean }) {
   const filtering = !!(q.trim() || tag);
   const stats = [
     { label: "Saved clips", value: items.length, icon: Archive, accent: "bg-blue-50 text-blue-700" },
-    { label: "AI summaries", value: items.filter((i) => i.aiOutput.summary).length, icon: Bot, accent: "bg-violet-50 text-violet-700" },
+    aiEnabled
+      ? { label: "AI summaries", value: items.filter((i) => i.aiOutput.summary).length, icon: Bot, accent: "bg-violet-50 text-violet-700" }
+      : { label: "Tagged clips", value: items.filter((i) => (i.tags?.length ?? 0) > 0).length, icon: Tag, accent: "bg-violet-50 text-violet-700" },
     { label: "Highlights", value: items.reduce((n, i) => n + (i.highlights?.length ?? 0), 0), icon: Highlighter, accent: "bg-amber-50 text-amber-700" },
     { label: "Comments", value: items.reduce((n, i) => n + (i.comments?.length ?? 0), 0), icon: MessageSquareText, accent: "bg-emerald-50 text-emerald-700" },
   ];

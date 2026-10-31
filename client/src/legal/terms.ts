@@ -6,7 +6,7 @@ export const termsSections: Section[] = [
     id: "about",
     title: "About these Terms",
     body: [
-      `These Terms of Service ("Terms") are an agreement between you and ${LEGAL.operator} ("we", "us"), who run ${LEGAL.appName}: a web app and browser extension for saving web pages and PDFs, getting AI summaries and citations, and organizing research in collections.`,
+      `These Terms of Service ("Terms") are an agreement between you and ${LEGAL.operator} ("we", "us"), who run ${LEGAL.appName}: a web app and browser extension for saving web pages and PDFs, getting summaries and citations, and organizing research in collections.`,
       "By creating an account or using Owlet you agree to these Terms and to our Privacy Policy. If you don't agree, please don't use Owlet.",
     ],
   },
@@ -32,7 +32,7 @@ export const termsSections: Section[] = [
     title: "Your content",
     body: [
       "Your content means the pages and PDFs you save, the summaries, tags, and citations created for them, and your highlights, notes, comments, and Collection settings. You keep ownership of your content.",
-      "You give us a limited licence to store, process, and display your content, and to show it to the people you share a Collection with, only so that we can run Owlet for you. This includes sending the text of what you save to our AI provider to produce summaries and tags.",
+      "You give us a limited licence to store, process, and display your content, and to show it to the people you share a Collection with, only so that we can run Owlet for you. When AI features are on, this includes sending the text of what you save, and the passages you pick in the AI workspace, to our AI provider.",
       "You are responsible for your content. Only save or share material you have the right to use. Owlet is meant for personal study and research: don't use shared collections or exports to republish or distribute other people's copyrighted material without permission.",
       `If you believe something in Owlet infringes your rights, contact us at ${LEGAL.contactEmail}. We will review it and may remove it.`,
     ],
@@ -47,11 +47,11 @@ export const termsSections: Section[] = [
   },
   {
     id: "ai",
-    title: "AI summaries and citations",
+    title: "Summaries, AI features and citations",
     body: [
-      "Summaries, key arguments, tags, and citations are generated automatically. They can be incomplete or wrong, and citation formats (APA, MLA, Chicago) may not match the latest style guide or your instructor's requirements.",
+      "Quick summaries, suggested terms, briefs, and citations are generated automatically. When AI features are on, so are AI summaries, tags, and workspace results. All of them can be incomplete or wrong, and citation formats (APA, MLA, Chicago) may not match the latest style guide or your instructor's requirements.",
       "Always check them against the original source before you rely on them or hand in work. You are responsible for your own academic integrity and for the accuracy of anything you publish or submit.",
-      "Don't save confidential or sensitive information that you are not allowed to send to a third-party AI provider.",
+      "While AI features are on, don't save confidential or sensitive information that you are not allowed to send to a third-party AI provider.",
     ],
   },
   {

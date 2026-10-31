@@ -5,7 +5,7 @@ import { api } from "../services/api";
 type Mode = "full" | "citations";
 
 const OPTIONS: { mode: Mode; title: string; hint: string }[] = [
-  { mode: "full", title: "Full report", hint: "Summaries, highlights, comments, and citations, grouped by topic" },
+  { mode: "full", title: "Full report", hint: "Highlights, comments, and citations, grouped by topic. Includes summaries where clips have them." },
   { mode: "citations", title: "Citations only", hint: "APA, MLA, and Chicago lists, grouped by topic" },
 ];
 

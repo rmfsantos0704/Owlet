@@ -8,6 +8,9 @@ import FilterBar, { type FilterSelect } from "../components/FilterBar";
 import HighlightsAnalysis, { MAX_ANALYSIS_SOURCES } from "../components/HighlightsAnalysis";
 import { styleFor } from "../utils/colors";
 import type { Highlight, ResearchItem } from "../types";
+import { useAuth } from "../context/AuthContext";
+import BriefModal from "../components/BriefModal";
+import type { BriefHighlight } from "../utils/brief";
 
 const FILTERS = ["All highlights", "With notes"] as const;
 
@@ -41,6 +44,13 @@ export default function Highlights() {
   // highlights picked for "Connect the patterns"
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [selectionNote, setSelectionNote] = useState("");
+
+  const { aiEnabled } = useAuth();
+
+    // the AI analysis reads at most this many sources; a brief has no such limit
+  const sourceLimit = aiEnabled ? MAX_ANALYSIS_SOURCES : Infinity;
+  
+  const [briefOpen, setBriefOpen] = useState(false);
 
   // the list is limited to the chosen collection, so its role decides who sees Edit (the server checks too)
   const canEdit = scopeCollection ? scopeCollection.role !== "viewer" : true;
@@ -83,6 +93,21 @@ export default function Highlights() {
         )
         .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
     [items]
+  );
+
+  const briefHighlights: BriefHighlight[] = useMemo(
+    () =>
+      all.map((h) => ({
+        id: `${h.item._id}:${h._id}`,
+        text: h.text,
+        note: h.note,
+        color: h.color,
+        itemId: h.item._id,
+        sourceTitle: h.item.source?.title ?? "Untitled",
+        apa: h.item.citations?.apa ?? "",
+        createdAt: h.createdAt,
+      })),
+    [all]
   );
 
   const clipOptions = useMemo(() => {
@@ -150,18 +175,18 @@ export default function Highlights() {
   const selected = all.filter((h) => selectedKeys.has(keyOf(h)));
   const selectedSources = new Set(selected.map((h) => h.item._id));
 
-  function toggleSelect(h: (typeof all)[number]) {
+function toggleSelect(h: (typeof all)[number]) {
     const k = keyOf(h);
     const next = new Set(selectedKeys);
     if (next.has(k)) {
       next.delete(k);
-    } else if (!selectedSources.has(h.item._id) && selectedSources.size >= MAX_ANALYSIS_SOURCES) {
+    } else if (!selectedSources.has(h.item._id) && selectedSources.size >= sourceLimit) {
       setSelectionNote(`Highlights from up to ${MAX_ANALYSIS_SOURCES} sources can be analyzed at a time.`);
       return;
     } else {
-      next.add(k);
+      setSelectionNote("");
+      next.add(k); // Also ensure you were adding the key to 'next' here!
     }
-    setSelectionNote("");
     setSelectedKeys(next);
   }
 
@@ -171,7 +196,7 @@ export default function Highlights() {
     let skipped = 0;
     for (const h of shown) {
       if (next.has(keyOf(h))) continue;
-      if (!sources.has(h.item._id) && sources.size >= MAX_ANALYSIS_SOURCES) {
+      if (!sources.has(h.item._id) && sources.size >= sourceLimit) {
         skipped++;
         continue;
       }
@@ -438,16 +463,70 @@ export default function Highlights() {
         </div>
 
         <div className="space-y-6 xl:self-start">
-          <HighlightsAnalysis
-            selected={selected.map((h) => ({ id: h._id, itemId: h.item._id }))}
-            shownCount={shown.length}
-            notice={selectionNote}
-            resetKey={scope}
-            onSelectAll={selectAllShown}
-            onClear={clearSelection}
-          />
+                    {aiEnabled ? (
+            <HighlightsAnalysis
+              selected={selected.map((h) => ({ id: h._id, itemId: h.item._id }))}
+              shownCount={shown.length}
+              notice={selectionNote}
+              resetKey={scope}
+              onSelectAll={selectAllShown}
+              onClear={clearSelection}
+            />
+          ) : (
+            <div className="rounded-2xl bg-brand p-5 text-white">
+              <div className="flex items-center gap-2">
+                <FileText className="size-4 text-cyan-300" />
+                <h2 className="font-semibold">Build a brief</h2>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-blue-100/70">
+                Tick highlights and get a brief grouped by source or by color, with your notes and an APA reference list.
+              </p>
+
+              <div className="mt-3 rounded-xl bg-white/10 p-3">
+                <p className="text-[11px] leading-4 text-blue-100/80">
+                  {selected.length === 0
+                    ? "Tick the highlights you want, or select everything shown."
+                    : `${selected.length} highlight${selected.length === 1 ? "" : "s"} selected from ${selectedSources.size} source${
+                        selectedSources.size === 1 ? "" : "s"
+                      }.`}
+                </p>
+                <div className="mt-2 flex items-center gap-3 text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={selectAllShown}
+                    disabled={shown.length === 0}
+                    className="text-cyan-300 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Select all shown ({shown.length})
+                  </button>
+                  {selected.length > 0 && (
+                    <button type="button" onClick={clearSelection} className="text-blue-100/70 hover:underline">
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setBriefOpen(true)}
+                disabled={all.length === 0}
+                className="mt-4 block w-full rounded-xl bg-white py-2.5 text-center text-xs font-bold text-brand hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {selected.length > 0 ? `Build brief from ${selected.length} selected` : "Build a brief"}
+              </button>
+            </div>
+          )}
         </div>
       </section>
+      {briefOpen && (
+        <BriefModal
+          open
+          onClose={() => setBriefOpen(false)}
+          highlights={briefHighlights}
+          initial={[...selectedKeys]}
+        />
+      )}
     </div>
   );
 }

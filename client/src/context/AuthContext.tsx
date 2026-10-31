@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api } from "../services/api";
+import { api, ApiError } from "../services/api";
 
 type User = { id?: string; email: string };
+type Session = { user: User; features?: { ai?: boolean } };
 
 export type RegisterInput = {
   email: string;
@@ -14,6 +15,7 @@ export type RegisterInput = {
 type AuthValue = {
   user: User | null;
   loading: boolean;
+  aiEnabled: boolean; // decided by the server (AI_ENABLED)
   login: (email: string, password: string) => Promise<void>;
   // creating an account does NOT log you in: the user must confirm their email first
   register: (input: RegisterInput) => Promise<void>;
@@ -24,26 +26,58 @@ const AuthContext = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [aiEnabled, setAiEnabled] = useState(false);
   const [loading, setLoading] = useState(!!localStorage.getItem("token"));
 
   useEffect(() => {
-    if (!localStorage.getItem("token")) return;
-    api<{ user: User }>("/auth/me")
-      .then((r) => setUser(r.user))
-      .catch(() => localStorage.removeItem("token"))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    const load = () => {
+      api<Session>("/auth/me")
+        .then((r) => {
+          if (cancelled) return;
+          setUser(r.user);
+          setAiEnabled(!!r.features?.ai);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          // only a rejected login ends the session; a network hiccup or server error must not log anyone out
+          if (e instanceof ApiError && (e.status === 401 || e.status === 403)) localStorage.removeItem("token");
+          setUser(null);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    };
+
+    if (localStorage.getItem("token")) load();
+
+    // another tab (or the extension) logged in or out: follow it
+    const onStorage = (e: StorageEvent) => {
+      if (e.storageArea !== localStorage || (e.key !== "token" && e.key !== null)) return;
+      if (localStorage.getItem("token")) load();
+      else setUser(null);
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   const value: AuthValue = {
     user,
     loading,
+    aiEnabled,
     login: async (email, password) => {
-      const r = await api<{ token: string; user: User }>("/auth/login", {
+      const r = await api<Session & { token: string }>("/auth/login", {
         method: "POST",
         body: { email, password },
       });
       localStorage.setItem("token", r.token);
       setUser(r.user);
+      setAiEnabled(!!r.features?.ai);
     },
     register: async (input) => {
       await api("/auth/register", { method: "POST", body: input });

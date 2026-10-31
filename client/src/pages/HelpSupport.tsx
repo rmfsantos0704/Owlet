@@ -3,83 +3,139 @@ import { Link } from "react-router-dom";
 import {
   Bookmark,
   ChevronDown,
+  FileText,
   FileUp,
   Highlighter,
   LifeBuoy,
+  ListChecks,
   Mail,
   Share2,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import SupportModal from "../components/SupportModal"; // adjust path to match where the file lives
+import { useAuth } from "../context/AuthContext";
 
-const GUIDES: { icon: LucideIcon; title: string; text: string; accent: string }[] = [
-  {
-    icon: Bookmark,
-    title: "Clip a page",
-    text: "Open an article, click the Owlet extension, pick a Collection and press Clip this page. Owlet saves the text and writes an AI summary.",
-    accent: "bg-blue-50 text-blue-700",
-  },
-  {
-    icon: FileUp,
-    title: "Import PDFs",
-    text: "In a Collection, press Import PDF or drag PDF files anywhere on the page. You can add up to 10 files at a time, 15 MB each.",
-    accent: "bg-violet-50 text-violet-700",
-  },
-  {
-    icon: Highlighter,
-    title: "Highlight and comment",
-    text: "Open a clip to highlight passages, add notes and leave comments. Everything shows up on the Highlights and Comments pages.",
-    accent: "bg-amber-50 text-amber-700",
-  },
-  {
-    icon: Sparkles,
-    title: "Use the AI workspace",
-    text: "Open it from the AI research assistant card on a Collection page. Pick up to 8 sources, choose a mode and run the analysis. Each run is saved under Recent sessions.",
-    accent: "bg-emerald-50 text-emerald-700",
-  },
-  {
+type Guide = { icon: LucideIcon; title: string; text: string; accent: string };
+
+function guides(ai: boolean): Guide[] {
+  const list: Guide[] = [
+    {
+      icon: Bookmark,
+      title: "Clip a page",
+      text: ai
+        ? "Open an article, click the Owlet extension, pick a Collection and press Clip this page. Owlet saves the text and writes an AI summary."
+        : "Open an article, click the Owlet extension, pick a Collection and press Clip this page. Owlet saves the text and builds the citations.",
+      accent: "bg-blue-50 text-blue-700",
+    },
+    {
+      icon: FileUp,
+      title: "Import PDFs",
+      text: "In a Collection, press Import PDF or drag PDF files anywhere on the page. You can add up to 10 files at a time, 15 MB each.",
+      accent: "bg-violet-50 text-violet-700",
+    },
+    {
+      icon: Highlighter,
+      title: "Highlight and comment",
+      text: "Open a clip to highlight passages, add notes and leave comments. Everything shows up on the Highlights and Comments pages.",
+      accent: "bg-amber-50 text-amber-700",
+    },
+  ];
+
+  if (ai) {
+    list.push({
+      icon: Sparkles,
+      title: "Use the AI workspace",
+      text: "Open it from the AI research assistant card on a Collection page. Pick up to 8 sources, choose a mode and run the analysis. Each run is saved under Recent sessions.",
+      accent: "bg-emerald-50 text-emerald-700",
+    });
+  } else {
+    list.push(
+      {
+        icon: ListChecks,
+        title: "Quick summary and tags",
+        text: "Open a clip to see its Quick summary: key sentences picked from the text, plus key terms. Click a term to add it as a tag.",
+        accent: "bg-cyan-50 text-cyan-700",
+      },
+      {
+        icon: FileText,
+        title: "Build a brief",
+        text: "On the Highlights page, press Build a brief, tick the highlights you want and group them by source or by color. Owlet compiles them with your notes and an APA reference list. Copy it as Markdown or download it as a .md file.",
+        accent: "bg-emerald-50 text-emerald-700",
+      }
+    );
+  }
+
+  list.push({
     icon: Share2,
     title: "Share a Collection",
     text: "Owners can create a join link from the Collection settings, or from the extension. Choose whether people join as viewers or editors, and when the link expires.",
     accent: "bg-sky-50 text-sky-700",
-  },
-];
+  });
+  return list;
+}
 
-const FAQ: [string, string][] = [
-  [
-    "Why does a clip say the AI summary failed?",
-    "The clip is still saved. The AI service may have been busy. Open the clip and press Regenerate to try the summary again.",
-  ],
-  [
-    "Why can't I import a PDF?",
-    "Owlet needs a PDF with selectable text. Scanned, image-only PDFs aren't supported yet. Also check that the file is under 15 MB and that you're an owner or editor of the Collection.",
-  ],
-  [
-    "What does \"Already clipped\" mean?",
-    "That page (or an identical PDF) is already in the Collection, so Owlet didn't save a second copy. You can open the existing clip from the message.",
-  ],
-  [
-    "What's the difference between owner, editor and viewer?",
-    "Owners manage settings, members and join links. Editors can add clips, highlights and comments. Viewers can read everything but can't change anything.",
-  ],
-  [
-    "Can I share my Personal Collection?",
-    "No. Personal is private to you. Create a new Collection if you want to work with other people.",
-  ],
-  [
-    "Can other people see my AI workspace sessions?",
-    "No. Sessions are private to you, even in a shared Collection. Only the 20 most recent sessions per Collection are kept.",
-  ],
-  [
+function faq(ai: boolean): [string, string][] {
+  const list: [string, string][] = [];
+
+  if (ai) {
+    list.push([
+      "Why does a clip say the AI summary failed?",
+      "The clip is still saved. The AI service may have been busy. Open the clip and press Regenerate to try the summary again.",
+    ]);
+  } else {
+    list.push(
+      [
+        "Where does the Quick summary come from?",
+        "Owlet picks the sentences that best reflect the most repeated terms in the text and shows them in the order they appear. It doesn't write anything new, so check the original for context. The key terms come from the same analysis.",
+      ],
+      [
+        "Why don't my clips have tags?",
+        "Tags aren't added automatically. Open a clip and add your own, or click a key term in its Quick summary. Tags are also used to group clips in the Collection PDF export.",
+      ]
+    );
+  }
+
+  list.push(
+    [
+      "Why can't I import a PDF?",
+      "Owlet needs a PDF with selectable text. Scanned, image-only PDFs aren't supported yet. Also check that the file is under 15 MB and that you're an owner or editor of the Collection.",
+    ],
+    [
+      "What does \"Already clipped\" mean?",
+      "That page (or an identical PDF) is already in the Collection, so Owlet didn't save a second copy. You can open the existing clip from the message.",
+    ],
+    [
+      "What's the difference between owner, editor and viewer?",
+      "Owners manage settings, members and join links. Editors can add clips, highlights and comments. Viewers can read everything but can't change anything.",
+    ],
+    [
+      "Can I share my Personal Collection?",
+      "No. Personal is private to you. Create a new Collection if you want to work with other people.",
+    ]
+  );
+
+  if (ai) {
+    list.push([
+      "Can other people see my AI workspace sessions?",
+      "No. Sessions are private to you, even in a shared Collection. Only the 20 most recent sessions per Collection are kept.",
+    ]);
+  }
+
+  list.push([
     "My join link stopped working.",
     "Links expire and can have a use limit. Ask the Collection owner to create a new one from the extension or the Collection settings.",
-  ],
-];
+  ]);
+  return list;
+}
 
 export default function HelpSupport() {
+  const { aiEnabled } = useAuth();
   const [open, setOpen] = useState<number | null>(0);
   const [supportOpen, setSupportOpen] = useState(false);
+
+  const GUIDES = guides(aiEnabled);
+  const FAQ = faq(aiEnabled);
 
   return (
     <div>

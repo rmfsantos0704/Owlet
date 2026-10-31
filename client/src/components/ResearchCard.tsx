@@ -20,6 +20,10 @@ type Props = {
 export default function ResearchCard({ item, onTag, collectionName }: Props) {
   const isPdf = item.source.kind === "pdf";
   const origin = isPdf ? `PDF${item.source.fileName ? ` · ${item.source.fileName}` : ""}` : item.source.domain;
+  const summary = item.aiOutput?.summary;
+  const words = item.content?.wordCount ?? 0;
+  const highlights = item.highlights?.length ?? 0;
+  const comments = item.comments?.length ?? 0;
 
   return (
     <div className="flex items-start gap-4 px-5 py-4 transition hover:bg-slate-50/80">
@@ -38,24 +42,37 @@ export default function ResearchCard({ item, onTag, collectionName }: Props) {
           {origin}
           {item.source.author && ` · ${item.source.author}`}
         </div>
-        {item.aiOutput.summary && (
-          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">{item.aiOutput.summary}</p>
-        )}
+        {summary && <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">{summary}</p>}
         {item.snippet && (
           <p className="mt-1.5 line-clamp-2 text-xs italic leading-5 text-slate-500">…{item.snippet}…</p>
         )}
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          {item.tags.map((t) => (
+          {(item.tags ?? []).map((t) => (
             <button key={t} onClick={() => onTag(t)} className="chip hover:bg-slate-200">
               {t}
             </button>
           ))}
-          {item.aiOutput.summary && (
+          {summary && (
             <span className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
               <Sparkles className="size-3" /> Summarized
             </span>
           )}
         </div>
+        {(words > 0 || highlights > 0 || comments > 0) && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
+            {words > 0 && <span>{words.toLocaleString()} words</span>}
+            {highlights > 0 && (
+              <span>
+                {highlights} highlight{highlights === 1 ? "" : "s"}
+              </span>
+            )}
+            {comments > 0 && (
+              <span>
+                {comments} comment{comments === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

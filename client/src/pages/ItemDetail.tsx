@@ -10,7 +10,8 @@ import TagInput from "../components/TagInput";
 import HighlightList from "../components/HighlightList";
 import ClippedText from "../components/ClippedText";
 import DraggableModal from "../components/DraggableModal";
-
+import { useAuth } from "../context/AuthContext";
+import QuickSummary from "../components/QuickSummary";
 import CommentThread from "../components/CommentThread";
 import SourceEditor from "../components/SourceEditor";
 import AiSettingsModal from "../components/AiSettingsModal";
@@ -22,6 +23,7 @@ import type { AiSettings, ResearchItem, Role } from "../types";
 export default function ItemDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { aiEnabled } = useAuth();
   const [item, setItem] = useState<ResearchItem | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [error, setError] = useState("");
@@ -199,6 +201,7 @@ export default function ItemDetail() {
             </div>
           </section>
 
+          {aiEnabled ? (
           <section className="rounded-2xl bg-brand p-5 text-white shadow-lg shadow-blue-950/10 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -241,6 +244,14 @@ export default function ItemDetail() {
               </>
             )}
           </section>
+          ) : (
+            <QuickSummary
+              text={item.content?.rawText ?? ""}
+              tags={item.tags}
+              canEdit={canEdit}
+              onAddTag={(t) => run("/tags", "PUT", { tags: [...new Set([...item.tags, t])] })}
+            />
+          )}
         </div>
 
         <div className="min-w-0 space-y-6">
@@ -308,15 +319,17 @@ export default function ItemDetail() {
         />
       </DraggableModal>
 
-      <AiSettingsModal
-        open={aiSettingsOpen}
-        onClose={() => setAiSettingsOpen(false)}
-        itemId={id}
-        settings={aiSettings}
-        canEdit={canEdit}
-        onSave={saveAiSettings}
-        onRegenerate={regenerate}
-      />
+      {aiEnabled && (
+        <AiSettingsModal
+          open={aiSettingsOpen}
+          onClose={() => setAiSettingsOpen(false)}
+          itemId={id}
+          settings={aiSettings}
+          canEdit={canEdit}
+          onSave={saveAiSettings}
+          onRegenerate={regenerate}
+        />
+      )}
 
       <Modal
         open={highlightsOpen}
@@ -333,19 +346,21 @@ export default function ItemDetail() {
         />
       </Modal>
 
-      <RegenerateModal
-        open={regenOpen}
-        onClose={() => setRegenOpen(false)}
-        settings={aiSettings}
-        onConfirm={() => {
-          setRegenOpen(false);
-          void regenerate();
-        }}
-        onEditSettings={() => {
-          setRegenOpen(false);
-          setAiSettingsOpen(true);
-        }}
-      />
+      {aiEnabled && (
+        <RegenerateModal
+          open={regenOpen}
+          onClose={() => setRegenOpen(false)}
+          settings={aiSettings}
+          onConfirm={() => {
+            setRegenOpen(false);
+            void regenerate();
+          }}
+          onEditSettings={() => {
+            setRegenOpen(false);
+            setAiSettingsOpen(true);
+          }}
+        />
+      )}
     </div>
   );
 }
