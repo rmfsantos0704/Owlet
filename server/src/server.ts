@@ -14,6 +14,8 @@ const need = (key: string, note = "") => {
 
 need("MONGODB_URI");
 need("JWT_SECRET");
+const aiOn = process.env.AI_ENABLED === "true";
+if (aiOn) need("GROQ_API_KEY", " (required when AI_ENABLED=true)");
 
 if (isProd) {
   // a live site must send real email, know how many proxies sit in front of it, and use a strong signing key
@@ -24,7 +26,6 @@ if (isProd) {
     "MAIL_FROM",
     "SUPPORT_EMAIL",
     "CLIENT_URL",
-    "GROQ_API_KEY",
     "TRUST_PROXY",
   ]) {
     need(key, " (required in production)");
@@ -39,9 +40,6 @@ if (isProd) {
   // not fatal in development, but worth knowing
   if (!process.env.SUPPORT_EMAIL || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.warn("Support form and emails won't send: set SUPPORT_EMAIL, SMTP_USER and SMTP_PASS in .env");
-  }
-  if (!process.env.GROQ_API_KEY) {
-    console.warn("GROQ_API_KEY is not set: clips will save, but without AI summaries.");
   }
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
     console.warn("JWT_SECRET is shorter than 32 characters. Production will refuse to start with it.");
@@ -64,6 +62,7 @@ async function main() {
   if (modifiedCount) console.log(`Marked ${modifiedCount} existing account(s) as verified`);
 
   const server = app.listen(port, () => console.log(`API on http://localhost:${port}`));
+  console.log(`AI features: ${aiOn ? "on" : "off"}`);
 
   // a host's proxy keeps connections open longer than Node's 5 second default, which causes random 502 errors
   server.keepAliveTimeout = 65_000;

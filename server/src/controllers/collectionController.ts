@@ -16,6 +16,7 @@ import { Activity } from "../models/Activity.js";
 import { recordActivity } from "../services/activityLog.js";
 import { streamcollectionPdf } from "../services/collectionPdf.js";
 import { Writable } from "node:stream";
+import { requireAi } from "../middlewares/requireAi.js";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(80),

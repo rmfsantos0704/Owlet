@@ -8,6 +8,7 @@ import {
   testAi, setAiSettings,
 } from "../controllers/researchController.js";
 import { requireAuth } from "../middlewares/auth.js";
+import { requireAi } from "../middlewares/requireAi.js";
 import { uploadPdf } from "../middlewares/upload.js";
 import {
   aiDailyLimiter, aiMinuteLimiter, clipDailyLimiter, importDailyLimiter, writeLimiter,
@@ -20,8 +21,8 @@ router.use(requireAuth); // the per-account limiters below rely on this having r
 // per-minute IP limits for clip/import are in app.ts; these add a daily cap per account
 router.post("/clip", clipDailyLimiter, trackActivity("clip_added"), clip);
 router.post("/import", importDailyLimiter, uploadPdf, trackActivity("pdf_imported"), importPdf);
-router.post("/ask", aiMinuteLimiter, aiDailyLimiter, ask);
-router.get("/sessions", listSessions);
+router.post("/ask", requireAi, aiMinuteLimiter, aiDailyLimiter, ask);
+router.get("/sessions", listSessions); // stays open so old sessions can still be deleted
 router.patch("/sessions/:id", writeLimiter, renameSession);
 router.delete("/sessions/:id", writeLimiter, removeSession);
 router.get("/", list);
@@ -30,8 +31,8 @@ router.get("/:id", getOne);
 router.delete("/:id", writeLimiter, remove);
 router.get("/:id/pdf", pdf);
 
-router.post("/:id/regenerate", aiMinuteLimiter, aiDailyLimiter, regenerate);
-router.post("/:id/test-ai", aiMinuteLimiter, aiDailyLimiter, testAi);
+router.post("/:id/regenerate", requireAi, aiMinuteLimiter, aiDailyLimiter, regenerate);
+router.post("/:id/test-ai", requireAi, aiMinuteLimiter, aiDailyLimiter, testAi);
 router.patch("/:id/source", writeLimiter, updateSource);
 router.post("/:id/highlights", writeLimiter, trackActivity("highlight_added"), addHighlight);
 router.patch("/:id/highlights/:highlightId", writeLimiter, updateHighlight);
@@ -40,5 +41,5 @@ router.post("/:id/comments", writeLimiter, trackActivity("comment_added"), addCo
 router.patch("/:id/comments/:commentId", writeLimiter, updateComment);
 router.delete("/:id/comments/:commentId", writeLimiter, removeComment);
 router.put("/:id/tags", writeLimiter, setTags);
-router.put("/:id/ai-settings", writeLimiter, setAiSettings);
+router.put("/:id/ai-settings", requireAi, writeLimiter, setAiSettings);
 export default router;

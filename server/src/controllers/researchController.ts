@@ -13,6 +13,7 @@ import { extractPdf, PdfImportError } from "../services/pdfImport.js";
 import { streamPdf } from "../services/pdf.js";
 import { toBibtex, toCsv } from "../services/export.js";
 import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../services/access.js";
+import { aiEnabled } from "../config/features.js";
 
 const MAX_TITLE = 100;
 const HIGHLIGHT_COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green"] as const;
@@ -133,6 +134,8 @@ function settingsFrom(ws: { aiSettings?: any }) {
 
 // Runs the AI summary with the given settings; a failure never blocks saving.
 async function runAi(settings: { format?: string; length?: string; instructions?: string }, title: string, text: string) {
+  // AI off: the clip is saved as it is, and the AI provider is never called
+  if (!aiEnabled()) return { ai: { summary: "", paraphrase: "", tags: [] as string[] }, aiFailed: false };
   try {
     const ai = await analyzeText(title, text, settings);
     return { ai, aiFailed: false };
@@ -178,7 +181,7 @@ export async function clip(req: Request, res: Response) {
       citations: buildCitations({ author: d.author, title: d.title, url: d.url, domain, publishedDate: d.publishedDate }),
       tags: ai.tags,
     });
-    res.status(201).json({ item, aiFailed });
+    res.status(201).json({ item, aiFailed, aiEnabled: aiEnabled() });
   } catch (e) {
     // two quick clicks can both pass the check above; the unique index stops the second one
     if (isDuplicateKey(e)) return res.status(409).json({ error: "Already clipped" });
