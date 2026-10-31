@@ -101,6 +101,17 @@ async function loadAi() {
   $<HTMLTextAreaElement>("instructions").value = s.instructions;
   updateAiHint();
 }
+// Show the AI settings only when the server has AI turned on.
+async function loadFeatures() {
+  try {
+    const r = await api("/auth/me");
+    const on = !!r.data?.features?.ai;
+    $("aiSettings").hidden = !on;
+    $("aiHintRow").hidden = !on;
+  } catch {
+    /* offline: the AI parts stay hidden */
+  }
+}
 
 function onAiChange() {
   updateAiHint();
@@ -327,7 +338,7 @@ async function render() {
   $("viewMain").hidden = !loggedIn;
   if (!loggedIn) return;
   status("");
-  await Promise.all([loadPage(), loadCollections(), loadAi()]);
+  await Promise.all([loadPage(), loadCollections(), loadAi(), loadFeatures()]);
 }
 
 // ---------- events ----------
@@ -440,7 +451,11 @@ $("clipBtn").addEventListener("click", async () => {
     const link = id ? { label: "View in Owlet", url: `${DASHBOARD_URL}/item/${id}` } : undefined;
     status(
       r.data.aiFailed ? "info" : "ok",
-      r.data.aiFailed ? "Saved, but the AI summary failed." : "Saved with an AI summary.",
+      r.data.aiFailed
+        ? "Saved, but the AI summary failed."
+        : r.data.aiEnabled === false
+          ? "Saved."
+          : "Saved with an AI summary.",
       link
     );
     flashClipDone();
