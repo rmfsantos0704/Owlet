@@ -32,6 +32,7 @@ router.get("/:id/tags", c.listTags);
 router.put("/:id/tags", writeLimiter, c.manageTag);
 router.get("/:id/matrix/export", c.exportMatrix);
 router.get("/:id/matrix", c.getMatrix);
+router.get("/:id/export-docs", rateLimit({ windowMs: 60 * 1000, limit: 10 }), c.exportGoogleDocContent);
 router.put("/:id/matrix", writeLimiter, c.updateMatrixColumns);
 router.get("/:id", c.getcollection);
 router.get("/:id/activity", act.listActivity);

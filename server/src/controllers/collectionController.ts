@@ -15,6 +15,7 @@ import { publicLink } from "./joinLinkController.js";
 import { Activity } from "../models/Activity.js";
 import { recordActivity } from "../services/activityLog.js";
 import { streamcollectionPdf } from "../services/collectionPdf.js";
+import { collectionDocument } from "../services/collectionDocument.js";
 import { Writable } from "node:stream";
 import { requireAi } from "../middlewares/requireAi.js";
 import { toLiteratureMatrixCsv } from "../services/export.js";
@@ -541,6 +542,33 @@ export async function testAi(req: Request, res: Response) {
   }
 }
 const EXPORT_LIMIT = 500;
+
+export async function exportGoogleDocContent(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  const modeResult = z.enum(["full", "citations"]).safeParse(req.query.mode ?? "full");
+  if (!modeResult.success) return res.status(400).json({ error: "Invalid export mode" });
+  const mode = modeResult.data;
+
+  const [items, total] = await Promise.all([
+    ResearchItem.find({ collectionId: found.ws._id })
+      .select("-content.rawText")
+      .sort({ createdAt: -1 })
+      .limit(EXPORT_LIMIT)
+      .lean(),
+    ResearchItem.countDocuments({ collectionId: found.ws._id }),
+  ]);
+  if (!items.length) return res.status(400).json({ error: "This collection has no clips to export yet" });
+
+  res.json({
+    ...collectionDocument(
+      { name: found.ws.name, description: found.ws.description ?? "" },
+      items,
+      mode,
+      total - items.length
+    ),
+  });
+}
 
 export async function exportPdf(req: Request, res: Response) {
   const found = await load(req, res);
