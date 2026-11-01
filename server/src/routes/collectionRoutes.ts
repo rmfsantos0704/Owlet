@@ -28,6 +28,11 @@ router.post("/notifications/read", writeLimiter, act.markNotificationsRead);
 router.get("/join/:token", joinLinkUseLimiter, jl.previewJoin);
 router.post("/join/:token", joinLinkUseLimiter, jl.confirmJoin);
 
+router.get("/:id/tags", c.listTags);
+router.put("/:id/tags", writeLimiter, c.manageTag);
+router.get("/:id/matrix/export", c.exportMatrix);
+router.get("/:id/matrix", c.getMatrix);
+router.put("/:id/matrix", writeLimiter, c.updateMatrixColumns);
 router.get("/:id", c.getcollection);
 router.get("/:id/activity", act.listActivity);
 router.patch("/:id", writeLimiter, c.updatecollection);

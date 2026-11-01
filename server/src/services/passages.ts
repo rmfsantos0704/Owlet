@@ -16,6 +16,70 @@ export function terms(query: string): string[] {
   return [...new Set((query.toLowerCase().match(WORD) ?? []).filter((w) => !STOP.has(w)))];
 }
 
+const RELATED_STOP = new Set(
+  (
+    "a about above after again against all also although among an and any are as at be because been before being below between both but by " +
+    "can could did do does doing down during each either even few for from further had has have having he her here hers him his how however i if in into is it its itself " +
+    "just like many may me might more most much my no nor not now of off on once one only or other our out over own per same shall she should since so some such than that the their theirs them then there therefore these they this those though three through thus to too two under until up upon us use used using very via was we were what when whether which while who whom why will with within without would yet you your yours " +
+    "first second new said says still http https www com org net html"
+  ).split(" ")
+);
+const RELATED_WORD = /\p{L}[\p{L}\p{N}'’-]*/gu;
+
+function relatedWords(text: string): string[] {
+  const out: string[] = [];
+  for (const match of text.toLowerCase().matchAll(RELATED_WORD)) {
+    const word = match[0].replace(/['’]s$/, "").replace(/['’-]+$/, "");
+    if (word) out.push(word);
+  }
+  return out;
+}
+
+function relatedSingular(word: string) {
+  if (word.length > 5 && word.endsWith("ies")) return word.slice(0, -3) + "y";
+  if (word.length > 4 && word.endsWith("s") && !/(ss|us|is|ics)$/.test(word)) return word.slice(0, -1);
+  return word;
+}
+
+export function keyTerms(text: string, max = 8): string[] {
+  const stats = new Map<string, { count: number; first: number; phrase: boolean }>();
+  let position = 0;
+  const bump = (term: string, phrase: boolean) => {
+    const current = stats.get(term);
+    if (current) current.count++;
+    else stats.set(term, { count: 1, first: position, phrase });
+  };
+  for (const chunk of text.split(/[.!?,\n;:()\[\]"“”]+/)) {
+    let previous = "";
+    for (const raw of relatedWords(chunk)) {
+      position++;
+      if (raw.length < 4 || raw.length > 30 || RELATED_STOP.has(raw)) {
+        previous = "";
+        continue;
+      }
+      const word = relatedSingular(raw);
+      bump(word, false);
+      if (previous) bump(`${previous} ${word}`, true);
+      previous = word;
+    }
+  }
+  let singles = 0;
+  for (const stat of stats.values()) if (!stat.phrase) singles += stat.count;
+  const minimum = singles < 400 ? 1 : 2;
+  const ranked = [...stats.entries()]
+    .filter(([, stat]) => stat.count >= minimum && (!stat.phrase || stat.count >= 2))
+    .map(([term, stat]) => ({ term, stat, score: stat.count * (stat.phrase ? 1.6 : 1) }))
+    .sort((a, b) => b.score - a.score || a.stat.first - b.stat.first);
+  const pool = ranked.slice(0, max * 3).map((entry) => entry.term);
+  const phrases = pool.filter((term) => term.includes(" "));
+  return pool
+    .filter((term) =>
+      term.includes(" ") ||
+      !phrases.some((phrase) => phrase.split(" ").includes(term) && stats.get(phrase)!.count * 1.5 >= stats.get(term)!.count)
+    )
+    .slice(0, max);
+}
+
 // ~900-character passages that break on paragraph and sentence boundaries
 export function chunk(text: string, size = 900): string[] {
   const pieces = text
@@ -53,11 +117,11 @@ export function pickPassages(text: string, query: string, max: number): Passage[
   if (chunks.length <= max) return chunks.map((t, i) => ({ n: i + 1, text: t }));
 
   const qs = terms(query);
-  const tokens = chunks.map((c) => c.toLowerCase().match(WORD) ?? []);
+  const tokens: string[][] = chunks.map((c) => Array.from(c.toLowerCase().match(WORD) ?? []));
 
   const picked: number[] = [];
   if (qs.length) {
-    const df = new Map(qs.map((t) => [t, tokens.filter((tk) => tk.includes(t)).length]));
+    const df = new Map<string, number>(qs.map((t) => [t, tokens.filter((tk) => tk.includes(t)).length]));
     const scored = tokens
       .map((tk, i) => {
         let score = 0;

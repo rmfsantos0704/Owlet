@@ -47,7 +47,15 @@ export async function extractPdf(buffer: Buffer, fileName: string) {
       throw new PdfImportError(`This PDF has ${pdf.numPages} pages. The limit is ${MAX_PAGES}.`);
     }
 
-    const { totalPages, text } = await withTimeout(extractText(pdf, { mergePages: true }), EXTRACT_TIMEOUT_MS);
+    const { totalPages, text: extractedPages } = await withTimeout(extractText(pdf), EXTRACT_TIMEOUT_MS);
+    const pages = Array.isArray(extractedPages) ? extractedPages.map((page) => tidy(page)) : [tidy(extractedPages)];
+    const pageOffsets: number[] = [];
+    let combined = "";
+    for (const [index, page] of pages.entries()) {
+      if (index > 0) combined += "\n\n";
+      pageOffsets.push(combined.length);
+      combined += page;
+    }
     const meta = await getMeta(pdf).catch(() => null);
     const info = (meta?.info ?? {}) as Record<string, unknown>;
 
@@ -57,7 +65,8 @@ export async function extractPdf(buffer: Buffer, fileName: string) {
 
     return {
       pages: totalPages,
-      text: tidy(String(text ?? "").slice(0, MAX_RAW_CHARS)),
+      text: combined.slice(0, MAX_RAW_CHARS),
+      pageOffsets: pageOffsets.filter((offset) => offset < MAX_RAW_CHARS),
       title: (rawTitle && !JUNK_TITLE.test(rawTitle) ? rawTitle : fallbackTitle).slice(0, 500),
       author: rawAuthor ? rawAuthor.slice(0, 200) : undefined,
     };

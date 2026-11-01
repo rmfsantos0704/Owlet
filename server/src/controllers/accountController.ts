@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { User } from "../models/User.js";
-import { collection } from "../models/Collection.js";
+import { collection, type CollectionMember } from "../models/Collection.js";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { Invitation } from "../models/Invitation.js";
 import { Activity, NotificationState } from "../models/Activity.js";
@@ -48,7 +48,7 @@ export async function getAccount(_req: Request, res: Response) {
 
   // shared collections need a decision before an account can be deleted, so the page needs their members
   const owned = await collection.find({ ownerId: id }).select("name isDefault members").lean();
-  const memberIds = [...new Set(owned.flatMap((w) => w.members.map((m) => String(m.userId))))];
+  const memberIds = [...new Set(owned.flatMap((w) => w.members.map((m: CollectionMember) => String(m.userId))))];
   const people = memberIds.length ? await User.find({ _id: { $in: memberIds } }).select("email").lean() : [];
   const emailOf = (uid: unknown) => people.find((p) => String(p._id) === String(uid))?.email ?? "unknown";
 
@@ -64,7 +64,7 @@ export async function getAccount(_req: Request, res: Response) {
       id: String(w._id),
       name: w.name,
       isDefault: !!w.isDefault,
-      members: w.members.map((m) => ({ userId: String(m.userId), email: emailOf(m.userId), role: m.role })),
+      members: w.members.map((m: CollectionMember) => ({ userId: String(m.userId), email: emailOf(m.userId), role: m.role })),
     })),
   });
 }
@@ -185,7 +185,7 @@ export async function exportData(_req: Request, res: Response) {
   const ownedIds = new Set(owned.map((w) => String(w._id)));
   const memberships = await collection.find({ "members.userId": id }).select("name members").lean();
 
-  const everyone = [...new Set([...owned.flatMap((w) => w.members.map((m) => String(m.userId)))])];
+  const everyone = [...new Set([...owned.flatMap((w) => w.members.map((m: CollectionMember) => String(m.userId)))])];
   const people = everyone.length ? await User.find({ _id: { $in: everyone } }).select("email").lean() : [];
   const emailOf = (uid: unknown) => people.find((p) => String(p._id) === String(uid))?.email ?? "unknown";
 
@@ -213,12 +213,12 @@ export async function exportData(_req: Request, res: Response) {
     },
     collectionsYouOwn: owned.map((w) => ({
       ...strip(w),
-      members: w.members.map((m) => ({ email: emailOf(m.userId), role: m.role, addedAt: m.addedAt })),
+      members: w.members.map((m: CollectionMember) => ({ email: emailOf(m.userId), role: m.role, addedAt: m.addedAt })),
       clips: ownedItems.filter((i) => String(i.collectionId) === String(w._id)).map(strip),
     })),
     collectionsYouBelongTo: memberships.map((w) => ({
       name: w.name,
-      yourRole: w.members.find((m) => String(m.userId) === id)?.role,
+      yourRole: w.members.find((m: CollectionMember) => String(m.userId) === id)?.role,
     })),
     yourClipsInOtherscollections: myClips.filter((c) => !ownedIds.has(String(c.collectionId))).map(strip),
     yourCommentsInOtherscollections: commented
@@ -253,7 +253,7 @@ export async function deleteAccount(req: Request, res: Response) {
   const undecided: string[] = [];
 
   for (const ws of owned) {
-    const memberIds = ws.members.map((m) => String(m.userId));
+    const memberIds = ws.members.map((m: CollectionMember) => String(m.userId));
     const choice = p.data.collections[String(ws._id)];
     if (memberIds.length === 0) {
       plan.push({ ws, action: "delete" }); // nobody else is in it

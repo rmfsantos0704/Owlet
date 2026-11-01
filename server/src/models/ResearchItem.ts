@@ -13,9 +13,23 @@ const researchItemSchema = new Schema(
       domain: String,
       title: String,
       author: String,
+      authors: [String],
       publishedDate: String,
+      journal: String,
+      volume: String,
+      issue: String,
+      pages: String,
+      doi: String,
     },
-    content: { rawText: String, wordCount: Number },
+    content: {
+      rawText: String,
+      wordCount: Number,
+      pageOffsets: [Number],
+    },
+    matrixValues: { type: Map, of: String, default: {} },
+    personalNote: { type: String, trim: true, maxlength: 280, default: "" },
+    readingStatus: { type: String, enum: ["to_read", "reading", "done"], default: "to_read", index: true },
+    userSummary: { type: String, trim: true, maxlength: 2000, default: "" },
     aiOutput: { summary: String, paraphrase: String },
     // per-clip summary settings (set from the AI settings modal on the clip page)
     aiSettings: {
@@ -28,6 +42,9 @@ const researchItemSchema = new Schema(
     highlights: [
       {
         text: String,
+        startOffset: Number,
+        endOffset: Number,
+        page: Number,
         color: { type: String, default: "yellow" },
         note: String,
         createdAt: { type: Date, default: Date.now },
@@ -49,6 +66,7 @@ const researchItemSchema = new Schema(
 );
 
 researchItemSchema.index({ collectionId: 1, createdAt: -1 });
+researchItemSchema.index({ collectionId: 1, "source.url": 1 });
 // no duplicate clips inside one collection (partial, so old unmigrated items don't collide)
 researchItemSchema.index(
   { collectionId: 1, "source.dedupeKey": 1 },

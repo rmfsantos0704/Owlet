@@ -42,6 +42,7 @@ export function streamPdf(item: any, res: Response) {
     heading("Highlights");
     for (const h of item.highlights) {
       body(`"${h.text}"`);
+      if (h.page) body(`p. ${h.page}`);
       if (h.note) {
         doc.font("Helvetica-Oblique").fontSize(9.5).fillColor("#555555").text("Note: " + clean(h.note));
       }

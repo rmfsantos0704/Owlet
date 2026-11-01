@@ -27,7 +27,11 @@ function modelParams(maxTokens: number) {
   };
 }
 
-export async function analyzeText(title: string, text: string, settings: Partial<AiSettings> = {}) {
+export async function analyzeText(
+  title: string,
+  text: string,
+  settings: Partial<AiSettings> = {}
+): Promise<{ summary: string; paraphrase: string; tags: string[] }> {
   const format = FORMATS[settings.format ?? ""] ?? FORMATS.paragraph;
   const length = LENGTHS[settings.length ?? ""] ?? LENGTHS.medium;
   const extra = settings.instructions?.trim();

@@ -7,11 +7,12 @@ import { collection } from "../models/Collection.js";
 import { User } from "../models/User.js";
 import { AiSession } from "../models/AiSession.js";
 import { analyzeText, askSources } from "../services/groq.js";
-import { pickPassages } from "../services/passages.js";
+import { keyTerms, pickPassages } from "../services/passages.js";
 import { buildCitations } from "../services/citations.js";
 import { extractPdf, PdfImportError } from "../services/pdfImport.js";
 import { streamPdf } from "../services/pdf.js";
-import { toBibtex, toCsv } from "../services/export.js";
+import { toBibtex, toCsv, toRis } from "../services/export.js";
+import { normalizePageUrl } from "../services/pageUrl.js";
 import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../services/access.js";
 import { aiEnabled } from "../config/features.js";
 
@@ -22,6 +23,20 @@ const HIGHLIGHT_COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "
 const isDuplicateKey = (e: unknown) => (e as { code?: number })?.code === 11000;
 const MAX_HIGHLIGHTS = 500;
 const MAX_COMMENTS = 500; // replies count too
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+async function findWebClip(collectionId: mongoose.Types.ObjectId, normalizedUrl: string) {
+  const exact = await ResearchItem.findOne({ collectionId, "source.dedupeKey": normalizedUrl }).select("_id collectionId");
+  if (exact) return exact;
+
+  const parsed = new URL(normalizedUrl);
+  const prefix = `${parsed.origin}${parsed.pathname}`;
+  const legacy = await ResearchItem.find({
+    collectionId,
+    "source.url": new RegExp(`^${escapeRegex(prefix)}(?:[?#]|$)`),
+  }).select("_id collectionId source.url").lean();
+  return legacy.find((item) => item.source?.url && normalizePageUrl(item.source.url) === normalizedUrl) ?? null;
+}
 
 // true when the person can edit the clip and it already holds the maximum
 async function isFull(req: Request, res: Response, field: "highlights" | "comments", max: number) {
@@ -56,20 +71,41 @@ const clipSchema = z.object({
   url: httpUrl,
   title: z.string().min(1).max(500),
   author: z.string().max(200).optional(),
+  authors: z.array(z.string().trim().min(1).max(200)).max(30).optional(),
   publishedDate: z.string().max(100).optional(),
+  journal: z.string().trim().max(300).optional(),
+  volume: z.string().trim().max(50).optional(),
+  issue: z.string().trim().max(50).optional(),
+  pages: z.string().trim().max(80).optional(),
+  doi: z.string().trim().max(200).optional(),
   rawText: z.string().min(50).max(200000),
   collectionId: z.string().optional(),
   aiSettings: aiSettingsSchema.optional(),
+  tags: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(20).optional(),
+  personalNote: z.string().trim().max(280).transform((note) => note.replace(/\s+/g, " ")).optional(),
 });
 const highlightSchema = z.object({
   text: z.string().trim().min(1).max(2000),
+  startOffset: z.number().int().min(0).optional(),
+  endOffset: z.number().int().min(1).optional(),
   color: z.enum(HIGHLIGHT_COLORS).default("yellow"),
   note: z.string().trim().max(1000).optional(),
 });
 const highlightUpdateSchema = z.object({
   color: z.enum(HIGHLIGHT_COLORS),
   note: z.string().trim().max(1000).default(""), // empty clears the note
-});
+  text: z.string().trim().min(1).max(2000).optional(),
+  startOffset: z.number().int().min(0).optional(),
+  endOffset: z.number().int().min(1).optional(),
+}).refine(
+  (highlight) =>
+    (highlight.startOffset === undefined && highlight.endOffset === undefined) ||
+    (highlight.startOffset !== undefined && highlight.endOffset !== undefined && highlight.endOffset > highlight.startOffset),
+  { message: "Highlight offsets must be provided as a valid range" }
+).refine(
+  (highlight) => highlight.text === undefined || (highlight.startOffset !== undefined && highlight.endOffset !== undefined),
+  { message: "Highlight text requires offsets" }
+);
 const commentSchema = z.object({
   text: z.string().trim().min(1).max(2000),
   highlightId: z.string().optional(),
@@ -83,8 +119,16 @@ const tagsSchema = z.object({
 });
 const sourceSchema = z.object({
   title: z.string().trim().min(1).max(500),
-  author: z.string().trim().max(200).optional(),
+  author: z.string().trim().max(1000).optional(),
   publishedDate: z.string().trim().max(100).optional(),
+});
+const workflowSchema = z.object({
+  readingStatus: z.enum(["to_read", "reading", "done"]).optional(),
+  userSummary: z.string().trim().max(2000).optional(),
+});
+const matrixValueSchema = z.object({
+  columnId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
+  value: z.string().max(2000),
 });
 const askSchema = z.object({
   itemIds: z.array(z.string()).min(1).max(8),
@@ -149,15 +193,16 @@ export async function clip(req: Request, res: Response) {
   const parsed = clipSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid clip data" });
   const d = parsed.data;
+  const normalizedUrl = normalizePageUrl(d.url);
   const userId = res.locals.userId;
 
   const ws = await targetcollection(res, userId, d.collectionId);
   if (!ws) return;
 
-  const existing = await ResearchItem.findOne({ collectionId: ws._id, "source.dedupeKey": d.url }).select("_id");
-  if (existing) return res.status(409).json({ error: "Already clipped", id: existing.id });
+  const existing = await findWebClip(ws._id, normalizedUrl);
+  if (existing) return res.status(409).json({ error: "Already clipped", id: String(existing._id) });
 
-  const domain = new URL(d.url).hostname;
+  const domain = new URL(normalizedUrl).hostname;
   // the popup's settings win; clips from elsewhere fall back to the collection's
   const aiSettings = d.aiSettings ?? settingsFrom(ws);
   const { ai, aiFailed } = await runAi(aiSettings, d.title, d.rawText);
@@ -168,18 +213,37 @@ export async function clip(req: Request, res: Response) {
       collectionId: ws._id,
       source: {
         kind: "web",
-        url: d.url,
-        dedupeKey: d.url,
+        url: normalizedUrl,
+        dedupeKey: normalizedUrl,
         domain,
         title: d.title,
-        author: d.author,
+        author: d.authors?.join("; ") || d.author,
+        authors: d.authors,
         publishedDate: d.publishedDate,
+        journal: d.journal,
+        volume: d.volume,
+        issue: d.issue,
+        pages: d.pages,
+        doi: d.doi,
       },
       content: { rawText: d.rawText, wordCount: d.rawText.split(/\s+/).length },
+      personalNote: d.personalNote ?? "",
       aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
       aiSettings,
-      citations: buildCitations({ author: d.author, title: d.title, url: d.url, domain, publishedDate: d.publishedDate }),
-      tags: ai.tags,
+      citations: buildCitations({
+        author: d.author,
+        authors: d.authors,
+        title: d.title,
+        url: normalizedUrl,
+        domain,
+        publishedDate: d.publishedDate,
+        journal: d.journal,
+        volume: d.volume,
+        issue: d.issue,
+        pages: d.pages,
+        doi: d.doi,
+      }),
+      tags: [...new Set(d.tags ?? ai.tags)],
     });
     res.status(201).json({ item, aiFailed, aiEnabled: aiEnabled() });
   } catch (e) {
@@ -240,7 +304,7 @@ export async function importPdf(req: Request, res: Response) {
         title,
         author,
       },
-      content: { rawText, wordCount: rawText.split(/\s+/).length },
+      content: { rawText, wordCount: rawText.split(/\s+/).length, pageOffsets: pdf.pageOffsets },
       aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
       aiSettings,
       citations: buildCitations({ author, title }),
@@ -260,6 +324,10 @@ async function buildFilter(req: Request, userId: string) {
     collectionId: { $in: wid ? ids.filter((i) => String(i) === wid) : ids },
   };
   if (typeof req.query.tag === "string" && req.query.tag) filter.tags = req.query.tag;
+  if (req.query.readingStatus === "to_read") filter.readingStatus = { $in: ["to_read", null] };
+  else if (req.query.readingStatus === "reading" || req.query.readingStatus === "done") {
+    filter.readingStatus = req.query.readingStatus;
+  }
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (q) {
     const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -269,13 +337,16 @@ async function buildFilter(req: Request, userId: string) {
     const words = q.split(/\s+/).map((w) => w.replace(/"/g, "")).filter(Boolean).slice(0, 8);
     if (words.length) {
       try {
-        const hits = await ResearchItem.find({
-          $text: { $search: words.map((w) => `"${w}"`).join(" ") },
-          collectionId: filter.collectionId,
-        })
-          .select("_id")
-          .limit(500)
-          .lean();
+        const hits = await ResearchItem.aggregate<{ _id: mongoose.Types.ObjectId }>([
+          {
+            $match: {
+              $text: { $search: words.map((w) => `"${w}"`).join(" ") },
+              collectionId: filter.collectionId,
+            },
+          },
+          { $project: { _id: 1 } },
+          { $limit: 500 },
+        ]);
         if (hits.length) or.push({ _id: { $in: hits.map((h) => h._id) } });
       } catch (err) {
         console.error("Full-text search unavailable:", err);
@@ -327,6 +398,44 @@ export async function list(req: Request, res: Response) {
   res.json({ items: items.map((i) => ({ ...i.toJSON(), snippet: snippets.get(String(i._id)) })) });
 }
 
+const lookupSchema = z.object({
+  url: httpUrl,
+  collectionId: z.string().optional().refine((id) => !id || mongoose.isValidObjectId(id)),
+});
+
+export async function lookup(req: Request, res: Response) {
+  const parsed = lookupSchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid lookup query" });
+
+  const ids = await collectionIds(res.locals.userId, "editor");
+  if (parsed.data.collectionId && !ids.some((id) => String(id) === parsed.data.collectionId)) {
+    return res.json({ id: null, collectionId: null });
+  }
+  const allowedIds = parsed.data.collectionId
+    ? ids.filter((id) => String(id) === parsed.data.collectionId)
+    : ids;
+  const normalizedUrl = normalizePageUrl(parsed.data.url);
+  let item = null;
+  for (const collectionId of allowedIds) {
+    item = await findWebClip(collectionId, normalizedUrl);
+    if (item) break;
+  }
+
+  res.json({
+    id: item ? String(item._id) : null,
+    collectionId: item ? String(item.collectionId) : null,
+  });
+}
+
+export async function getHighlights(req: Request, res: Response) {
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await collectionIds(res.locals.userId, "viewer");
+  const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("highlights").lean();
+  if (!item) return res.status(404).json({ error: "Not found" });
+  res.json({ highlights: item.highlights ?? [] });
+}
+
 export async function getOne(req: Request, res: Response) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
@@ -358,11 +467,36 @@ async function mutate(req: Request, res: Response, update: UpdateQuery<any>, sta
 
 export async function addHighlight(req: Request, res: Response) {
   const p = highlightSchema.safeParse(req.body);
-    if (await isFull(req, res, "highlights", MAX_HIGHLIGHTS)) {
+  if (!p.success) return res.status(400).json({ error: "Invalid highlight" });
+  if (await isFull(req, res, "highlights", MAX_HIGHLIGHTS)) {
     return res.status(409).json({ error: `A clip can have up to ${MAX_HIGHLIGHTS} highlights.` });
   }
-  if (!p.success) return res.status(400).json({ error: "Invalid highlight" });
-  return mutate(req, res, { $push: { highlights: p.data } }, 201);
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const clip = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("content.rawText content.pageOffsets");
+  if (!clip) return res.status(404).json({ error: "Not found" });
+
+  const highlight: typeof p.data & { page?: number } = { ...p.data };
+  if (p.data.startOffset !== undefined || p.data.endOffset !== undefined) {
+    const rawText = clip.content?.rawText ?? "";
+    if (
+      p.data.startOffset === undefined ||
+      p.data.endOffset === undefined ||
+      p.data.endOffset <= p.data.startOffset ||
+      p.data.endOffset > rawText.length ||
+      rawText.slice(p.data.startOffset, p.data.endOffset).replace(/\s+/g, " ").trim() !== p.data.text.replace(/\s+/g, " ").trim()
+    ) {
+      return res.status(400).json({ error: "The selected text position doesn't match this clip" });
+    }
+    highlight.page = undefined;
+    const offsets = clip.content?.pageOffsets ?? [];
+    for (let index = 0; index < offsets.length; index += 1) {
+      if (offsets[index] > p.data.startOffset) break;
+      highlight.page = index + 1;
+    }
+  }
+  return mutate(req, res, { $push: { highlights: highlight } }, 201);
 }
 
 // PATCH /research/:id/highlights/:highlightId: changes a highlight's color and note.
@@ -375,9 +509,41 @@ export async function updateHighlight(req: Request, res: Response) {
     return res.status(400).json({ error: "Bad id" });
   }
   const ids = await collectionIds(res.locals.userId, "editor");
+  const clip = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("content.rawText content.pageOffsets");
+  if (!clip) return res.status(404).json({ error: "Not found" });
+
+  const update: Record<string, string | number> = {
+    "highlights.$.color": p.data.color,
+    "highlights.$.note": p.data.note,
+  };
+  const unset: Record<string, 1> = {};
+  if (p.data.text !== undefined) {
+    const rawText = clip.content?.rawText ?? "";
+    const { startOffset, endOffset } = p.data;
+    if (
+      startOffset === undefined ||
+      endOffset === undefined ||
+      endOffset > rawText.length ||
+      rawText.slice(startOffset, endOffset).replace(/\s+/g, " ").trim() !== p.data.text.replace(/\s+/g, " ").trim()
+    ) {
+      return res.status(400).json({ error: "The selected text position doesn't match this clip" });
+    }
+
+    update["highlights.$.text"] = p.data.text;
+    update["highlights.$.startOffset"] = startOffset;
+    update["highlights.$.endOffset"] = endOffset;
+    const pageOffsets = clip.content?.pageOffsets ?? [];
+    let page: number | undefined;
+    for (let index = 0; index < pageOffsets.length; index += 1) {
+      if (pageOffsets[index] > startOffset) break;
+      page = index + 1;
+    }
+    if (page === undefined) unset["highlights.$.page"] = 1;
+    else update["highlights.$.page"] = page;
+  }
   const item = await ResearchItem.findOneAndUpdate(
     { _id: id, collectionId: { $in: ids }, "highlights._id": hid },
-    { $set: { "highlights.$.color": p.data.color, "highlights.$.note": p.data.note } },
+    { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) },
     { new: true }
   );
   if (!item) return res.status(404).json({ error: "Highlight not found" });
@@ -473,6 +639,117 @@ export async function setTags(req: Request, res: Response) {
   return mutate(req, res, { $set: { tags: [...new Set(p.data.tags)] } });
 }
 
+export async function updateWorkflow(req: Request, res: Response) {
+  const parsed = workflowSchema.safeParse(req.body);
+  if (!parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    return res.status(400).json({ error: "Invalid reading status or personal summary" });
+  }
+  const $set: Record<string, unknown> = {};
+  if (parsed.data.readingStatus !== undefined) $set.readingStatus = parsed.data.readingStatus;
+  if (parsed.data.userSummary !== undefined) $set.userSummary = parsed.data.userSummary;
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const item = await ResearchItem.findOneAndUpdate(
+    { _id: id, collectionId: { $in: ids } },
+    { $set },
+    { new: true }
+  ).select("readingStatus userSummary");
+  if (!item) return res.status(404).json({ error: "Not found" });
+  res.json({ readingStatus: item.readingStatus, userSummary: item.userSummary });
+}
+
+export async function updateMatrixValue(req: Request, res: Response) {
+  const parsed = matrixValueSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid matrix cell" });
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const clip = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("collectionId");
+  if (!clip) return res.status(404).json({ error: "Not found" });
+  const ws = await collection.findById(clip.collectionId).select("matrixColumns");
+  const columns = ws?.get("matrixColumns") as { id: string }[] | undefined;
+  if (!columns?.some((column) => column.id === parsed.data.columnId)) {
+    return res.status(404).json({ error: "Matrix column not found" });
+  }
+  const item = await ResearchItem.findOneAndUpdate(
+    { _id: id, collectionId: clip.collectionId },
+    { $set: { [`matrixValues.${parsed.data.columnId}`]: parsed.data.value } },
+    { new: true }
+  ).select("matrixValues");
+  if (!item) return res.status(404).json({ error: "Not found" });
+  res.json({ matrixValues: item.matrixValues instanceof Map ? Object.fromEntries(item.matrixValues) : item.matrixValues });
+}
+
+export async function related(req: Request, res: Response) {
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await collectionIds(res.locals.userId, "viewer");
+  const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } })
+    .select("collectionId source.title tags aiOutput.summary userSummary content.rawText")
+    .lean();
+  if (!item) return res.status(404).json({ error: "Not found" });
+
+  const terms = keyTerms(
+    item.content?.rawText || `${item.source?.title ?? ""} ${item.aiOutput?.summary ?? ""} ${item.userSummary ?? ""}`,
+    8
+  );
+  const [tagged, textMatches] = await Promise.all([
+    item.tags?.length
+      ? ResearchItem.find({ collectionId: item.collectionId, _id: { $ne: item._id }, tags: { $in: item.tags } })
+          .select("source.title source.domain source.author tags aiOutput.summary userSummary createdAt")
+          .sort({ createdAt: -1 })
+          .limit(100)
+          .lean()
+      : [],
+    terms.length
+      ? ResearchItem.aggregate([
+          { $match: { collectionId: item.collectionId, _id: { $ne: item._id }, $text: { $search: terms.join(" ") } } },
+          {
+            $project: {
+              _id: 1,
+              source: 1,
+              tags: 1,
+              aiOutput: 1,
+              userSummary: 1,
+              createdAt: 1,
+              textScore: { $meta: "textScore" },
+            },
+          },
+          { $sort: { textScore: -1 } },
+          { $limit: 100 },
+        ])
+      : [],
+  ]);
+  const byId = new Map<string, (typeof tagged)[number] & { textScore?: number }>();
+  for (const candidate of tagged) byId.set(String(candidate._id), candidate);
+  for (const candidate of textMatches) {
+    const key = String(candidate._id);
+    const previous = byId.get(key);
+    byId.set(key, previous
+      ? { ...previous, textScore: candidate.textScore }
+      : candidate);
+  }
+  const matches = [...byId.values()];
+  const tagSet = new Set(item.tags ?? []);
+  const relatedItems = matches.map((candidate) => {
+    const sharedTags = (candidate.tags ?? []).filter((tag) => tagSet.has(tag));
+    const text = `${candidate.source?.title ?? ""} ${candidate.aiOutput?.summary ?? ""} ${candidate.userSummary ?? ""}`.toLowerCase();
+    const sharedTerms = terms.filter((term) => text.includes(term));
+    return { candidate, sharedTags, score: sharedTags.length * 5 + sharedTerms.length + (candidate.textScore ?? 0) };
+  }).sort((a, b) => b.score - a.score || b.candidate.createdAt.getTime() - a.candidate.createdAt.getTime());
+  res.json({
+    items: relatedItems.slice(0, 8).map(({ candidate, sharedTags, score }) => ({
+      id: String(candidate._id),
+      title: candidate.source?.title ?? "Untitled",
+      domain: candidate.source?.domain,
+      author: candidate.source?.author,
+      sharedTags,
+      score,
+    })),
+  });
+}
+
 // Fix a clip's title/author/date and rebuild its citations from the corrected details.
 export async function updateSource(req: Request, res: Response) {
   const p = sourceSchema.safeParse(req.body);
@@ -483,7 +760,10 @@ export async function updateSource(req: Request, res: Response) {
 
   const found = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("source").lean();
   if (!found) return res.status(404).json({ error: "Not found" });
-  const s = (found.source ?? {}) as { url?: string; domain?: string };
+  const s = (found.source ?? {}) as {
+    url?: string; domain?: string; authors?: string[]; journal?: string; volume?: string;
+    issue?: string; pages?: string; doi?: string;
+  };
 
   const { title, author = "", publishedDate = "" } = p.data;
   const item = await ResearchItem.findOneAndUpdate(
@@ -492,8 +772,21 @@ export async function updateSource(req: Request, res: Response) {
       $set: {
         "source.title": title,
         "source.author": author,
+        "source.authors": author ? author.split(/\s*;\s*/).filter(Boolean) : [],
         "source.publishedDate": publishedDate,
-        citations: buildCitations({ author, title, url: s.url, domain: s.domain, publishedDate }),
+        citations: buildCitations({
+          author,
+          authors: author ? author.split(/\s*;\s*/).filter(Boolean) : [],
+          title,
+          url: s.url,
+          domain: s.domain,
+          publishedDate,
+          journal: s.journal,
+          volume: s.volume,
+          issue: s.issue,
+          pages: s.pages,
+          doi: s.doi,
+        }),
       },
     },
     { new: true }
@@ -515,10 +808,18 @@ export async function pdf(req: Request, res: Response) {
 
 export async function exportItems(req: Request, res: Response) {
   const format = String(req.query.format ?? "json");
-  if (!["json", "csv", "bibtex"].includes(format)) {
-    return res.status(400).json({ error: "format must be json, csv or bibtex" });
+  if (!["json", "csv", "bibtex", "ris"].includes(format)) {
+    return res.status(400).json({ error: "format must be json, csv, bibtex or ris" });
   }
-  const items = await ResearchItem.find(await buildFilter(req, res.locals.userId))
+  const filter = await buildFilter(req, res.locals.userId);
+  if (typeof req.query.itemIds === "string") {
+    const rawIds = req.query.itemIds.split(",").filter(Boolean);
+    if (!rawIds.length || rawIds.length > 1000 || rawIds.some((id) => !mongoose.isValidObjectId(id))) {
+      return res.status(400).json({ error: "Choose between 1 and 1,000 valid clips to export" });
+    }
+    filter._id = { $in: rawIds };
+  }
+  const items = await ResearchItem.find(filter)
     .select("-content.rawText")
     .sort({ createdAt: -1 })
     .limit(1000)
@@ -531,6 +832,8 @@ export async function exportItems(req: Request, res: Response) {
     type = "text/csv"; ext = "csv"; body = toCsv(items);
   } else if (format === "bibtex") {
     type = "application/x-bibtex"; ext = "bib"; body = toBibtex(items);
+  } else if (format === "ris") {
+    type = "application/x-research-info-systems"; ext = "ris"; body = toRis(items);
   } else {
     body = JSON.stringify({ exportedAt: new Date().toISOString(), count: items.length, items }, null, 2);
   }
@@ -733,7 +1036,7 @@ type SaveSessionInput = {
   collectionId: string;
   sessionId?: string; // present = re-run of an existing session
   title: string;
-  mode: string;
+  mode: "Research brief" | "Summarize" | "Compare sources";
   prompt: string;
   sources: { id: string; title: string }[];
   out: {

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { z } from "zod";
-import { collection } from "../models/Collection.js";
+import { collection, type CollectionMember } from "../models/Collection.js";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { User } from "../models/User.js";
 import { Invitation } from "../models/Invitation.js";
@@ -17,6 +17,12 @@ import { recordActivity } from "../services/activityLog.js";
 import { streamcollectionPdf } from "../services/collectionPdf.js";
 import { Writable } from "node:stream";
 import { requireAi } from "../middlewares/requireAi.js";
+import { toLiteratureMatrixCsv } from "../services/export.js";
+
+const matrixColumnsSchema = z.array(z.object({
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
+  name: z.string().trim().min(1).max(50),
+})).max(12);
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -40,6 +46,11 @@ const addMemberSchema = z.object({
 });
 const roleSchema = z.object({ role: z.enum(["editor", "viewer"]) });
 const mergeSchema = z.object({ targetId: z.string() });
+const tagManageSchema = z.object({
+  action: z.enum(["rename", "merge", "delete"]),
+  tag: z.string().trim().toLowerCase().min(1).max(40),
+  target: z.string().trim().toLowerCase().min(1).max(40).optional(),
+});
 
 function summary(w: any, role: Role) {
   return {
@@ -98,16 +109,128 @@ export async function getcollection(req: Request, res: Response) {
   const found = await load(req, res);
   if (!found) return;
   const { ws, role } = found;
-  const users = await User.find({ _id: { $in: [ws.ownerId, ...ws.members.map((m) => m.userId)] } }).select("email");
+  const users = await User.find({ _id: { $in: [ws.ownerId, ...ws.members.map((m: CollectionMember) => m.userId)] } }).select("email");
   const email = (id: unknown) => users.find((u) => String(u._id) === String(id))?.email ?? "unknown";
   res.json({
     collection: {
       ...summary(ws, role),
       owner: { id: String(ws.ownerId), email: email(ws.ownerId) },
-      members: ws.members.map((m) => ({ userId: String(m.userId), email: email(m.userId), role: m.role })),
+      members: ws.members.map((m: CollectionMember) => ({ userId: String(m.userId), email: email(m.userId), role: m.role })),
       joinLink: role === "owner" ? publicLink(ws) : undefined,
     },
   });
+}
+
+export async function listTags(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  const tags = await ResearchItem.distinct("tags", { collectionId: found.ws._id });
+  res.json({ tags: tags.filter((tag): tag is string => typeof tag === "string").sort((a, b) => a.localeCompare(b)) });
+}
+
+export async function manageTag(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  if (!atLeast(found.role, "editor")) return res.status(403).json({ error: "You can't manage tags in this collection" });
+  const parsed = tagManageSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid tag action" });
+
+  const { action, tag, target } = parsed.data;
+  if (action !== "delete" && !target) return res.status(400).json({ error: "Choose a destination tag" });
+  if (action !== "delete" && target === tag) return res.status(400).json({ error: "Choose a different destination tag" });
+
+  const items = await ResearchItem.find({ collectionId: found.ws._id, tags: tag }).select("_id tags").lean();
+  if (!items.length) return res.status(404).json({ error: "Tag not found in this collection" });
+  if (action === "merge" && !(await ResearchItem.exists({ collectionId: found.ws._id, tags: target }))) {
+    return res.status(400).json({ error: "The destination tag must already exist in this collection" });
+  }
+
+  await ResearchItem.bulkWrite(items.map((item) => {
+    const updated = action === "delete"
+      ? item.tags.filter((existing) => existing !== tag)
+      : [...new Set(item.tags.map((existing) => existing === tag ? target! : existing))];
+    return { updateOne: { filter: { _id: item._id, collectionId: found.ws._id }, update: { $set: { tags: updated } } } };
+  }));
+  const tags = await ResearchItem.distinct("tags", { collectionId: found.ws._id });
+  res.json({
+    tags: tags.filter((value): value is string => typeof value === "string").sort((a, b) => a.localeCompare(b)),
+    updated: items.length,
+  });
+}
+
+export async function getMatrix(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  const page = Number(req.query.page ?? 1);
+  if (!Number.isSafeInteger(page) || page < 1 || page > 10000) {
+    return res.status(400).json({ error: "Invalid page number" });
+  }
+  const pageSize = 100;
+  const filter = { collectionId: found.ws._id };
+  const [total, clips] = await Promise.all([
+    ResearchItem.countDocuments(filter),
+    ResearchItem.find(filter)
+      .select("_id source.title matrixValues")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .lean(),
+  ]);
+  res.json({
+    columns: (found.ws.get("matrixColumns") as { id: string; name: string }[] | undefined) ?? [],
+    clips: clips.map((clip) => ({
+      id: String(clip._id),
+      title: clip.source?.title ?? "Untitled",
+      values: clip.matrixValues instanceof Map ? Object.fromEntries(clip.matrixValues) : clip.matrixValues ?? {},
+    })),
+    total,
+    page,
+    pageSize,
+  });
+}
+
+export async function updateMatrixColumns(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  if (!atLeast(found.role, "editor")) return res.status(403).json({ error: "You can't edit this collection's literature matrix" });
+  const parsed = matrixColumnsSchema.safeParse(req.body?.columns);
+  if (!parsed.success) return res.status(400).json({ error: "Use up to 12 columns, each with a name of 1-50 characters" });
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  for (const column of parsed.data) {
+    const normalizedName = column.name.toLocaleLowerCase();
+    if (ids.has(column.id) || names.has(normalizedName)) {
+      return res.status(400).json({ error: "Column IDs and names must be unique" });
+    }
+    ids.add(column.id);
+    names.add(normalizedName);
+  }
+  const previous = (found.ws.get("matrixColumns") as { id: string; name: string }[] | undefined) ?? [];
+  const removed = previous.filter((column) => !ids.has(column.id));
+  found.ws.set("matrixColumns", parsed.data);
+  await found.ws.save();
+  if (removed.length) {
+    const unset = Object.fromEntries(removed.map((column) => [`matrixValues.${column.id}`, ""]));
+    await ResearchItem.updateMany({ collectionId: found.ws._id }, { $unset: unset });
+  }
+  res.json({ columns: parsed.data });
+}
+
+export async function exportMatrix(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  const items = await ResearchItem.find({ collectionId: found.ws._id })
+    .select("source.title matrixValues")
+    .sort({ createdAt: -1 })
+    .limit(10001)
+    .lean();
+  if (items.length > 10000) return res.status(413).json({ error: "This matrix is too large to export at once" });
+  const columns = (found.ws.get("matrixColumns") as { id: string; name: string }[] | undefined) ?? [];
+  const body = toLiteratureMatrixCsv(items, columns);
+  const filename = `${found.ws.name.trim().replace(/[^\w-]+/g, "-") || "collection"}-literature-matrix.csv`;
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(body);
 }
 
 export async function updatecollection(req: Request, res: Response) {
@@ -160,7 +283,49 @@ export async function mergeCollection(req: Request, res: Response) {
     return res.status(403).json({ error: "You can't add clips to that collection" });
   }
 
+  const targetColumns = (target.get("matrixColumns") as { id: string; name: string }[] | undefined) ?? [];
+  const sourceColumns = (found.ws.get("matrixColumns") as { id: string; name: string }[] | undefined) ?? [];
+  const mergedColumns = [...targetColumns];
+  const usedIds = new Set(targetColumns.map((column) => column.id));
+  const targetByName = new Map(targetColumns.map((column) => [column.name.trim().toLowerCase(), column]));
+  const sourceColumnIds = new Map<string, string>();
+  for (const column of sourceColumns) {
+    const existing = targetByName.get(column.name.trim().toLowerCase());
+    if (existing) {
+      sourceColumnIds.set(column.id, existing.id);
+      continue;
+    }
+    let id = column.id;
+    while (usedIds.has(id)) id = new mongoose.Types.ObjectId().toHexString();
+    const merged = { id, name: column.name };
+    mergedColumns.push(merged);
+    usedIds.add(id);
+    targetByName.set(column.name.trim().toLowerCase(), merged);
+    sourceColumnIds.set(column.id, id);
+  }
+  if (mergedColumns.length > 12) {
+    return res.status(400).json({
+      error: "These collections have more than 12 unique matrix columns. Remove some columns before merging.",
+    });
+  }
+
   try {
+    const remappedColumns = [...sourceColumnIds].filter(([sourceId, targetId]) => sourceId !== targetId);
+    if (remappedColumns.length) {
+      const set = Object.fromEntries(
+        remappedColumns.map(([sourceId, targetId]) => [`matrixValues.${targetId}`, `$matrixValues.${sourceId}`])
+      );
+      const unset = remappedColumns.map(([sourceId]) => `matrixValues.${sourceId}`);
+      await ResearchItem.updateMany(
+        { collectionId: found.ws._id },
+        [{ $set: set }, { $unset: unset }]
+      );
+    }
+    if (mergedColumns.length !== targetColumns.length) {
+      target.set("matrixColumns", mergedColumns);
+      await target.save();
+    }
+
     const targetKeys = await ResearchItem.distinct("source.dedupeKey", { collectionId: target._id });
     const moved = await ResearchItem.updateMany(
       { collectionId: found.ws._id, "source.dedupeKey": { $nin: targetKeys } },
@@ -198,7 +363,7 @@ export async function addMember(req: Request, res: Response) {
   const user = await User.findOne({ email: p.data.email });
   if (!user) return res.status(404).json({ error: "No Owlet account uses that email. Ask them to sign up first." });
   if (String(user._id) === String(found.ws.ownerId)) return res.status(400).json({ error: "That's the owner" });
-  if (found.ws.members.some((m) => String(m.userId) === String(user._id))) {
+  if (found.ws.members.some((m: CollectionMember) => String(m.userId) === String(user._id))) {
     return res.status(409).json({ error: "Already a member" });
   }
 
@@ -311,7 +476,7 @@ export async function removeMember(req: Request, res: Response) {
   if (found.role !== "owner" && target !== String(res.locals.userId)) {
     return res.status(403).json({ error: "Not allowed" });
   }
-  const wasMember = found.ws.members.some((m) => String(m.userId) === target);
+  const wasMember = found.ws.members.some((m: CollectionMember) => String(m.userId) === target);
   await collection.updateOne(
     { _id: found.ws._id },
     { $pull: { members: { userId: new mongoose.Types.ObjectId(target) } } }

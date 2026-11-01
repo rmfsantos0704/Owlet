@@ -1,5 +1,11 @@
 import { Schema, model } from "mongoose";
 import mongoose from 'mongoose';
+export type CollectionMember = {
+  userId: mongoose.Types.ObjectId;
+  role: "editor" | "viewer";
+  addedAt?: Date;
+};
+
 const collectionSchema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 80 },
@@ -27,6 +33,10 @@ const collectionSchema = new Schema(
       format: { type: String, enum: ["paragraph", "bullets", "academic", "simple"], default: "paragraph" },
       length: { type: String, enum: ["short", "medium", "detailed"], default: "medium" },
       instructions: { type: String, maxlength: 500, default: "" },
+    },
+    matrixColumns: {
+      type: [{ _id: false, id: String, name: String }],
+      default: [],
     },
   },
   { timestamps: true }
