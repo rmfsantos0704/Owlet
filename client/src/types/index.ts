@@ -1,4 +1,13 @@
-export type Highlight = { _id: string; text: string; color: string; note?: string; createdAt: string };
+export type Highlight = {
+  _id: string;
+  text: string;
+  color: string;
+  note?: string;
+  startOffset?: number;
+  endOffset?: number;
+  page?: number;
+  createdAt: string;
+};
 export type Comment = {
   _id: string;
   text: string;
@@ -48,6 +57,9 @@ export type collectionDetail = Collection & {
 export type ResearchItem = {
   _id: string;
   collectionId: string;
+  personalNote?: string;
+  readingStatus?: "to_read" | "reading" | "done";
+  userSummary?: string;
   source: {
     kind?: "web" | "pdf";
     url?: string;
@@ -55,9 +67,16 @@ export type ResearchItem = {
     domain?: string;
     title?: string;
     author?: string;
+    authors?: string[];
     publishedDate?: string;
+    journal?: string;
+    volume?: string;
+    issue?: string;
+    pages?: string;
+    doi?: string;
   };
   content?: { rawText?: string; wordCount?: number };
+  matrixValues?: Record<string, string>;
   aiOutput: { summary?: string; paraphrase?: string };
   aiSettings?: AiSettings; // per-clip summary settings; missing on clips saved before this existed
   citations: { apa?: string; mla?: string; chicago?: string };

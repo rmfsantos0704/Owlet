@@ -37,7 +37,7 @@ export default function SourceEditor({ source, onSave }: { source: Source; onSav
   return (
     <form onSubmit={submit} className="mt-4 space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
       <input value={v.title} onChange={(e) => setV({ ...v, title: e.target.value })} placeholder="Title" maxLength={500} required className="field" />
-      <input value={v.author} onChange={(e) => setV({ ...v, author: e.target.value })} placeholder="Author (e.g. Jane Doe, or an organization)" maxLength={200} className="field" />
+      <input value={v.author} onChange={(e) => setV({ ...v, author: e.target.value })} placeholder="Author(s) (separate names with semicolons)" maxLength={1000} className="field" />
       <input value={v.publishedDate} onChange={(e) => setV({ ...v, publishedDate: e.target.value })} placeholder="Date (2023, 2023-03-05, or March 5, 2023)" maxLength={100} className="field" />
       <p className="text-[11px] text-slate-500">Saving rebuilds the APA, MLA, and Chicago citations.</p>
       <div className="flex gap-2">

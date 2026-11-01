@@ -10,6 +10,7 @@ const PALETTES = [
   "bg-amber-50 text-amber-700",
 ];
 const palette = (s = "") => PALETTES[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTES.length];
+const STATUS_LABELS = { to_read: "To read", reading: "Reading", done: "Done" } as const;
 
 type Props = {
   item: ResearchItem;
@@ -42,6 +43,15 @@ export default function ResearchCard({ item, onTag, collectionName }: Props) {
           {origin}
           {item.source.author && ` · ${item.source.author}`}
         </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="chip">{STATUS_LABELS[item.readingStatus ?? "to_read"]}</span>
+          {item.personalNote && <span className="text-xs italic text-slate-500">Saved because: {item.personalNote}</span>}
+        </div>
+        {item.userSummary && (
+          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-600">
+            <span className="font-semibold text-slate-700">My summary: </span>{item.userSummary}
+          </p>
+        )}
         {summary && <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">{summary}</p>}
         {item.snippet && (
           <p className="mt-1.5 line-clamp-2 text-xs italic leading-5 text-slate-500">…{item.snippet}…</p>

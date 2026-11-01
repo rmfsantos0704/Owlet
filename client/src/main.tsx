@@ -5,6 +5,9 @@ import "./index.css";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { CollectionProvider } from "./context/CollectionContext";
+import { wakeServer } from "./services/api";
+
+wakeServer(); // free hosts sleep when idle: start waking the server before anyone clicks anything
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

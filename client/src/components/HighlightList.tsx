@@ -81,6 +81,7 @@ export default function HighlightList({ highlights, comments = [], readOnly, onE
         return (
           <li key={h._id} className={`rounded-xl border p-3 ${styleFor(editing ? editColor : h.color).card}`}>
             <p className="break-words text-sm text-slate-800">“{clip(h.text)}”</p>
+            {h.page && <p className="mt-1 text-[11px] font-medium text-slate-500">p. {h.page}</p>}
 
             {editing ? (
               <div className="mt-3 space-y-2.5">

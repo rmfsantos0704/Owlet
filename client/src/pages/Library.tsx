@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  Archive, Bot, FileDown, Highlighter, MessageSquareText, Search, Settings, Tag, Upload, X, type LucideIcon,
+  Archive, Bot, Copy, FileDown, Highlighter, MessageSquareText, Quote, Search, Settings, Tag, Upload, X, type LucideIcon,
 } from "lucide-react";
 import { api, download, upload } from "../services/api";
 import type { ResearchItem } from "../types";
@@ -40,6 +40,7 @@ export default function Library({ all = false }: { all?: boolean }) {
   const [params, setParams] = useSearchParams();
   const q = params.get("q") ?? "";
   const tag = params.get("tag") ?? "";
+  const readingStatus = params.get("readingStatus") ?? "";
   const [items, setItems] = useState<ResearchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -47,6 +48,7 @@ export default function Library({ all = false }: { all?: boolean }) {
   const [importing, setImporting] = useState("");
   const [dragging, setDragging] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [citationStyle, setCitationStyle] = useState<"apa" | "mla" | "chicago">("apa");
   const fileRef = useRef<HTMLInputElement>(null);
   const busyRef = useRef(false);
   const importRef = useRef<(files: File[]) => void>(() => {});
@@ -68,6 +70,7 @@ export default function Library({ all = false }: { all?: boolean }) {
       if (wid) p.set("collectionId", wid);
       if (q.trim()) p.set("q", q.trim());
       if (tag) p.set("tag", tag);
+      if (readingStatus) p.set("readingStatus", readingStatus);
 
       api<{ items: ResearchItem[] }>(`/research?${p}`)
         .then((res) => {
@@ -85,7 +88,7 @@ export default function Library({ all = false }: { all?: boolean }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [q, tag, wid, all, reloadKey]);
+  }, [q, tag, readingStatus, wid, all, reloadKey]);
 
   function setTag(t: string) {
     const next = new URLSearchParams(params);
@@ -94,13 +97,45 @@ export default function Library({ all = false }: { all?: boolean }) {
     setParams(next);
   }
 
+  function setReadingStatus(value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set("readingStatus", value);
+    else next.delete("readingStatus");
+    setParams(next);
+  }
+
   function exportAs(format: "bibtex" | "csv" | "json") {
     const p = new URLSearchParams({ format });
     if (wid) p.set("collectionId", wid);
     if (q.trim()) p.set("q", q.trim());
     if (tag) p.set("tag", tag);
+    if (readingStatus) p.set("readingStatus", readingStatus);
     download(`/research/export?${p}`, `owlet-export.${format === "bibtex" ? "bib" : format}`)
       .catch((e) => setError(e.message));
+  }
+
+  async function copyBibliography(selected: ResearchItem[]) {
+    const references = selected
+      .map((item) => item.citations?.[citationStyle]?.trim())
+      .filter((reference): reference is string => !!reference)
+      .sort((a, b) => a.localeCompare(b));
+    if (!references.length) {
+      setNotice({ text: "The selected clips don't have generated citations yet.", error: true });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(references.join("\n\n"));
+      setNotice({ text: `Copied ${references.length} ${citationStyle.toUpperCase()} reference${references.length === 1 ? "" : "s"}.`, error: false });
+    } catch {
+      setNotice({ text: "Couldn't access the clipboard. Check browser permissions and try again.", error: true });
+    }
+  }
+
+  function exportSelectedRis(selected: ResearchItem[]) {
+    const ids = selected.map((item) => item._id);
+    const query = new URLSearchParams({ format: "ris", itemIds: ids.join(",") });
+    download(`/research/export?${query}`, "owlet-selected.ris")
+      .catch((cause) => setNotice({ text: cause instanceof Error ? cause.message : "RIS export failed.", error: true }));
   }
 
   async function importFiles(picked: File[]) {
@@ -197,7 +232,7 @@ export default function Library({ all = false }: { all?: boolean }) {
     };
   }, [canImport]);
 
-  const filtering = !!(q.trim() || tag);
+  const filtering = !!(q.trim() || tag || readingStatus);
   const stats = [
     { label: "Saved clips", value: items.length, icon: Archive, accent: "bg-blue-50 text-blue-700" },
     aiEnabled
@@ -236,24 +271,61 @@ export default function Library({ all = false }: { all?: boolean }) {
         </>
       }
       actions={
-        <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-          <FileDown className="ml-2 size-3.5 text-slate-400" />
-          {(["bibtex", "csv", "json"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => exportAs(f)}
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-white hover:text-brand hover:shadow-sm"
-            >
-              {f === "bibtex" ? "BibTeX" : f.toUpperCase()}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="Filter by reading status"
+            value={readingStatus}
+            onChange={(e) => setReadingStatus(e.target.value)}
+            className="field !w-auto !py-1.5 !text-xs"
+          >
+            <option value="">All reading statuses</option>
+            <option value="to_read">To read</option>
+            <option value="reading">Reading</option>
+            <option value="done">Done</option>
+          </select>
+          <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+            <FileDown className="ml-2 size-3.5 text-slate-400" />
+            {(["bibtex", "csv", "json"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => exportAs(f)}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-white hover:text-brand hover:shadow-sm"
+              >
+                {f === "bibtex" ? "BibTeX" : f.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
       }
+      selectionActions={(selected) => (
+        <>
+          <label className="sr-only" htmlFor="bibliography-style">Citation style</label>
+          <div className="relative">
+            <Quote aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
+            <select
+              id="bibliography-style"
+              value={citationStyle}
+              onChange={(event) => setCitationStyle(event.target.value as "apa" | "mla" | "chicago")}
+              className="btn-secondary whitespace-nowrap !rounded-lg !py-2 !pl-7 !pr-2 !text-xs"
+            >
+              <option value="apa">APA</option>
+              <option value="mla">MLA</option>
+              <option value="chicago">Chicago</option>
+            </select>
+          </div>
+          <button type="button" onClick={() => void copyBibliography(selected)} disabled={!selected.length} title="Copy references" aria-label="Copy references" className="btn-secondary size-9 !rounded-lg !p-0">
+            <Copy aria-hidden="true" className="size-3.5" />
+          </button>
+          <button type="button" onClick={() => exportSelectedRis(selected)} disabled={!selected.length} title="Export RIS" aria-label="Export RIS" className="btn-secondary size-9 !rounded-lg !p-0">
+            <FileDown aria-hidden="true" className="size-3.5" />
+          </button>
+        </>
+      )}
       // viewers can't delete; in "All clips" the role differs per clip, so the server decides
       canSelect={all || (!!current && current.role !== "viewer")}
       loading={loading}
       error={error}
-      resetKey={`${q}|${tag}|${wid ?? ""}|${all}`}
+      resetKey={`${q}|${tag}|${readingStatus}|${wid ?? ""}|${all}`}
       empty={
         <div className="px-5 py-16 text-center">
           <Search className="mx-auto mb-3 size-6 text-slate-300" />

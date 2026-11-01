@@ -1,6 +1,6 @@
 const API_URL = ((import.meta.env.VITE_API_URL as string | undefined) ?? "").replace(/\/+$/, "");
 
-const TIMEOUT_MS = 90_000; // some requests wait for the AI
+const TIMEOUT_MS = 120_000; // some requests wait for the AI, and a sleeping free server takes about a minute to wake
 const FILE_TIMEOUT_MS = 120_000;
 const TOO_MANY = "Too many attempts. Please wait a few minutes and try again.";
 
@@ -56,6 +56,13 @@ async function fail(res: Response, token: string | null, fallback: string): Prom
   const data = await res.json().catch(() => ({}));
   handleUnauthorized(res.status, token);
   throw new ApiError(typeof data?.error === "string" ? data.error : fallback, res.status, data?.code);
+}
+
+// Free hosts put idle servers to sleep. Call this once when the app opens, so the server is waking up
+// while the person is still typing their email and password.
+export function wakeServer() {
+  if (configError()) return;
+  void fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(120_000) }).catch(() => {});
 }
 
 export async function api<T>(

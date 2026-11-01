@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Archive, ChevronRight, Highlighter, MessageSquareText } from "lucide-react";
+import { Archive, ChevronRight, Highlighter, MessageSquareText, Table } from "lucide-react";
 
 const WORKSPACE_LINKS = [
   { to: "/all", label: "All clips", icon: Archive },
   { to: "/highlights", label: "Highlights", icon: Highlighter },
   { to: "/comments", label: "Comments", icon: MessageSquareText },
+  { to: "/matrix", label: "Literature matrix", icon: Table },
 ];
 
 const OPEN_KEY = "owlet.sidebar.workspaces";

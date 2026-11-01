@@ -17,6 +17,7 @@ import SourceEditor from "../components/SourceEditor";
 import AiSettingsModal from "../components/AiSettingsModal";
 import RegenerateModal from "../components/RegenerateModal";
 import Modal from "../components/Modal";
+import RelatedClips from "../components/RelatedClips";
 import { DEFAULT_AI_SETTINGS } from "../types";
 import type { AiSettings, ResearchItem, Role } from "../types";
 
@@ -34,13 +35,19 @@ export default function ItemDetail() {
   const [highlightsOpen, setHighlightsOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [textOpen, setTextOpen] = useState(false);
+  const [readingNotesOpen, setReadingNotesOpen] = useState(false);
   const [pdfState, setPdfState] = useState<"idle" | "loading" | "done">("idle"); // drives the Download PDF button
+  const [readingStatus, setReadingStatus] = useState<"to_read" | "reading" | "done">("to_read");
+  const [userSummary, setUserSummary] = useState("");
+  const [workflowSaving, setWorkflowSaving] = useState(false);
 
   useEffect(() => {
     api<{ item: ResearchItem; role: Role | null }>(`/research/${id}`)
       .then((r) => {
         setItem(r.item);
         setRole(r.role);
+        setReadingStatus(r.item.readingStatus ?? "to_read");
+        setUserSummary(r.item.userSummary ?? "");
       })
       .catch((e) => setError(e.message));
   }, [id]);
@@ -56,6 +63,39 @@ export default function ItemDetail() {
     }
   }
 
+  async function saveHighlight(
+    text: string,
+    color: string,
+    note?: string,
+    offsets?: { startOffset: number; endOffset: number },
+    existingHighlightId?: string
+  ) {
+    const normalizedText = text.replace(/\s+/g, " ").trim();
+    const existing = item?.highlights.find((highlight) => highlight._id === existingHighlightId) ?? item?.highlights.find((highlight) => {
+      const hasSelectionOffsets = offsets && offsets.endOffset > offsets.startOffset;
+      const hasHighlightOffsets =
+        Number.isInteger(highlight.startOffset) &&
+        Number.isInteger(highlight.endOffset) &&
+        highlight.endOffset! > highlight.startOffset!;
+      if (hasSelectionOffsets && hasHighlightOffsets) {
+        return offsets.startOffset < highlight.endOffset! && offsets.endOffset > highlight.startOffset!;
+      }
+      return highlight.text.replace(/\s+/g, " ").trim() === normalizedText;
+    });
+
+    if (existing) {
+      await act(`/highlights/${existing._id}`, "PATCH", {
+        color,
+        note: note?.trim() || existing.note || "",
+        text,
+        ...offsets,
+      });
+      return;
+    }
+
+    await act("/highlights", "POST", { text, color, note, ...offsets });
+  }
+
   // for handlers that don't need to react to failure (the error is already shown)
   const run = (path: string, method: string, body?: unknown) => act(path, method, body).catch(() => {});
 
@@ -68,6 +108,19 @@ export default function ItemDetail() {
 
   // throws on failure so the modal can show the error
   const saveAiSettings = (aiSettings: AiSettings) => act("/ai-settings", "PUT", { aiSettings });
+
+  async function saveWorkflow() {
+    setWorkflowSaving(true);
+    try {
+      await act("/workflow", "PATCH", { readingStatus, userSummary });
+      return true;
+    } catch {
+      // act() reports the failure in the page-level action error.
+      return false;
+    } finally {
+      setWorkflowSaving(false);
+    }
+  }
 
   // navigate(-1) does nothing when this page was opened in a fresh tab (e.g. from the extension),
   // because there is no earlier history entry. React Router stores the entry index in history.state.idx.
@@ -150,6 +203,16 @@ export default function ItemDetail() {
           </button>
           <button
             type="button"
+              onClick={() => setReadingNotesOpen(true)}
+              title="Reading notes"
+              aria-label="Open reading notes"
+              className="btn-secondary"
+            >
+              <FileText className="size-4" />
+              <span className="hidden sm:inline">Reading notes</span>
+            </button>
+            <button
+              type="button"
             onClick={downloadPdf}
             disabled={pdfState === "loading"}
             aria-live="polite"
@@ -195,6 +258,12 @@ export default function ItemDetail() {
             <p className="mt-2 text-sm text-slate-500">
               {[item.source.author, item.source.publishedDate].filter(Boolean).join(" · ") || "No author or date yet"}
             </p>
+            {(item.source.journal || item.source.doi) && (
+              <p className="mt-1 text-xs text-slate-400">
+                {[item.source.journal, item.source.volume && `Vol. ${item.source.volume}`, item.source.issue && `No. ${item.source.issue}`, item.source.pages && `pp. ${item.source.pages}`, item.source.doi && `DOI: ${item.source.doi}`]
+                  .filter(Boolean).join(" · ")}
+              </p>
+            )}
             {canEdit && <SourceEditor source={item.source} onSave={(v) => act("/source", "PATCH", v)} />}
             <div className="mt-4">
               <TagInput tags={item.tags} readOnly={!canEdit} onChange={(tags) => run("/tags", "PUT", { tags })} />
@@ -255,6 +324,7 @@ export default function ItemDetail() {
         </div>
 
         <div className="min-w-0 space-y-6">
+          <RelatedClips itemId={id} />
           <section className="card space-y-3 p-5">
             <h2 className="font-semibold text-ink">Citations</h2>
             <CitationBox label="APA" text={item.citations.apa ?? ""} />
@@ -298,8 +368,67 @@ export default function ItemDetail() {
           text={item.content?.rawText ?? ""}
           highlights={item.highlights}
           readOnly={!canEdit}
-          onHighlight={(text, color, note) => act("/highlights", "POST", { text, color, note })}
+          onHighlight={saveHighlight}
         />
+      </Modal>
+
+      <Modal
+        open={readingNotesOpen}
+        onClose={() => setReadingNotesOpen(false)}
+        title="My reading notes"
+        maxWidth="max-w-xl"
+        footer={
+          canEdit ? (
+            <>
+              <button type="button" onClick={() => setReadingNotesOpen(false)} disabled={workflowSaving} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (await saveWorkflow()) setReadingNotesOpen(false);
+                }}
+                disabled={workflowSaving}
+                className="btn-primary"
+              >
+                {workflowSaving ? "Saving…" : "Save notes"}
+              </button>
+            </>
+          ) : undefined
+        }
+      >
+        {canEdit ? (
+          <div className="space-y-4">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold text-slate-600">Reading status</span>
+              <select
+                value={readingStatus}
+                onChange={(event) => setReadingStatus(event.target.value as "to_read" | "reading" | "done")}
+                className="field"
+              >
+                <option value="to_read">To read</option>
+                <option value="reading">Reading</option>
+                <option value="done">Done</option>
+              </select>
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold text-slate-600">Notes</span>
+              <textarea
+                value={userSummary}
+                onChange={(event) => setUserSummary(event.target.value)}
+                maxLength={2000}
+                rows={8}
+                placeholder="Write your own summary or research notes…"
+                className="field"
+              />
+            </label>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <span className="chip">{readingStatus === "done" ? "Done" : readingStatus === "reading" ? "Reading" : "To read"}</span>
+            <p className="whitespace-pre-wrap text-sm text-slate-600">{userSummary || "No personal summary yet."}</p>
+          </div>
+        )}
       </Modal>
 
       <DraggableModal

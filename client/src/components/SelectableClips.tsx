@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Trash2 } from "lucide-react";
+import { ListChecks, ListX, Trash2 } from "lucide-react";
 import { api } from "../services/api";
 import Modal from "./Modal";
 
@@ -13,6 +13,7 @@ type Props<T> = {
   title: string;
   subtitle?: ReactNode; // clip count, tag chip, etc.
   actions?: ReactNode; // shown beside the trash button when not selecting (e.g. export buttons)
+  selectionActions?: (selectedClips: T[]) => ReactNode;
   canSelect?: boolean;
   loading?: boolean;
   error?: string;
@@ -30,6 +31,7 @@ export default function SelectableClips<T>({
   title,
   subtitle,
   actions,
+  selectionActions,
   canSelect = true,
   loading = false,
   error = "",
@@ -97,39 +99,42 @@ export default function SelectableClips<T>({
             {subtitle && <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">{subtitle}</div>}
           </div>
 
-          {clips.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {selectMode ? (
+          {(clips.length > 0 || actions) && (
+            <div className={`flex items-center gap-1.5 ${selectMode ? "min-w-0 max-w-full flex-nowrap overflow-x-auto" : "flex-wrap"}`}>
+              {selectMode && clips.length > 0 ? (
                 <>
                   <button
                     type="button"
                     onClick={() => setSelected(allSelected ? new Set() : new Set(clips.map(getId)))}
                     disabled={deleting}
-                    className="text-sm font-medium text-slate-500 hover:text-brand disabled:opacity-50"
+                    title={allSelected ? "Clear selection" : "Select all clips"}
+                    aria-label={allSelected ? "Clear selection" : "Select all clips"}
+                    className="btn-secondary size-9 !rounded-lg !p-0"
                   >
-                    {allSelected ? "Clear all" : "Select all"}
+                    {allSelected ? <ListX className="size-4" /> : <ListChecks className="size-4" />}
                   </button>
+                  {selectionActions?.(selectedClips)}
                   <button
                     type="button"
                     onClick={() => setConfirmOpen(true)}
                     disabled={count === 0 || deleting}
-                    className="btn-danger disabled:opacity-50"
+                    className="btn-danger whitespace-nowrap !rounded-lg !px-3 !py-2 !text-xs disabled:opacity-50"
                   >
                     <Trash2 className="size-4" />
                     Delete ({count})
                   </button>
-                  <button type="button" onClick={exitSelect} disabled={deleting} className="btn-secondary">
+                  <button type="button" onClick={exitSelect} disabled={deleting} className="btn-secondary whitespace-nowrap !rounded-lg !px-3 !py-2 !text-xs">
                     Cancel
                   </button>
                 </>
               ) : (
                 <>
-                  {canSelect && (
+                  {canSelect && clips.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setSelectMode(true)}
-                      title="Select clips to delete"
-                      aria-label="Select clips to delete"
+                      title="Select clips"
+                      aria-label="Select clips"
                       className="flex size-10 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 transition hover:bg-red-50 hover:text-red-700"
                     >
                       <Trash2 className="size-4" />

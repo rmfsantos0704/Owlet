@@ -9,7 +9,13 @@ type Props = {
   highlights?: Highlight[];
   readOnly?: boolean;
   /** Should throw on failure so the form keeps what was typed. */
-  onHighlight: (text: string, color: string, note?: string) => Promise<unknown> | void;
+  onHighlight: (
+    text: string,
+    color: string,
+    note?: string,
+    offsets?: { startOffset: number; endOffset: number },
+    existingHighlightId?: string
+  ) => Promise<unknown> | void;
 };
 
 const escapeRx = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -17,11 +23,23 @@ const clip = (s: string, n = 120) => (s.length > n ? s.slice(0, n).trimEnd() + "
 
 type Segment = { text: string; h?: Highlight };
 
-// Highlights store their text, not positions, so each one is matched to its first free spot in the clip.
-// Whitespace is matched loosely because a selection can differ from the clip in line breaks.
+// Prefer stored positions to disambiguate repeated phrases; legacy and extension highlights fall back to text.
 function buildSegments(text: string, highlights: Highlight[]): Segment[] {
   const ranges: { start: number; end: number; h: Highlight }[] = [];
   for (const h of highlights) {
+    const hasValidPosition =
+      Number.isInteger(h.startOffset) &&
+      Number.isInteger(h.endOffset) &&
+      h.startOffset! >= 0 &&
+      h.endOffset! > h.startOffset! &&
+      h.endOffset! <= text.length &&
+      text.slice(h.startOffset!, h.endOffset!).replace(/\s+/g, " ").trim() === h.text.replace(/\s+/g, " ").trim();
+    if (hasValidPosition) {
+      if (!ranges.some((range) => h.startOffset! < range.end && h.endOffset! > range.start)) {
+        ranges.push({ start: h.startOffset!, end: h.endOffset!, h });
+      }
+      continue;
+    }
     const needle = h.text.trim();
     if (!needle) continue;
     const rx = new RegExp(needle.split(/\s+/).map(escapeRx).join("\\s+"), "g");
@@ -53,6 +71,8 @@ export default function ClippedText({ text, highlights = [], readOnly, onHighlig
   const boxRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState("");
+  const [pendingOffsets, setPendingOffsets] = useState<{ startOffset: number; endOffset: number }>();
+  const [pendingHighlightId, setPendingHighlightId] = useState<string>();
   const [color, setColor] = useState<string>("yellow");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -74,19 +94,30 @@ export default function ClippedText({ text, highlights = [], readOnly, onHighlig
     const box = boxRef.current;
     if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !box) return;
     if (!box.contains(sel.getRangeAt(0).commonAncestorContainer)) return;
-    const t = sel.toString().trim();
+    const range = sel.getRangeAt(0);
+    const raw = range.toString();
+    const t = raw.trim();
     if (!t) return;
     if (t.length > 2000) {
       setPending("");
       setError("Select at most 2000 characters at a time.");
       return;
     }
+    const before = document.createRange();
+    before.selectNodeContents(box);
+    before.setEnd(range.startContainer, range.startOffset);
+    const startOffset = before.toString().length + raw.length - raw.trimStart().length;
     setError("");
     setPending(t);
+    setPendingOffsets({ startOffset, endOffset: startOffset + t.length });
+    const existing = Array.from(box.querySelectorAll("mark[data-highlight-id]")).find((mark) => range.intersectsNode(mark));
+    setPendingHighlightId(existing?.getAttribute("data-highlight-id") || undefined);
   }
 
   function cancel() {
     setPending("");
+    setPendingOffsets(undefined);
+    setPendingHighlightId(undefined);
     setNote("");
     setError("");
     window.getSelection()?.removeAllRanges();
@@ -97,8 +128,10 @@ export default function ClippedText({ text, highlights = [], readOnly, onHighlig
     setSaving(true);
     setError("");
     try {
-      await onHighlight(pending, color, note.trim() || undefined);
+      await onHighlight(pending, color, note.trim() || undefined, pendingOffsets, pendingHighlightId);
       setPending("");
+      setPendingOffsets(undefined);
+      setPendingHighlightId(undefined);
       setNote("");
       window.getSelection()?.removeAllRanges();
     } catch {
@@ -121,7 +154,7 @@ export default function ClippedText({ text, highlights = [], readOnly, onHighlig
       >
         {segments.map((s, i) =>
           s.h ? (
-            <mark key={i} title={s.h.note || undefined} className={`rounded px-0.5 text-slate-900 ${styleFor(s.h.color).mark}`}>
+            <mark key={i} data-highlight-id={s.h._id} title={s.h.note || undefined} className={`rounded px-0.5 text-slate-900 ${styleFor(s.h.color).mark}`}>
               {s.text}
             </mark>
           ) : (
@@ -150,7 +183,7 @@ export default function ClippedText({ text, highlights = [], readOnly, onHighlig
                   Cancel
                 </button>
                 <button type="button" onClick={save} disabled={saving} className="btn-primary">
-                  {saving ? "Saving…" : "Add highlight"}
+                  {saving ? "Saving…" : pendingHighlightId ? "Update highlight" : "Add highlight"}
                 </button>
               </div>
             </div>

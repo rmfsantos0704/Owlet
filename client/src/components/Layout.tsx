@@ -19,7 +19,6 @@ import {
   Search,
   Users,
   X,
-  UserRound,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
@@ -149,6 +148,11 @@ export default function Layout() {
   const q = params.get("q") ?? "";
   const initials = (user?.email ?? "?").slice(0, 2).toUpperCase();
   const onCollectionPage = pathname === "/";
+  const searchPlaceholder = pathname === "/highlights"
+    ? "Search highlights, notes, or sources..."
+    : pathname === "/comments"
+      ? "Search comments, people, or sources..."
+      : "Search clips, tags, or sources...";
 
   function onSearch(value: string) {
     const next = new URLSearchParams(params);
@@ -365,7 +369,7 @@ export default function Layout() {
             <input
               value={q}
               onChange={(e) => onSearch(e.target.value)}
-              placeholder="Search clips, tags, or sources..."
+              placeholder={searchPlaceholder}
               className="field pl-10"
             />
           </div>

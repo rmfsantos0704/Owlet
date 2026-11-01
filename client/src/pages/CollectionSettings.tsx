@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
 import type { JoinLink, SentInvitation, collectionDetail } from "../types";
+import CollectionTagManager from "../components/CollectionTagManager";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -311,6 +312,8 @@ export default function CollectionSettings() {
       </form>
 
       {!isOwner && error && <p className="text-sm text-red-600">{error}</p>}
+
+      {ws.role !== "viewer" && <CollectionTagManager key={ws.id} collectionId={ws.id} />}
 
       <section className="card p-5">
         <h2 className="font-semibold text-ink">Members</h2>

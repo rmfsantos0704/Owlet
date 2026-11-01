@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Highlighter, MessageSquareText, FileText, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Highlighter, ListFilter, MessageSquareText, StickyNote, FileText, Pencil } from "lucide-react";
 import { api } from "../services/api";
 import { useCollectionScope } from "../hooks/useCollectionScope";
 import ColorPicker from "../components/ColorPicker";
@@ -13,6 +13,7 @@ import BriefModal from "../components/BriefModal";
 import type { BriefHighlight } from "../utils/brief";
 
 const FILTERS = ["All highlights", "With notes"] as const;
+const PAGE_SIZE = 5;
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -21,15 +22,14 @@ const keyOf = (h: { _id: string; item: { _id: string } }) => `${h.item._id}:${h.
 
 export default function Highlights() {
   const { ready, scope, setScope, scopeCollection, qs, options: collectionOptions } = useCollectionScope();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const q = (params.get("q") ?? "").toLowerCase();
   const [items, setItems] = useState<ResearchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All highlights");
+  const [pagination, setPagination] = useState({ key: "", page: 1 });
 
-  // search + filters
-  const [search, setSearch] = useState("");
   const [clipId, setClipId] = useState("");
   const [color, setColor] = useState("");
   const [userEmail, setUserEmail] = useState("");
@@ -124,7 +124,6 @@ export default function Highlights() {
 
   const authors = useMemo(() => [...new Set(all.map((h) => h.author).filter(Boolean))].sort(), [all]);
 
-  const needle = search.trim().toLowerCase();
   const matches = (h: (typeof all)[number], s: string) =>
     !s ||
     h.text.toLowerCase().includes(s) ||
@@ -138,17 +137,28 @@ export default function Highlights() {
       (!clipId || h.item._id === clipId) &&
       (!color || h.colorKey === color) &&
       (!userEmail || h.author === userEmail) &&
-      matches(h, q) &&
-      matches(h, needle)
+      matches(h, q)
   );
+  const paginationKey = JSON.stringify([scope, q, filter, clipId, color, userEmail]);
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const page = pagination.key === paginationKey ? Math.min(pagination.page, pageCount) : 1;
+  const pageItems = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageStart = shown.length ? (page - 1) * PAGE_SIZE + 1 : 0;
+  const pageEnd = Math.min(page * PAGE_SIZE, shown.length);
 
-  const filtersActive = !!(needle || clipId || color || userEmail);
+  function changePage(nextPage: number) {
+    setPagination({ key: paginationKey, page: nextPage });
+  }
+
+  const filtersActive = !!(q || clipId || color || userEmail);
 
   function clearFilters() {
-    setSearch("");
     setClipId("");
     setColor("");
     setUserEmail("");
+    const next = new URLSearchParams(params);
+    next.delete("q");
+    setParams(next, { replace: true });
   }
 
   const selects: FilterSelect[] = [
@@ -158,6 +168,7 @@ export default function Highlights() {
       label: "Clip",
       value: clipId,
       onChange: setClipId,
+      className: "w-52",
       options: [{ value: "", label: "All clips" }, ...clipOptions.map(([id, title]) => ({ value: id, label: title }))],
     },
   ];
@@ -167,6 +178,7 @@ export default function Highlights() {
       label: "User",
       value: userEmail,
       onChange: setUserEmail,
+      className: "w-36",
       options: [{ value: "", label: "All users" }, ...authors.map((a) => ({ value: a, label: a }))],
     });
   }
@@ -274,64 +286,80 @@ function toggleSelect(h: (typeof all)[number]) {
         ))}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <section className={aiEnabled ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]" : ""}>
         <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
-          <div className="space-y-4 border-b border-slate-100 p-4">
-            <div className="inline-flex gap-1 rounded-lg bg-slate-100 p-1">
-              {FILTERS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                    filter === f ? "bg-white text-brand shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-
+          <div className="border-b border-slate-100 p-4">
             <FilterBar
-              search={search}
-              onSearch={setSearch}
-              placeholder="Search highlights, notes, or sources"
               selects={selects}
+              topActions={!aiEnabled && (
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBriefOpen(true)}
+                    disabled={all.length === 0}
+                    className="btn-primary !py-2 !text-xs"
+                  >
+                    <FileText className="size-3.5" />
+                    {selected.length > 0 ? `Build brief (${selected.length})` : "Build a brief"}
+                  </button>
+                </div>
+              )}
+              filterControls={
+                <>
+                  <fieldset className="flex shrink-0 items-center gap-3 rounded-lg bg-slate-100 px-3 py-2">
+                    <legend className="sr-only">Highlight type</legend>
+                    {FILTERS.map((f) => (
+                      <label key={f} className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs font-medium ${filter === f ? "text-brand" : "text-slate-500 hover:text-slate-700"}`}>
+                        <input
+                          type="radio"
+                          name="highlight-type"
+                          value={f}
+                          checked={filter === f}
+                          onChange={() => setFilter(f)}
+                          className="size-3.5 accent-blue-600"
+                        />
+                        {f === "With notes" ? (
+                          <StickyNote aria-hidden="true" className="size-3.5" />
+                        ) : (
+                          <ListFilter aria-hidden="true" className="size-3.5" />
+                        )}
+                        {f}
+                      </label>
+                    ))}
+                  </fieldset>
+                  {colorCounts.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="mr-1 text-[11px] font-semibold text-slate-400">Color</span>
+                      {colorCounts.map(([c, n]) => {
+                        const on = color === c;
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setColor(on ? "" : c)}
+                            aria-label={`${cap(c)} highlights${on ? ", selected" : ""}`}
+                            aria-pressed={on}
+                            title={`${cap(c)} (${n})`}
+                            className={`inline-flex size-8 items-center justify-center rounded-full border transition ${
+                              on
+                                ? "border-blue-300 bg-blue-50 text-blue-700"
+                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span className={`size-4 rounded-full ${styleFor(c).dot}`} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              }
               active={filtersActive}
               onClear={clearFilters}
               shown={shown.length}
               total={all.length}
               noun="highlights"
-            >
-              {colorCounts.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-[11px] font-semibold text-slate-400">Color</span>
-                  {colorCounts.map(([c, n]) => {
-                    const on = color === c;
-                    return (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setColor(on ? "" : c)}
-                        aria-pressed={on}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
-                          on
-                            ? "border-blue-300 bg-blue-50 text-blue-700"
-                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        {/* a 12px slice of the color's border, so the swatch matches the highlight bars */}
-                        <span
-                          className={`inline-block h-3 rounded-sm ${styleFor(c).bar}`}
-                          style={{ width: 0, borderLeftWidth: 12, borderLeftStyle: "solid" }}
-                        />
-                        {cap(c)}
-                        <span className="text-slate-400">{n}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </FilterBar>
+            />
           </div>
 
           {loading ? (
@@ -350,7 +378,7 @@ function toggleSelect(h: (typeof all)[number]) {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {shown.map((h) => {
+              {pageItems.map((h) => {
                 const editing = editingId === h._id;
                 return (
                   <article
@@ -388,6 +416,7 @@ function toggleSelect(h: (typeof all)[number]) {
                             ))}
                           </div>
                         )}
+
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         {canEdit && !editing && (
@@ -460,10 +489,26 @@ function toggleSelect(h: (typeof all)[number]) {
               })}
             </div>
           )}
+
+          {!loading && !error && pageCount > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+              <span>
+                Showing {pageStart}–{pageEnd} of {shown.length} highlights · page {page} of {pageCount}
+              </span>
+              <div className="flex gap-2">
+                <button type="button" disabled={page <= 1} onClick={() => changePage(page - 1)} className="btn-secondary !py-1.5">
+                  <ChevronLeft className="size-3.5" /> Previous
+                </button>
+                <button type="button" disabled={page >= pageCount} onClick={() => changePage(page + 1)} className="btn-secondary !py-1.5">
+                  Next <ChevronRight className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="space-y-6 xl:self-start">
-                    {aiEnabled ? (
+        {aiEnabled && (
+          <div className="space-y-6 xl:self-start">
             <HighlightsAnalysis
               selected={selected.map((h) => ({ id: h._id, itemId: h.item._id }))}
               shownCount={shown.length}
@@ -472,52 +517,8 @@ function toggleSelect(h: (typeof all)[number]) {
               onSelectAll={selectAllShown}
               onClear={clearSelection}
             />
-          ) : (
-            <div className="rounded-2xl bg-brand p-5 text-white">
-              <div className="flex items-center gap-2">
-                <FileText className="size-4 text-cyan-300" />
-                <h2 className="font-semibold">Build a brief</h2>
-              </div>
-              <p className="mt-2 text-xs leading-5 text-blue-100/70">
-                Tick highlights and get a brief grouped by source or by color, with your notes and an APA reference list.
-              </p>
-
-              <div className="mt-3 rounded-xl bg-white/10 p-3">
-                <p className="text-[11px] leading-4 text-blue-100/80">
-                  {selected.length === 0
-                    ? "Tick the highlights you want, or select everything shown."
-                    : `${selected.length} highlight${selected.length === 1 ? "" : "s"} selected from ${selectedSources.size} source${
-                        selectedSources.size === 1 ? "" : "s"
-                      }.`}
-                </p>
-                <div className="mt-2 flex items-center gap-3 text-[11px] font-semibold">
-                  <button
-                    type="button"
-                    onClick={selectAllShown}
-                    disabled={shown.length === 0}
-                    className="text-cyan-300 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Select all shown ({shown.length})
-                  </button>
-                  {selected.length > 0 && (
-                    <button type="button" onClick={clearSelection} className="text-blue-100/70 hover:underline">
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setBriefOpen(true)}
-                disabled={all.length === 0}
-                className="mt-4 block w-full rounded-xl bg-white py-2.5 text-center text-xs font-bold text-brand hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {selected.length > 0 ? `Build brief from ${selected.length} selected` : "Build a brief"}
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </section>
       {briefOpen && (
         <BriefModal

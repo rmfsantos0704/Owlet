@@ -24,8 +24,8 @@ function guides(ai: boolean): Guide[] {
       icon: Bookmark,
       title: "Clip a page",
       text: ai
-        ? "Open an article, click the Owlet extension, pick a Collection and press Clip this page. Owlet saves the text and writes an AI summary."
-        : "Open an article, click the Owlet extension, pick a Collection and press Clip this page. Owlet saves the text and builds the citations.",
+        ? "Open an article, click the Owlet extension, pick a Collection, optionally add tags or a short note about why you saved it, and press Clip this page. Owlet saves the text and writes an AI summary."
+        : "Open an article, click the Owlet extension, pick a Collection, optionally add tags or a short note about why you saved it, and press Clip this page. Owlet saves the text and builds the citations.",
       accent: "bg-blue-50 text-blue-700",
     },
     {
@@ -37,7 +37,13 @@ function guides(ai: boolean): Guide[] {
     {
       icon: Highlighter,
       title: "Highlight and comment",
-      text: "Open a clip to highlight passages, add notes and leave comments. Everything shows up on the Highlights and Comments pages.",
+      text: "Open a clip to highlight passages, add notes and leave comments. Highlights use their saved position to avoid confusing repeated phrases, and PDF highlights show a page number when available.",
+      accent: "bg-amber-50 text-amber-700",
+    },
+    {
+      icon: Highlighter,
+      title: "Highlight while you read",
+      text: "Select text on any page and right-click Save selection to Owlet, or press Alt+Shift+S. It saves to the Collection selected in the extension and clips the page first if needed.",
       accent: "bg-amber-50 text-amber-700",
     },
   ];
@@ -72,6 +78,12 @@ function guides(ai: boolean): Guide[] {
     text: "Owners can create a join link from the Collection settings, or from the extension. Choose whether people join as viewers or editors, and when the link expires.",
     accent: "bg-sky-50 text-sky-700",
   });
+  list.push({
+    icon: FileText,
+    title: "Build a literature matrix",
+    text: "Open Literature matrix from Workspaces. Add your own columns, fill in each clip's cells, and export the collection matrix as CSV.",
+    accent: "bg-cyan-50 text-cyan-700",
+  });
   return list;
 }
 
@@ -103,7 +115,11 @@ function faq(ai: boolean): [string, string][] {
     ],
     [
       "What does \"Already clipped\" mean?",
-      "That page (or an identical PDF) is already in the Collection, so Owlet didn't save a second copy. You can open the existing clip from the message.",
+      "That page (or an identical PDF) is already in the Collection, so Owlet didn't save a second copy. Tracking parameters and page fragments are ignored when detecting web duplicates. You can open the existing clip from the message.",
+    ],
+    [
+      "How do I export references for a bibliography?",
+      "Select clips in the library, choose APA, MLA or Chicago, and copy the reference list. You can also export the selected clips as RIS for Zotero or EndNote.",
     ],
     [
       "What's the difference between owner, editor and viewer?",

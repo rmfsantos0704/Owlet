@@ -18,6 +18,7 @@ import JoinCollection from "./pages/JoinCollection";
 import AiWorkspace from "./pages/AiWorkspace";
 import Highlights from "./pages/Highlights";
 import Comments from "./pages/Comments";
+import LiteratureMatrix from "./pages/LiteratureMatrix";
 import HelpSupport from "./pages/HelpSupport";
 import { DialogProvider } from "./context/DialogContext";
 
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/ai" element={aiEnabled ? <AiWorkspace /> : <Navigate to="/highlights" replace />} />
         <Route path="/highlights" element={<Highlights />} />
         <Route path="/comments" element={<Comments />} />
+        <Route path="/matrix" element={<LiteratureMatrix />} />
         <Route path="/help" element={<HelpSupport />} />
         <Route path="/item/:id" element={<ItemDetail />} />
         <Route path="/Collection/:id/settings" element={<CollectionSettings />} />

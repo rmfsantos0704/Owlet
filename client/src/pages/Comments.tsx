@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { MessageSquareText, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Highlighter, ListFilter, MessageSquareText, Trash2, UsersRound } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useCollectionScope } from "../hooks/useCollectionScope";
 import { useDialog } from "../context/DialogContext";
 import FilterBar, { type FilterSelect } from "../components/FilterBar";
+import Modal from "../components/Modal";
 import type { ResearchItem } from "../types";
 
 const FILTERS = ["All", "On highlights", "General"] as const;
+const PAGE_SIZE = 5;
 const TINTS = ["bg-violet-100 text-violet-700", "bg-emerald-100 text-emerald-700", "bg-amber-100 text-amber-700", "bg-sky-100 text-sky-700"];
 
 function tint(email = "") {
@@ -21,15 +23,15 @@ export default function Comments() {
   const { user } = useAuth();
   const dialog = useDialog();
   const { ready, scope, setScope, scopeCollection, qs, options: collectionOptions } = useCollectionScope();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const q = (params.get("q") ?? "").toLowerCase();
   const [items, setItems] = useState<ResearchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
+  const [pagination, setPagination] = useState({ key: "", page: 1 });
+  const [collaboratorsOpen, setCollaboratorsOpen] = useState(false);
 
-  // search + filters
-  const [search, setSearch] = useState("");
   const [clipId, setClipId] = useState("");
   const [userEmail, setUserEmail] = useState("");
 
@@ -78,7 +80,6 @@ export default function Comments() {
     [threads]
   );
 
-  const needle = search.trim().toLowerCase();
   const matches = (c: (typeof threads)[number], s: string) =>
     !s ||
     c.text.toLowerCase().includes(s) ||
@@ -91,16 +92,27 @@ export default function Comments() {
       (filter === "All" || (filter === "On highlights" ? !!c.highlightId : !c.highlightId)) &&
       (!clipId || c.item._id === clipId) &&
       (!userEmail || c.authorEmail === userEmail) &&
-      matches(c, q) &&
-      matches(c, needle)
+      matches(c, q)
   );
+  const paginationKey = JSON.stringify([scope, q, filter, clipId, userEmail]);
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const page = pagination.key === paginationKey ? Math.min(pagination.page, pageCount) : 1;
+  const pageItems = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageStart = shown.length ? (page - 1) * PAGE_SIZE + 1 : 0;
+  const pageEnd = Math.min(page * PAGE_SIZE, shown.length);
 
-  const filtersActive = !!(needle || clipId || userEmail);
+  function changePage(nextPage: number) {
+    setPagination({ key: paginationKey, page: nextPage });
+  }
+
+  const filtersActive = !!(q || clipId || userEmail);
 
   function clearFilters() {
-    setSearch("");
     setClipId("");
     setUserEmail("");
+    const next = new URLSearchParams(params);
+    next.delete("q");
+    setParams(next, { replace: true });
   }
 
   const selects: FilterSelect[] = [
@@ -110,6 +122,7 @@ export default function Comments() {
       label: "Clip",
       value: clipId,
       onChange: setClipId,
+      className: "w-52",
       options: [{ value: "", label: "All clips" }, ...clipOptions.map(([id, title]) => ({ value: id, label: title }))],
     },
     {
@@ -117,6 +130,7 @@ export default function Comments() {
       label: "User",
       value: userEmail,
       onChange: setUserEmail,
+      className: "w-36",
       options: [{ value: "", label: "All users" }, ...authors.map((a) => ({ value: a, label: a }))],
     },
   ];
@@ -135,41 +149,58 @@ export default function Comments() {
   const people = useMemo(() => {
     const m = new Map<string, number>();
     threads.forEach((t) => t.authorEmail && m.set(t.authorEmail, (m.get(t.authorEmail) ?? 0) + 1));
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [threads]);
 
   return (
     <div>
       <section className="mb-8">
-        <div className="eyebrow mb-2 text-blue-600">Team collaboration</div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Comments</h1>
-        <p className="mt-2 text-sm text-slate-500">
-          Questions, feedback, and decisions across {scopeCollection ? scopeCollection.name : "all your collections"}.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="eyebrow mb-2 text-blue-600">Team collaboration</div>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Comments</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Questions, feedback, and decisions across {scopeCollection ? scopeCollection.name : "all your collections"}.
+            </p>
+          </div>
+          <button type="button" onClick={() => setCollaboratorsOpen(true)} className="btn-secondary">
+            <UsersRound className="size-4 text-blue-600" />
+            Active collaborators
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{people.length}</span>
+          </button>
+        </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <section>
         <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
-          <div className="space-y-4 border-b border-slate-100 p-4">
-            <div className="inline-flex gap-1 rounded-lg bg-slate-100 p-1">
-              {FILTERS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`rounded-md px-4 py-1.5 text-xs font-semibold ${
-                    filter === f ? "bg-white text-brand shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-
+          <div className="border-b border-slate-100 p-4">
             <FilterBar
-              search={search}
-              onSearch={setSearch}
-              placeholder="Search comments, people, or sources"
               selects={selects}
+              filterControls={
+                <fieldset className="flex shrink-0 items-center gap-3 rounded-lg bg-slate-100 px-3 py-2">
+                  <legend className="sr-only">Comment type</legend>
+                  {FILTERS.map((f) => (
+                    <label key={f} className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs font-medium ${filter === f ? "text-brand" : "text-slate-500 hover:text-slate-700"}`}>
+                      <input
+                        type="radio"
+                        name="comment-type"
+                        value={f}
+                        checked={filter === f}
+                        onChange={() => setFilter(f)}
+                        className="size-3.5 accent-blue-600"
+                      />
+                      {f === "On highlights" ? (
+                        <Highlighter aria-hidden="true" className="size-3.5" />
+                      ) : f === "General" ? (
+                        <MessageSquareText aria-hidden="true" className="size-3.5" />
+                      ) : (
+                        <ListFilter aria-hidden="true" className="size-3.5" />
+                      )}
+                      {f}
+                    </label>
+                  ))}
+                </fieldset>
+              }
               active={filtersActive}
               onClear={clearFilters}
               shown={shown.length}
@@ -194,7 +225,7 @@ export default function Comments() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {shown.map((c) => {
+              {pageItems.map((c) => {
                 const mine = c.authorEmail && c.authorEmail === user?.email;
                 return (
                   <article key={`${c.item._id}-${c._id}`} className="p-5 sm:p-6">
@@ -241,10 +272,32 @@ export default function Comments() {
               })}
             </div>
           )}
+
+          {!loading && !error && pageCount > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+              <span>
+                Showing {pageStart}–{pageEnd} of {shown.length} comments · page {page} of {pageCount}
+              </span>
+              <div className="flex gap-2">
+                <button type="button" disabled={page <= 1} onClick={() => changePage(page - 1)} className="btn-secondary !py-1.5">
+                  <ChevronLeft className="size-3.5" /> Previous
+                </button>
+                <button type="button" disabled={page >= pageCount} onClick={() => changePage(page + 1)} className="btn-secondary !py-1.5">
+                  Next <ChevronRight className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5">
-          <h2 className="mb-4 font-semibold text-ink">Active collaborators</h2>
+      </section>
+
+      <Modal
+        open={collaboratorsOpen}
+        onClose={() => setCollaboratorsOpen(false)}
+        title={`Active collaborators (${people.length})`}
+        maxWidth="max-w-md"
+      >
           {people.length === 0 ? (
             <p className="text-xs text-slate-400">People who comment appear here.</p>
           ) : (
@@ -262,8 +315,7 @@ export default function Comments() {
               ))}
             </div>
           )}
-        </div>
-      </section>
+      </Modal>
     </div>
   );
 }
