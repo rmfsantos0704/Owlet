@@ -1,42 +1,14 @@
 import "dotenv/config";
 import mongoose from "mongoose";
 import app from "./app.js";
-import { connectDB } from "./config/db.js";
-import { User } from "./models/User.js";
+import { getEnvironmentProblems } from "./config/environment.js";
+import { initializeApplication } from "./config/startup.js";
 
 const isProd = process.env.NODE_ENV === "production";
-
-// collect every problem so they can all be fixed in one go
-const problems: string[] = [];
-const need = (key: string, note = "") => {
-  if (!process.env[key]) problems.push(`${key} is missing${note}`);
-};
-
-need("MONGODB_URI");
-need("JWT_SECRET");
 const aiOn = process.env.AI_ENABLED === "true";
-if (aiOn) need("GROQ_API_KEY", " (required when AI_ENABLED=true)");
+const problems = getEnvironmentProblems(isProd);
 
-if (isProd) {
-  // a live site must send real email, know how many proxies sit in front of it, and use a strong signing key
-  for (const key of [
-    "SMTP_HOST",
-    "SMTP_USER",
-    "SMTP_PASS",
-    "MAIL_FROM",
-    "SUPPORT_EMAIL",
-    "CLIENT_URL",
-    "TRUST_PROXY",
-  ]) {
-    need(key, " (required in production)");
-  }
-  if (process.env.CLIENT_URL && !process.env.CLIENT_URL.startsWith("https://")) {
-    problems.push("CLIENT_URL must start with https:// in production");
-  }
-  if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-    problems.push("JWT_SECRET must be at least 32 characters in production");
-  }
-} else {
+if (!isProd) {
   // not fatal in development, but worth knowing
   if (!process.env.SUPPORT_EMAIL || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.warn("Support form and emails won't send: set SUPPORT_EMAIL, SMTP_USER and SMTP_PASS in .env");
@@ -55,11 +27,7 @@ if (problems.length) {
 const port = Number(process.env.PORT) || 4000;
 
 async function main() {
-  await connectDB();
-
-  // Accounts created before email verification existed count as verified (they have no value yet).
-  const { modifiedCount } = await User.updateMany({ emailVerified: { $exists: false } }, { $set: { emailVerified: true } });
-  if (modifiedCount) console.log(`Marked ${modifiedCount} existing account(s) as verified`);
+  await initializeApplication();
 
   const server = app.listen(port, () => console.log(`API on http://localhost:${port}`));
   console.log(`AI features: ${aiOn ? "on" : "off"}`);

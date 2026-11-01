@@ -7,6 +7,7 @@ import accountRoutes from "./routes/accountRoutes.js";
 import researchRoutes from "./routes/researchRoutes.js";
 import collectionRoutes from "./routes/collectionRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js";
+import { initializeApplication } from "./config/startup.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
@@ -60,6 +61,15 @@ const limiter = (windowMs: number, limit: number) =>
 
 // before the limiters, so a host's health checks are never blocked
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+app.use("/api", async (_req, _res, next) => {
+  try {
+    await initializeApplication();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.use("/api", limiter(minutes(1), 300)); // overall cap per visitor
 app.use("/api/auth", limiter(minutes(15), 100)); // everything under /api/auth
