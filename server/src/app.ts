@@ -59,8 +59,8 @@ const limiter = (windowMs: number, limit: number) =>
     message: { error: "Too many requests. Please wait a little and try again." },
   });
 
-// before the limiters, so a host's health checks are never blocked
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+// Keep liveness checks independent of MongoDB so host health checks are never blocked.
+app.get(["/api", "/api/health"], (_req, res) => res.json({ ok: true }));
 
 app.use("/api", async (_req, _res, next) => {
   try {
