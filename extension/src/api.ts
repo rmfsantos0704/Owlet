@@ -15,6 +15,13 @@ export const clearToken = async () => {
   await chrome.storage.local.remove("token");
 };
 
+// Free hosts put idle servers to sleep, and the first request wakes them (up to about a minute).
+// Call this as soon as the popup opens, so the server is already awake when the person logs in or clips.
+export function wake() {
+  if (!SAFE_API) return;
+  void fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(120_000) }).catch(() => {});
+}
+
 export async function api(path: string, options: { method?: string; body?: unknown } = {}) {
   if (!SAFE_API) throw new Error("API_URL must start with https:// outside development");
   const token = await getToken();
@@ -25,7 +32,7 @@ export async function api(path: string, options: { method?: string; body?: unkno
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
-    signal: AbortSignal.timeout(60_000), // a clip waits for the AI summary, so allow a minute
+    signal: AbortSignal.timeout(150_000), // a sleeping free server can take about a minute to wake up
   });
   const data = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, data };

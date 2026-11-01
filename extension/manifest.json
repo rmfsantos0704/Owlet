@@ -18,17 +18,28 @@
       "32": "icons/icon32.png"
     }
   },
-  "permissions": ["activeTab", "scripting", "storage"],
-"host_permissions": ["http://localhost:4000/*"],
+  "permissions": ["activeTab", "contextMenus", "scripting", "storage"],
+  "host_permissions": ["http://localhost:4000/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "save-selection": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Save selected text to Owlet"
+    }
+  },
   "content_scripts": [
     {
-      "matches": ["https://app.yourdomain.com/*"],
+      "matches": ["http://localhost:5173/*"],
       "js": ["pageHook.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://app.yourdomain.com/*"],
+      "matches": ["http://localhost:5173/*"],
       "js": ["bridge.js"],
       "run_at": "document_start"
     }

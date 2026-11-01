@@ -1,4 +1,6 @@
-import { api, getToken, setToken, clearToken, DASHBOARD_URL } from "../api";
+import { api, getToken, setToken, clearToken, DASHBOARD_URL, wake } from "../api";
+import { HIGHLIGHT_COLORS } from "../highlightColors";
+import { normalizePageUrl } from "../pageUrl";
 
 type Collection = {
   id: string;
@@ -30,6 +32,7 @@ let clippable = false;
 let clipping = false;
 let lastCollectionId = ""; // last real selection, so Cancel can go back to it
 let hasLink = false; // whether the selected collection currently has a usable join link
+let clipTags: string[] = [];
 
 const open = (url: string) => chrome.tabs.create({ url });
 const selected = () => collections.find((w) => w.id === $<HTMLSelectElement>("collection").value);
@@ -55,6 +58,7 @@ function loginMsg(text = "") {
 
 function updateClipEnabled() {
   $<HTMLButtonElement>("clipBtn").disabled = clipping || !clippable || !selected();
+  $<HTMLButtonElement>("showHighlightsBtn").disabled = !clippable || !selected();
 }
 
 function setClipBusy(busy: boolean) {
@@ -91,6 +95,59 @@ function readAi(): AiSettings {
 function updateAiHint() {
   const s = readAi();
   $("aiHint").textContent = `AI summary: ${FORMATS[s.format] ?? "Paragraph"} \u00B7 ${LENGTHS[s.length] ?? "Medium"}`;
+}
+
+function renderClipTags() {
+  const list = $("clipTagList");
+  list.replaceChildren();
+  for (const tag of clipTags) {
+    const chip = document.createElement("span");
+    chip.className = "clip-tag";
+    chip.append(document.createTextNode(tag));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", `Remove ${tag}`);
+    remove.addEventListener("click", () => {
+      clipTags = clipTags.filter((item) => item !== tag);
+      renderClipTags();
+    });
+    chip.append(remove);
+    list.append(chip);
+  }
+}
+
+function addClipTags(raw: string) {
+  const input = $<HTMLInputElement>("clipTags");
+  const values = raw.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  for (const tag of values) {
+    if (tag.length > 40) {
+      status("err", "Tags must be 40 characters or fewer.");
+      continue;
+    }
+    if (!clipTags.includes(tag) && clipTags.length < 20) clipTags.push(tag);
+  }
+  if (clipTags.length >= 20 && values.some((tag) => !clipTags.includes(tag))) {
+    status("err", "A clip can have up to 20 tags.");
+  }
+  input.value = "";
+  renderClipTags();
+}
+
+async function loadTagSuggestions(collectionId: string) {
+  try {
+    const response = await api(`/collections/${encodeURIComponent(collectionId)}/tags`);
+    if (!response.ok || selected()?.id !== collectionId) return;
+    const suggestions = (response.data.tags as string[]).filter((tag) => typeof tag === "string");
+    const list = $("tagSuggestions");
+    list.replaceChildren(...suggestions.map((tag) => {
+      const option = document.createElement("option");
+      option.value = tag;
+      return option;
+    }));
+  } catch {
+    $("tagSuggestions").replaceChildren();
+  }
 }
 
 async function loadAi() {
@@ -202,13 +259,22 @@ function resetLinkLabels() {
 function applyLink(link: JoinLink | null | undefined) {
   const info = $("linkInfo");
   hasLink = linkUsable(link);
-  if (linkUsable(link)) {
+  if (link && hasLink) {
     const uses = link.maxUses === null ? `${link.uses} joined` : `${link.uses} of ${link.maxUses} used`;
-    info.innerHTML = `<strong>Active</strong> · joins as ${link.role} · expires ${new Date(link.expiresAt).toLocaleDateString()} · ${uses}. A new link replaces this one.`;
+    const active = document.createElement("strong");
+    active.textContent = "Active";
+    info.replaceChildren(
+      active,
+      document.createTextNode(
+        ` · joins as ${link.role} · expires ${new Date(link.expiresAt).toLocaleDateString()} · ${uses}. A new link replaces this one.`
+      )
+    );
     setSelect("linkRole", link.role);
     setSelect("linkUses", link.maxUses === null ? "" : String(link.maxUses));
+  } else if (link?.expired) {
+    info.textContent = "The link has expired. Create a new one.";
   } else if (link) {
-    info.textContent = link.expired ? "The link has expired. Create a new one." : "The link has reached its use limit. Create a new one.";
+    info.textContent = "The link has reached its use limit. Create a new one.";
   } else {
     info.textContent = "No active link. Choose the settings below and create one.";
   }
@@ -318,7 +384,7 @@ async function loadCollections(preferId?: string) {
     const { collectionId } = await chrome.storage.local.get("collectionId");
     collections = (r.data.collections as Collection[]).filter((w) => w.role !== "viewer");
     const sel = $<HTMLSelectElement>("collection");
-    sel.innerHTML = "";
+    sel.replaceChildren();
     for (const w of collections) sel.add(new Option(w.name, w.id));
     sel.add(new Option("+ Create new collection…", "new"));
 
@@ -327,12 +393,15 @@ async function loadCollections(preferId?: string) {
     lastCollectionId = sel.value;
     showNewRow(false);
     fillSettings();
+    const collection = selected();
+    if (collection) void loadTagSuggestions(collection.id);
   } catch {
     status("err", OFFLINE);
   }
 }
 
 async function render() {
+  wake(); // free hosts sleep when idle: start waking the server as soon as the popup opens
   const loggedIn = !!(await getToken());
   $("viewLogin").hidden = loggedIn;
   $("viewMain").hidden = !loggedIn;
@@ -346,6 +415,7 @@ async function render() {
 $("collection").addEventListener("change", () => {
   const sel = $<HTMLSelectElement>("collection");
   if (sel.value === "new") {
+    $("tagSuggestions").replaceChildren();
     status("");
     showNewRow(true);
     fillSettings();
@@ -355,6 +425,20 @@ $("collection").addEventListener("change", () => {
   showNewRow(false);
   chrome.storage.local.set({ collectionId: sel.value });
   fillSettings();
+  const collection = selected();
+  if (collection) void loadTagSuggestions(collection.id);
+});
+
+$<HTMLInputElement>("clipTags").addEventListener("keydown", (event) => {
+  const input = event.currentTarget as HTMLInputElement;
+  if (event.key === "Enter" || event.key === ",") {
+    event.preventDefault();
+    addClipTags(input.value);
+  }
+});
+$<HTMLInputElement>("clipTags").addEventListener("change", (event) => {
+  const input = event.currentTarget as HTMLInputElement;
+  if (input.value) addClipTags(input.value);
 });
 
 async function createCollection() {
@@ -415,6 +499,162 @@ $("pageFavicon").addEventListener("error", () => {
   $("pageFallback").style.display = "";
 });
 
+$<HTMLButtonElement>("showHighlightsBtn").addEventListener("click", async () => {
+  const button = $<HTMLButtonElement>("showHighlightsBtn");
+  if (button.disabled) return;
+  button.disabled = true;
+  status("info", "Finding saved highlights…");
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !tab.url || !/^https?:\/\//i.test(tab.url)) {
+      return status("err", "Open a regular web page to show its highlights.");
+    }
+    const collection = selected();
+    if (!collection) return status("err", "Choose a Collection first.");
+
+    const url = normalizePageUrl(tab.url);
+    const query = new URLSearchParams({ url, collectionId: collection.id });
+    const found = await api(`/research/lookup?${query.toString()}`);
+    if (found.status === 401) {
+      await clearToken();
+      await render();
+      return loginMsg("Session expired. Please log in again.");
+    }
+    if (!found.ok) return status("err", found.data.error ?? "Couldn't find this page.");
+    if (typeof found.data.id !== "string") return status("info", "This page isn't clipped yet.");
+
+    const response = await api(`/research/${encodeURIComponent(found.data.id)}/highlights`);
+    if (response.status === 401) {
+      await clearToken();
+      await render();
+      return loginMsg("Session expired. Please log in again.");
+    }
+    if (!response.ok) return status("err", response.data.error ?? "Couldn't load the highlights.");
+    const highlights = response.data.highlights as { text: string; color: string }[];
+    const [painted] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: paintSavedHighlights,
+      args: [highlights, HIGHLIGHT_COLORS],
+    });
+    status("info", painted?.result ?? `Showing 0 of ${highlights.length} highlights`);
+  } catch {
+    status("err", "Can't reach Owlet or read this page.");
+  } finally {
+    button.disabled = !clippable || !selected();
+  }
+});
+
+function paintSavedHighlights(
+  highlights: { text: string; color: string }[],
+  palette: Record<string, string>
+): string {
+  const pageWindow = window as Window & {
+    Highlight?: new (...ranges: Range[]) => object;
+    CSS?: {
+      highlights?: {
+        delete(name: string): void;
+        set(name: string, value: object): void;
+      };
+    };
+  };
+  const registry = pageWindow.CSS?.highlights;
+  const HighlightConstructor = pageWindow.Highlight;
+  if (!registry || !HighlightConstructor) return `Showing 0 of ${highlights.length} highlights`;
+
+  const colors = Object.keys(palette);
+  for (const color of colors) registry.delete(`owlet-${color}`);
+
+  const root = document.body ?? document.documentElement;
+  if (!root) return `Showing 0 of ${highlights.length} highlights`;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      return parent && !["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA"].includes(parent.tagName)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT;
+    },
+  });
+  const nodes: Text[] = [];
+  let node: Node | null;
+  while ((node = walker.nextNode())) nodes.push(node as Text);
+
+  const offsets: { node: Text; offset: number }[] = [];
+  let text = "";
+  for (const textNode of nodes) {
+    for (let offset = 0; offset < textNode.length; offset += 1) {
+      const character = textNode.data[offset];
+      if (/\s/.test(character)) {
+        if (text && !text.endsWith(" ")) {
+          text += " ";
+          offsets.push({ node: textNode, offset });
+        }
+      } else {
+        text += character;
+        offsets.push({ node: textNode, offset });
+      }
+    }
+  }
+  if (text.endsWith(" ")) {
+    text = text.slice(0, -1);
+    offsets.pop();
+  }
+
+  const rangesByColor = new Map<string, Range[]>();
+  const usedRanges: { start: number; end: number }[] = [];
+  for (const highlight of highlights) {
+    const needle = highlight.text.replace(/\s+/g, " ").trim();
+    const color = colors.includes(highlight.color) ? highlight.color : "yellow";
+    if (!needle) continue;
+    let start = text.indexOf(needle);
+    while (
+      start >= 0 &&
+      usedRanges.some((range) => start < range.end && start + needle.length > range.start)
+    ) {
+      start = text.indexOf(needle, start + 1);
+    }
+    if (start < 0) continue;
+    const end = start + needle.length - 1;
+    const first = offsets[start];
+    const last = offsets[end];
+    if (!first || !last) continue;
+    const range = document.createRange();
+    range.setStart(first.node, first.offset);
+    range.setEnd(last.node, last.offset + 1);
+    usedRanges.push({ start, end: start + needle.length });
+    const ranges = rangesByColor.get(color) ?? [];
+    ranges.push(range);
+    rangesByColor.set(color, ranges);
+  }
+
+  for (const [color, ranges] of rangesByColor) {
+    registry.set(`owlet-${color}`, new HighlightConstructor(...ranges));
+  }
+
+  const styledColors = new Set<string>();
+  for (const sheet of document.adoptedStyleSheets) {
+    try {
+      for (const rule of Array.from(sheet.cssRules)) {
+        for (const color of colors) {
+          if (rule.cssText.includes(`::highlight(owlet-${color})`)) styledColors.add(color);
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+  const missingStyles = colors.filter((color) => !styledColors.has(color));
+  if (missingStyles.length) {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(
+      missingStyles.map((color) => `::highlight(owlet-${color}) { background-color: ${palette[color]}; }`).join("\n")
+    );
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  }
+
+  const count = Array.from(rangesByColor.values()).reduce((total, ranges) => total + ranges.length, 0);
+  return `Showing ${count} of ${highlights.length} highlights`;
+}
+
 $("clipBtn").addEventListener("click", async () => {
   if (clipping || !clippable) return;
   setClipBusy(true);
@@ -432,6 +672,8 @@ $("clipBtn").addEventListener("click", async () => {
       body: {
         ...page,
         collectionId: $<HTMLSelectElement>("collection").value || undefined,
+        tags: [...clipTags],
+        personalNote: $<HTMLInputElement>("personalNote").value.trim(),
         aiSettings: readAi(), // this clip's own AI settings
       },
     });
@@ -448,6 +690,11 @@ $("clipBtn").addEventListener("click", async () => {
     if (!r.ok) return status("err", r.data.error ?? "Clip failed");
 
     const id = r.data.item?._id;
+    clipTags = [];
+    renderClipTags();
+    $<HTMLInputElement>("personalNote").value = "";
+    const clippedCollection = selected();
+    if (clippedCollection) void loadTagSuggestions(clippedCollection.id);
     const link = id ? { label: "View in Owlet", url: `${DASHBOARD_URL}/item/${id}` } : undefined;
     status(
       r.data.aiFailed ? "info" : "ok",

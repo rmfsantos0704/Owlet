@@ -179,6 +179,9 @@
     .row .field { min-width: 0; }
 
     .new-collection { margin-top: 8px; }
+    .clip-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+    .clip-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 11px; }
+    .clip-tag button { padding: 0; border: 0; background: none; color: inherit; line-height: 1; }
     .new-collection .link { margin-top: 6px; }
 
     /* join link */
@@ -262,10 +265,24 @@
         </p>
       </div>
 
+      <div>
+        <label class="eyebrow" for="clipTags">Tags <span class="muted">(optional)</span></label>
+        <input id="clipTags" class="field" list="tagSuggestions" maxlength="400" placeholder="Type a tag and press Enter" autocomplete="off" />
+        <datalist id="tagSuggestions"></datalist>
+        <div id="clipTagList" class="clip-tags" aria-live="polite"></div>
+        <label class="eyebrow mt-2" for="personalNote">Why I saved this <span class="muted">(optional)</span></label>
+        <input id="personalNote" class="field" maxlength="280" placeholder="A short reminder for later" />
+      </div>
+
       <button id="clipBtn" class="btn btn-primary btn-lg" type="button" disabled>
         <span id="clipSpinner" class="spinner" hidden></span>
         <svg id="clipIcon" class="i" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
         <span id="clipLabel">Clip this page</span>
+      </button>
+
+      <button id="showHighlightsBtn" class="btn btn-secondary" type="button" disabled>
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 5h16"/><path d="M4 10h10"/><path d="M4 15h16"/><path d="M4 20h10"/></svg>
+        Show my highlights
       </button>
 
       <div id="status" class="status" role="status" hidden>

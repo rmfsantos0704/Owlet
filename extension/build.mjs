@@ -10,6 +10,7 @@ mkdirSync("dist/fonts", { recursive: true });
 
 await build({
   entryPoints: {
+    background: "src/background.ts",
     popup: "src/popup/popup.ts",
     content: "src/content.ts",
     bridge: "src/bridge.ts", // syncs login with the dashboard
