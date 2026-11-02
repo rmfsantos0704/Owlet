@@ -327,7 +327,7 @@ export default function CollectionSettings() {
             <li key={m.userId} className="flex items-center gap-2 py-2.5 text-sm">
               <span className="min-w-0 flex-1 truncate">{m.email}</span>
               {isOwner ? (
-                <select value={m.role} onChange={(e) => changeRole(m.userId, e.target.value)} className="field !w-auto !py-1 !text-xs">
+                <select value={m.role} onChange={(e) => changeRole(m.userId, e.target.value)} className="field !w-auto !px-2 !py-1.5 !text-xs">
                   <option value="editor">Editor</option>
                   <option value="viewer">Viewer</option>
                 </select>
@@ -337,7 +337,7 @@ export default function CollectionSettings() {
               {(isOwner || m.email.toLowerCase() === me) && (
                 <button
                   onClick={() => removeMember(m.userId, m.email.toLowerCase() === me)}
-                  className="text-xs font-medium text-red-600 hover:underline"
+                  className="rounded-lg px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
                 >
                   {m.email.toLowerCase() === me ? "Leave" : "Remove"}
                 </button>
@@ -353,7 +353,7 @@ export default function CollectionSettings() {
                 <li key={s.id} className="flex items-center gap-2 py-2.5 text-sm">
                   <span className="min-w-0 flex-1 truncate">{s.email}</span>
                   <span className="chip capitalize">{s.role}</span>
-                  <button onClick={() => cancelInvite(s.id)} className="text-xs font-medium text-red-600 hover:underline">
+                  <button onClick={() => cancelInvite(s.id)} className="rounded-lg px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
                     Cancel
                   </button>
                 </li>
@@ -364,12 +364,12 @@ export default function CollectionSettings() {
         {isOwner && (
           <>
             <form onSubmit={addMember} className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email of an existing Owlet user" className="field flex-1" />
-              <select value={role} onChange={(e) => setRole(e.target.value as "editor" | "viewer")} className="field sm:!w-32">
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email of an existing Owlet user" className="field flex-1 !px-2 !py-1.5 !text-xs" />
+              <select value={role} onChange={(e) => setRole(e.target.value as "editor" | "viewer")} className="field !w-auto !px-2 !py-1.5 !text-xs sm:!w-32">
                 <option value="viewer">Viewer</option>
                 <option value="editor">Editor</option>
               </select>
-              <button className="btn-primary">Invite</button>
+              <button className="btn-primary !rounded-lg !px-3 !py-1.5 !text-xs">Invite</button>
             </form>
             <p className="mt-1.5 text-[11px] text-slate-400">
               They join only after they accept. The invitation shows up in their Owlet and expires after 14 days.
@@ -401,7 +401,7 @@ export default function CollectionSettings() {
                 <button
                   type="button"
                   onClick={() => copyLink(`${window.location.origin}/join/${ws.joinLink!.token}`)}
-                  className="btn-secondary"
+                  className="btn-secondary !rounded-lg !px-3 !py-1.5 !text-xs"
                 >
                   {copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "Copied" : "Copy"}
                 </button>
@@ -438,7 +438,7 @@ export default function CollectionSettings() {
               <option value="25">25 uses</option>
             </select>
             <div className="flex gap-2">
-              <button type="button" onClick={makeLink} disabled={linkBusy} className="btn-primary flex-1 sm:flex-none">
+              <button type="button" onClick={makeLink} disabled={linkBusy} className="btn-primary flex-1 !rounded-lg !px-3 !py-1.5 !text-xs sm:flex-none">
                 {ws.joinLink ? "Make new link" : "Create link"}
               </button>
               {linkActive && (
@@ -447,7 +447,7 @@ export default function CollectionSettings() {
                   onClick={revokeLink}
                   title="Turn off link"
                   aria-label="Turn off link"
-                  className="btn-secondary !px-3 text-red-600 hover:!bg-red-50"
+                  className="btn-secondary !rounded-lg !px-2 !py-1.5 text-red-600 !text-xs hover:!bg-red-50"
                 >
                   <Power className="size-4" />
                 </button>
