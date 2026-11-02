@@ -103,6 +103,78 @@ export function toRis(items: any[]) {
   }).join("\r\n\r\n") + (items.length ? "\r\n" : "");
 }
 
+const markdownText = (value: unknown) =>
+  String(value ?? "").replace(/\r\n?/g, "\n").replace(/([\\`*_{}\[\]()#+.!|>])/g, "\\$1").trim();
+
+const markdownUrl = (value: unknown) => {
+  const url = String(value ?? "").trim();
+  return /^https?:\/\/\S+$/i.test(url)
+    ? `<${url.replace(/[<>]/g, (char) => char === "<" ? "%3C" : "%3E")}>`
+    : markdownText(url);
+};
+
+export function toCollectionMarkdown(
+  collection: { name: string; description?: string },
+  items: any[],
+  total: number
+) {
+  const lines = [
+    `# ${markdownText(collection.name) || "Collection"}`,
+    "",
+    collection.description ? markdownText(collection.description) : "",
+    "",
+    `Exported ${items.length} of ${total} sources.`,
+  ];
+
+  for (const item of items) {
+    const source = item.source ?? {};
+    lines.push("", `## ${markdownText(source.title || source.fileName || source.url || "Untitled")}`);
+
+    const metadata = [
+      source.author && `**Author:** ${markdownText(source.author)}`,
+      source.publishedDate && `**Published:** ${markdownText(source.publishedDate)}`,
+      source.url && `**URL:** ${markdownUrl(source.url)}`,
+      item.tags?.length && `**Tags:** ${item.tags.map(markdownText).join(", ")}`,
+    ].filter(Boolean);
+    lines.push(...metadata, "");
+
+    if (item.personalNote) lines.push("### My note", "", markdownText(item.personalNote), "");
+    if (item.userSummary) lines.push("### My summary", "", markdownText(item.userSummary), "");
+    if (item.aiOutput?.summary) lines.push("### Summary", "", markdownText(item.aiOutput.summary), "");
+    if (item.aiOutput?.paraphrase) lines.push("### Key arguments", "", markdownText(item.aiOutput.paraphrase), "");
+
+    if (item.highlights?.length) {
+      lines.push("### Highlights", "");
+      for (const highlight of item.highlights) {
+        lines.push(`- “${markdownText(highlight.text)}”${highlight.note ? ` — ${markdownText(highlight.note)}` : ""}`);
+      }
+      lines.push("");
+    }
+
+    if (item.comments?.length) {
+      lines.push("### Comments", "");
+      for (const comment of item.comments) {
+        const author = comment.authorEmail ? ` — ${markdownText(comment.authorEmail)}` : "";
+        lines.push(`- ${markdownText(comment.text)}${author}`);
+      }
+      lines.push("");
+    }
+
+    const citations = [
+      ["APA", item.citations?.apa],
+      ["MLA", item.citations?.mla],
+      ["Chicago", item.citations?.chicago],
+    ].filter((entry): entry is [string, string] => typeof entry[1] === "string" && !!entry[1].trim());
+    if (citations.length) {
+      lines.push("### Citations", "");
+      for (const [style, citation] of citations) lines.push(`- **${style}:** ${markdownText(citation)}`);
+      lines.push("");
+    }
+  }
+
+  return lines.join("\n").trimEnd() + "\n";
+}
+
 export function toLiteratureMatrixCsv(
   items: any[],
   columns: { id: string; name: string }[]

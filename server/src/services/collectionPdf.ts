@@ -42,7 +42,7 @@ const titleCase = (s: string) =>
 const sortKey = (s: string) => clean(s).replace(/^[^a-z0-9]+/i, "").toLowerCase();
 
 // Each clip goes under ONE topic: its most widely shared tag in this collection (ties: alphabetical).
-export function groupByTopic(items: any[]) {
+function groupByTopic(items: any[]) {
   const freq = new Map<string, number>();
   for (const it of items) {
     for (const t of new Set<string>((it.tags ?? []).map(String))) freq.set(t, (freq.get(t) ?? 0) + 1);

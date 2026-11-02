@@ -15,10 +15,9 @@ import { publicLink } from "./joinLinkController.js";
 import { Activity } from "../models/Activity.js";
 import { recordActivity } from "../services/activityLog.js";
 import { streamcollectionPdf } from "../services/collectionPdf.js";
-import { collectionDocument } from "../services/collectionDocument.js";
 import { Writable } from "node:stream";
 import { requireAi } from "../middlewares/requireAi.js";
-import { toLiteratureMatrixCsv } from "../services/export.js";
+import { toBibtex, toCollectionMarkdown, toCsv, toLiteratureMatrixCsv, toRis } from "../services/export.js";
 
 const matrixColumnsSchema = z.array(z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
@@ -543,31 +542,64 @@ export async function testAi(req: Request, res: Response) {
 }
 const EXPORT_LIMIT = 500;
 
-export async function exportGoogleDocContent(req: Request, res: Response) {
-  const found = await load(req, res);
-  if (!found) return;
-  const modeResult = z.enum(["full", "citations"]).safeParse(req.query.mode ?? "full");
-  if (!modeResult.success) return res.status(400).json({ error: "Invalid export mode" });
-  const mode = modeResult.data;
-
+async function getCollectionExportItems(collectionId: mongoose.Types.ObjectId) {
   const [items, total] = await Promise.all([
-    ResearchItem.find({ collectionId: found.ws._id })
+    ResearchItem.find({ collectionId })
       .select("-content.rawText")
       .sort({ createdAt: -1 })
       .limit(EXPORT_LIMIT)
       .lean(),
-    ResearchItem.countDocuments({ collectionId: found.ws._id }),
+    ResearchItem.countDocuments({ collectionId }),
   ]);
+  return { items, total };
+}
+
+export async function exportCollectionFile(req: Request, res: Response) {
+  const found = await load(req, res);
+  if (!found) return;
+  const formatResult = z.enum(["markdown", "csv", "bibtex", "ris", "json"]).safeParse(req.query.format);
+  if (!formatResult.success) return res.status(400).json({ error: "Unsupported export format" });
+
+  const { items, total } = await getCollectionExportItems(found.ws._id);
   if (!items.length) return res.status(400).json({ error: "This collection has no clips to export yet" });
 
-  res.json({
-    ...collectionDocument(
-      { name: found.ws.name, description: found.ws.description ?? "" },
+  const slug = found.ws.name.trim().replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "collection";
+  const format = formatResult.data;
+  let contentType: string;
+  let extension: string;
+  let body: string;
+
+  if (format === "markdown") {
+    contentType = "text/markdown";
+    extension = "md";
+    body = toCollectionMarkdown({ name: found.ws.name, description: found.ws.description ?? "" }, items, total);
+  } else if (format === "csv") {
+    contentType = "text/csv";
+    extension = "csv";
+    body = toCsv(items);
+  } else if (format === "bibtex") {
+    contentType = "application/x-bibtex";
+    extension = "bib";
+    body = toBibtex(items);
+  } else if (format === "ris") {
+    contentType = "application/x-research-info-systems";
+    extension = "ris";
+    body = toRis(items);
+  } else {
+    contentType = "application/json";
+    extension = "json";
+    body = JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      collection: { name: found.ws.name, description: found.ws.description ?? "" },
+      count: items.length,
+      total,
       items,
-      mode,
-      total - items.length
-    ),
-  });
+    }, null, 2);
+  }
+
+  res.setHeader("Content-Type", `${contentType}; charset=utf-8`);
+  res.setHeader("Content-Disposition", `attachment; filename="${slug}.${extension}"`);
+  res.send(body);
 }
 
 export async function exportPdf(req: Request, res: Response) {
@@ -575,14 +607,7 @@ export async function exportPdf(req: Request, res: Response) {
   if (!found) return;
   const mode = req.query.mode === "citations" ? "citations" : "full";
 
-  const [items, total] = await Promise.all([
-    ResearchItem.find({ collectionId: found.ws._id })
-      .select("-content.rawText")
-      .sort({ createdAt: -1 })
-      .limit(EXPORT_LIMIT)
-      .lean(),
-    ResearchItem.countDocuments({ collectionId: found.ws._id }),
-  ]);
+  const { items, total } = await getCollectionExportItems(found.ws._id);
   if (!items.length) return res.status(400).json({ error: "This collection has no clips to export yet" });
 
   // Build the PDF in memory and send it inside JSON. Download managers and PDF extensions
