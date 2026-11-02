@@ -420,17 +420,17 @@ export default function CollectionSettings() {
             )
           )}
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <select value={linkRole} onChange={(e) => setLinkRole(e.target.value as "editor" | "viewer")} className="field sm:!w-36">
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={linkRole} onChange={(e) => setLinkRole(e.target.value as "editor" | "viewer")} className="field !w-auto !px-2 !py-1.5 !text-xs sm:!w-32">
               <option value="viewer">Viewer</option>
               <option value="editor">Editor</option>
             </select>
-            <select value={linkDays} onChange={(e) => setLinkDays(Number(e.target.value) as 1 | 7 | 30)} className="field sm:!w-40">
+            <select value={linkDays} onChange={(e) => setLinkDays(Number(e.target.value) as 1 | 7 | 30)} className="field !w-auto !px-2 !py-1.5 !text-xs sm:!w-36">
               <option value={1}>Expires in 1 day</option>
               <option value={7}>Expires in 7 days</option>
               <option value={30}>Expires in 30 days</option>
             </select>
-            <select value={linkMax} onChange={(e) => setLinkMax(e.target.value)} className="field sm:!w-40">
+            <select value={linkMax} onChange={(e) => setLinkMax(e.target.value)} className="field !w-auto !px-2 !py-1.5 !text-xs sm:!w-36">
               <option value="">Unlimited uses</option>
               <option value="1">1 use</option>
               <option value="5">5 uses</option>
