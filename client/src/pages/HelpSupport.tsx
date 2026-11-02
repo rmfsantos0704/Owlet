@@ -52,7 +52,7 @@ function guides(ai: boolean): Guide[] {
     list.push({
       icon: Sparkles,
       title: "Use the AI workspace",
-      text: "Open it from the AI research assistant card on a Collection page. Pick up to 8 sources, choose a mode and run the analysis. Each run is saved under Recent sessions.",
+      text: "Open it from the AI research assistant card on a Collection page. Pick up to 8 sources, choose a mode and run the analysis. Each run is saved under Recent sessions. AI use is limited to 10 generations per account each day.",
       accent: "bg-emerald-50 text-emerald-700",
     });
   } else {
@@ -89,6 +89,21 @@ function guides(ai: boolean): Guide[] {
 
 function faq(ai: boolean): [string, string][] {
   const list: [string, string][] = [];
+
+  list.push(
+    [
+      "How does the daily AI limit work?",
+      "Each account can use AI for up to 10 generations per day. Summaries, PDF summaries, tests, regenerations and AI workspace runs count. The allowance resets at 00:00 UTC. When you reach it, Owlet switches off AI-only tools for your account until the reset; your clips and built-in non-AI tools remain available.",
+    ],
+    [
+      "Does one person's AI usage use up everyone else's limit?",
+      "No. Each account has its own daily Owlet allowance. However, the AI providers' overall quotas are shared by Owlet, so if all configured providers are unavailable or have exhausted their quotas, AI may temporarily be unavailable for everyone. Owlet will not switch to its built-in paid provider models as a fallback.",
+    ],
+    [
+      "Why might AI still be unavailable before I reach my limit?",
+      "Owlet tries its configured providers (Groq, Gemini and OpenRouter) in sequence when one is unavailable. Their free-tier limits, model access and billing rules depend on each provider and can change. If none can serve the request, use Owlet's non-AI tools and try again later.",
+    ]
+  );
 
   if (ai) {
     list.push([
