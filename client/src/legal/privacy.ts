@@ -40,6 +40,7 @@ export const privacySections: Section[] = [
       [
         "to create and secure your account, including emailing you confirmation, password-reset, and security messages;",
         "to run Owlet: saving your clips, generating summaries and citations, and sharing collections with the people you choose;",
+        "when a clipped page includes a DOI, to look up its bibliographic metadata from Crossref; only the DOI is sent for that lookup, and a failed lookup falls back to the page's metadata;",
         "to prevent abuse and keep Owlet working;",
         "to follow the law.",
       ],
@@ -64,7 +65,7 @@ export const privacySections: Section[] = [
     title: "Who sees your information",
     body: [
       "Members of a Collection can see its content and each other's email addresses. Comments show their author's email. Other Owlet users cannot see your age or your role.",
-      `Service providers help us run Owlet: hosting (${LEGAL.hostingProviders}), our database (MongoDB Atlas), email delivery (${LEGAL.emailProvider}), and, when AI features are on, Groq. They process data only to provide those services.`,
+      `Service providers help us run Owlet: hosting (${LEGAL.hostingProviders}), our database (MongoDB Atlas), email delivery (${LEGAL.emailProvider}), Crossref for DOI metadata lookups, and, when AI features are on, Groq. They process data only to provide those services.`,
       "We may disclose information if the law requires it or to protect people's safety or rights.",
     ],
   },

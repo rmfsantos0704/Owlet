@@ -1,16 +1,43 @@
 import { useState, type FormEvent } from "react";
 import { Pencil } from "lucide-react";
 
-type Source = { title?: string; author?: string; publishedDate?: string };
-type Values = { title: string; author: string; publishedDate: string };
+type Source = {
+  title?: string;
+  author?: string;
+  publishedDate?: string;
+  journal?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  doi?: string;
+};
+type Values = Required<Source>;
 
 export default function SourceEditor({ source, onSave }: { source: Source; onSave: (v: Values) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [v, setV] = useState<Values>({ title: "", author: "", publishedDate: "" });
+  const [v, setV] = useState<Values>({
+    title: "",
+    author: "",
+    publishedDate: "",
+    journal: "",
+    volume: "",
+    issue: "",
+    pages: "",
+    doi: "",
+  });
 
   function start() {
-    setV({ title: source.title ?? "", author: source.author ?? "", publishedDate: source.publishedDate ?? "" });
+    setV({
+      title: source.title ?? "",
+      author: source.author ?? "",
+      publishedDate: source.publishedDate ?? "",
+      journal: source.journal ?? "",
+      volume: source.volume ?? "",
+      issue: source.issue ?? "",
+      pages: source.pages ?? "",
+      doi: source.doi ?? "",
+    });
     setOpen(true);
   }
 
@@ -19,7 +46,16 @@ export default function SourceEditor({ source, onSave }: { source: Source; onSav
     if (!v.title.trim()) return;
     setBusy(true);
     try {
-      await onSave({ title: v.title.trim(), author: v.author.trim(), publishedDate: v.publishedDate.trim() });
+      await onSave({
+        title: v.title.trim(),
+        author: v.author.trim(),
+        publishedDate: v.publishedDate.trim(),
+        journal: v.journal.trim(),
+        volume: v.volume.trim(),
+        issue: v.issue.trim(),
+        pages: v.pages.trim(),
+        doi: v.doi.trim(),
+      });
       setOpen(false);
     } finally {
       setBusy(false);
@@ -39,6 +75,13 @@ export default function SourceEditor({ source, onSave }: { source: Source; onSav
       <input value={v.title} onChange={(e) => setV({ ...v, title: e.target.value })} placeholder="Title" maxLength={500} required className="field" />
       <input value={v.author} onChange={(e) => setV({ ...v, author: e.target.value })} placeholder="Author(s) (separate names with semicolons)" maxLength={1000} className="field" />
       <input value={v.publishedDate} onChange={(e) => setV({ ...v, publishedDate: e.target.value })} placeholder="Date (2023, 2023-03-05, or March 5, 2023)" maxLength={100} className="field" />
+      <input value={v.journal} onChange={(e) => setV({ ...v, journal: e.target.value })} placeholder="Journal or publication" maxLength={300} className="field" />
+      <div className="grid grid-cols-3 gap-2">
+        <input value={v.volume} onChange={(e) => setV({ ...v, volume: e.target.value })} placeholder="Volume" maxLength={50} className="field" />
+        <input value={v.issue} onChange={(e) => setV({ ...v, issue: e.target.value })} placeholder="Issue" maxLength={50} className="field" />
+        <input value={v.pages} onChange={(e) => setV({ ...v, pages: e.target.value })} placeholder="Pages" maxLength={80} className="field" />
+      </div>
+      <input value={v.doi} onChange={(e) => setV({ ...v, doi: e.target.value })} placeholder="DOI" maxLength={200} className="field" />
       <p className="text-[11px] text-slate-500">Saving rebuilds the APA, MLA, and Chicago citations.</p>
       <div className="flex gap-2">
         <button disabled={busy} className="btn-primary">Save</button>
