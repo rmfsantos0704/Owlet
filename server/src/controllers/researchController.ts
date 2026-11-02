@@ -9,6 +9,7 @@ import { AiSession } from "../models/AiSession.js";
 import { analyzeText, askSources } from "../services/groq.js";
 import { keyTerms, pickPassages } from "../services/passages.js";
 import { buildCitations } from "../services/citations.js";
+import { lookupCrossref } from "../services/crossref.js";
 import { extractPdf, PdfImportError } from "../services/pdfImport.js";
 import { streamPdf } from "../services/pdf.js";
 import { toBibtex, toCsv, toRis } from "../services/export.js";
@@ -121,6 +122,11 @@ const sourceSchema = z.object({
   title: z.string().trim().min(1).max(500),
   author: z.string().trim().max(1000).optional(),
   publishedDate: z.string().trim().max(100).optional(),
+  journal: z.string().trim().max(300).optional(),
+  volume: z.string().trim().max(50).optional(),
+  issue: z.string().trim().max(50).optional(),
+  pages: z.string().trim().max(80).optional(),
+  doi: z.string().trim().max(200).optional(),
 });
 const workflowSchema = z.object({
   readingStatus: z.enum(["to_read", "reading", "done"]).optional(),
@@ -205,7 +211,26 @@ export async function clip(req: Request, res: Response) {
   const domain = new URL(normalizedUrl).hostname;
   // the popup's settings win; clips from elsewhere fall back to the collection's
   const aiSettings = d.aiSettings ?? settingsFrom(ws);
-  const { ai, aiFailed } = await runAi(aiSettings, d.title, d.rawText);
+  const [crossref, { ai, aiFailed }] = await Promise.all([
+    d.doi
+      ? lookupCrossref(d.doi).catch((error: unknown) => {
+          console.warn("Crossref metadata lookup failed:", error instanceof Error ? error.message : "unknown error");
+          return null;
+        })
+      : Promise.resolve(null),
+    runAi(aiSettings, d.title, d.rawText),
+  ]);
+  const source = {
+    title: crossref?.title ?? d.title,
+    authors: crossref?.authors ?? d.authors,
+    author: crossref?.authors?.join("; ") || d.authors?.join("; ") || d.author,
+    publishedDate: crossref?.publishedDate ?? d.publishedDate,
+    journal: crossref?.journal ?? d.journal,
+    volume: crossref?.volume ?? d.volume,
+    issue: crossref?.issue ?? d.issue,
+    pages: crossref?.pages ?? d.pages,
+    doi: crossref?.doi ?? d.doi,
+  };
 
   try {
     const item = await ResearchItem.create({
@@ -216,32 +241,16 @@ export async function clip(req: Request, res: Response) {
         url: normalizedUrl,
         dedupeKey: normalizedUrl,
         domain,
-        title: d.title,
-        author: d.authors?.join("; ") || d.author,
-        authors: d.authors,
-        publishedDate: d.publishedDate,
-        journal: d.journal,
-        volume: d.volume,
-        issue: d.issue,
-        pages: d.pages,
-        doi: d.doi,
+        ...source,
       },
       content: { rawText: d.rawText, wordCount: d.rawText.split(/\s+/).length },
       personalNote: d.personalNote ?? "",
       aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
       aiSettings,
       citations: buildCitations({
-        author: d.author,
-        authors: d.authors,
-        title: d.title,
+        ...source,
         url: normalizedUrl,
         domain,
-        publishedDate: d.publishedDate,
-        journal: d.journal,
-        volume: d.volume,
-        issue: d.issue,
-        pages: d.pages,
-        doi: d.doi,
       }),
       tags: [...new Set(d.tags ?? ai.tags)],
     });
@@ -750,7 +759,7 @@ export async function related(req: Request, res: Response) {
   });
 }
 
-// Fix a clip's title/author/date and rebuild its citations from the corrected details.
+// Fix a clip's bibliographic metadata and rebuild its citations from the corrected details.
 export async function updateSource(req: Request, res: Response) {
   const p = sourceSchema.safeParse(req.body);
   if (!p.success) return res.status(400).json({ error: "A title is required" });
@@ -765,7 +774,7 @@ export async function updateSource(req: Request, res: Response) {
     issue?: string; pages?: string; doi?: string;
   };
 
-  const { title, author = "", publishedDate = "" } = p.data;
+  const { title, author = "", publishedDate = "", journal = "", volume = "", issue = "", pages = "", doi = "" } = p.data;
   const item = await ResearchItem.findOneAndUpdate(
     { _id: id, collectionId: { $in: ids } },
     {
@@ -774,6 +783,11 @@ export async function updateSource(req: Request, res: Response) {
         "source.author": author,
         "source.authors": author ? author.split(/\s*;\s*/).filter(Boolean) : [],
         "source.publishedDate": publishedDate,
+        "source.journal": journal,
+        "source.volume": volume,
+        "source.issue": issue,
+        "source.pages": pages,
+        "source.doi": doi,
         citations: buildCitations({
           author,
           authors: author ? author.split(/\s*;\s*/).filter(Boolean) : [],
@@ -781,11 +795,11 @@ export async function updateSource(req: Request, res: Response) {
           url: s.url,
           domain: s.domain,
           publishedDate,
-          journal: s.journal,
-          volume: s.volume,
-          issue: s.issue,
-          pages: s.pages,
-          doi: s.doi,
+          journal,
+          volume,
+          issue,
+          pages,
+          doi,
         }),
       },
     },
