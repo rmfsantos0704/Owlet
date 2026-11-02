@@ -6,7 +6,7 @@ import { ResearchItem } from "../models/ResearchItem.js";
 import { collection } from "../models/Collection.js";
 import { User } from "../models/User.js";
 import { AiSession } from "../models/AiSession.js";
-import { analyzeText, askSources } from "../services/groq.js";
+import { analyzeText, askSources } from "../services/ai.js";
 import { keyTerms, pickPassages } from "../services/passages.js";
 import { buildCitations } from "../services/citations.js";
 import { lookupCrossref } from "../services/crossref.js";
@@ -16,6 +16,7 @@ import { toBibtex, toCsv, toRis } from "../services/export.js";
 import { normalizePageUrl } from "../services/pageUrl.js";
 import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../services/access.js";
 import { aiEnabled } from "../config/features.js";
+import { AiQuotaExceededError, aiAvailableForUser } from "../services/aiUsage.js";
 
 const MAX_TITLE = 100;
 const HIGHLIGHT_COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green"] as const;
@@ -183,15 +184,28 @@ function settingsFrom(ws: { aiSettings?: any }) {
 }
 
 // Runs the AI summary with the given settings; a failure never blocks saving.
-async function runAi(settings: { format?: string; length?: string; instructions?: string }, title: string, text: string) {
+async function runAi(
+  userId: string,
+  settings: { format?: string; length?: string; instructions?: string },
+  title: string,
+  text: string
+) {
   // AI off: the clip is saved as it is, and the AI provider is never called
-  if (!aiEnabled()) return { ai: { summary: "", paraphrase: "", tags: [] as string[] }, aiFailed: false };
+  if (!aiEnabled()) {
+    return { ai: { summary: "", paraphrase: "", tags: [] as string[] }, aiFailed: false, aiLimitReached: false };
+  }
   try {
-    const ai = await analyzeText(title, text, settings);
-    return { ai, aiFailed: false };
+    const ai = await analyzeText(userId, title, text, settings);
+    return { ai, aiFailed: false, aiLimitReached: false };
   } catch (err) {
-    console.error("Groq failed:", err);
-    return { ai: { summary: "", paraphrase: "", tags: [] as string[] }, aiFailed: true };
+    if (
+      err instanceof AiQuotaExceededError ||
+      !(await aiAvailableForUser(userId))
+    ) {
+      return { ai: { summary: "", paraphrase: "", tags: [] as string[] }, aiFailed: false, aiLimitReached: true };
+    }
+    console.error("AI providers failed:", err);
+    return { ai: { summary: "", paraphrase: "", tags: [] as string[] }, aiFailed: true, aiLimitReached: false };
   }
 }
 
@@ -211,14 +225,14 @@ export async function clip(req: Request, res: Response) {
   const domain = new URL(normalizedUrl).hostname;
   // the popup's settings win; clips from elsewhere fall back to the collection's
   const aiSettings = d.aiSettings ?? settingsFrom(ws);
-  const [crossref, { ai, aiFailed }] = await Promise.all([
+  const [crossref, { ai, aiFailed, aiLimitReached }] = await Promise.all([
     d.doi
       ? lookupCrossref(d.doi).catch((error: unknown) => {
           console.warn("Crossref metadata lookup failed:", error instanceof Error ? error.message : "unknown error");
           return null;
         })
       : Promise.resolve(null),
-    runAi(aiSettings, d.title, d.rawText),
+    runAi(userId, aiSettings, d.title, d.rawText),
   ]);
   const source = {
     title: crossref?.title ?? d.title,
@@ -254,7 +268,11 @@ export async function clip(req: Request, res: Response) {
       }),
       tags: [...new Set(d.tags ?? ai.tags)],
     });
-    res.status(201).json({ item, aiFailed, aiEnabled: aiEnabled() });
+    res.status(201).json({
+      item,
+      aiFailed,
+      aiEnabled: aiEnabled() && !aiLimitReached && (await aiAvailableForUser(userId)),
+    });
   } catch (e) {
     // two quick clicks can both pass the check above; the unique index stops the second one
     if (isDuplicateKey(e)) return res.status(409).json({ error: "Already clipped" });
@@ -300,7 +318,7 @@ export async function importPdf(req: Request, res: Response) {
   const author = pdf.author ? String(pdf.author).slice(0, 200) : undefined;
   const aiSettings = settingsFrom(ws);
   // long documents: give the AI the start (abstract/intro) and the end (conclusions)
-  const { ai, aiFailed } = await runAi(aiSettings, title, forAi(rawText));
+  const { ai, aiFailed, aiLimitReached } = await runAi(userId, aiSettings, title, forAi(rawText));
 
   try {
     const item = await ResearchItem.create({
@@ -319,7 +337,12 @@ export async function importPdf(req: Request, res: Response) {
       citations: buildCitations({ author, title }),
       tags: ai.tags,
     });
-    res.status(201).json({ item, aiFailed, truncated: pdf.text.length > rawText.length });
+    res.status(201).json({
+      item,
+      aiFailed,
+      truncated: pdf.text.length > rawText.length,
+      aiEnabled: aiEnabled() && !aiLimitReached && (await aiAvailableForUser(userId)),
+    });
   } catch (e) {
     if (isDuplicateKey(e)) return res.status(409).json({ error: "This PDF is already in the collection" });
     throw e;
@@ -897,10 +920,19 @@ export async function testAi(req: Request, res: Response) {
   }
 
   try {
-    const ai = await analyzeText(title, text, p.data.aiSettings);
-    res.json({ ...ai, source });
+    const ai = await analyzeText(String(res.locals.userId), title, text, p.data.aiSettings);
+    res.json({ ...ai, source, aiEnabled: aiEnabled() && (await aiAvailableForUser(String(res.locals.userId))) });
   } catch (err) {
-    console.error("Groq failed:", err);
+    if (
+      err instanceof AiQuotaExceededError ||
+      !(await aiAvailableForUser(String(res.locals.userId)))
+    ) {
+      return res.status(429).json({
+        error: "Your daily AI allowance is used up. Owlet's non-AI features are still available until tomorrow.",
+        code: "AI_QUOTA_EXCEEDED",
+      });
+    }
+    console.error("AI providers failed:", err);
     res.status(502).json({ error: "The AI service failed. Try again." });
   }
 }
@@ -932,13 +964,22 @@ export async function regenerate(req: Request, res: Response) {
 
   let ai;
   try {
-    ai = await analyzeText(item.source?.title ?? "Untitled", input, {
+    ai = await analyzeText(String(res.locals.userId), item.source?.title ?? "Untitled", input, {
       format: settings.format,
       length: settings.length,
       instructions: settings.instructions,
     });
   } catch (err) {
-    console.error("Groq failed:", err);
+    if (
+      err instanceof AiQuotaExceededError ||
+      !(await aiAvailableForUser(String(res.locals.userId)))
+    ) {
+      return res.status(429).json({
+        error: "Your daily AI allowance is used up. Owlet's non-AI features are still available until tomorrow.",
+        code: "AI_QUOTA_EXCEEDED",
+      });
+    }
+    console.error("AI providers failed:", err);
     return res.status(502).json({ error: "The AI service failed. Your existing summary is unchanged." });
   }
   if (!ai.summary.trim()) {
@@ -955,6 +996,7 @@ export async function regenerate(req: Request, res: Response) {
   res.json({
     aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
     ...(body.data.aiSettings ? { aiSettings: body.data.aiSettings } : {}),
+    aiEnabled: aiEnabled() && (await aiAvailableForUser(String(res.locals.userId))),
   });
 }
 
@@ -1001,9 +1043,18 @@ export async function ask(req: Request, res: Response) {
 
   let out;
   try {
-    out = await askSources(mode, prompt, sources);
+    out = await askSources(String(res.locals.userId), mode, prompt, sources);
   } catch (err) {
-    console.error("Groq failed:", err);
+    if (
+      err instanceof AiQuotaExceededError ||
+      !(await aiAvailableForUser(String(res.locals.userId)))
+    ) {
+      return res.status(429).json({
+        error: "Your daily AI allowance is used up. Owlet's non-AI features are still available until tomorrow.",
+        code: "AI_QUOTA_EXCEEDED",
+      });
+    }
+    console.error("AI providers failed:", err);
     return res.status(502).json({ error: "The AI service failed. Try again." });
   }
 
@@ -1019,7 +1070,12 @@ export async function ask(req: Request, res: Response) {
     sources: refs,
     out,
   });
-  res.json({ ...out, sources: refs, session });
+  res.json({
+    ...out,
+    sources: refs,
+    session,
+    aiEnabled: aiEnabled() && (await aiAvailableForUser(String(res.locals.userId))),
+  });
 }
 
 // ---- AI workspace sessions: private to the person who ran them, newest 20 kept per collection ----

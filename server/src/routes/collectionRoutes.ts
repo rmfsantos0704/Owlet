@@ -5,6 +5,7 @@ import * as inv from "../controllers/invitationController.js";
 import * as jl from "../controllers/joinLinkController.js";
 import * as act from "../controllers/activityController.js";
 import { requireAuth } from "../middlewares/auth.js";
+import { requireAi } from "../middlewares/requireAi.js";
 import {
   inviteHourlyLimiter, inviteMinuteLimiter, joinLinkManageLimiter, joinLinkUseLimiter, writeLimiter,
 } from "../middlewares/rateLimits.js";
@@ -43,7 +44,7 @@ router.delete("/:id", writeLimiter, c.deletecollection);
 router.post("/:id/merge", writeLimiter, c.mergeCollection);
 
 router.get("/:id/export-pdf", rateLimit({ windowMs: 60 * 1000, limit: 10 }), c.exportPdf);
-router.post("/:id/test-ai", rateLimit({ windowMs: 60 * 1000, limit: 10 }), c.testAi);
+router.post("/:id/test-ai", requireAi, rateLimit({ windowMs: 60 * 1000, limit: 10 }), c.testAi);
 
 // sends an invitation: 20 a minute and 30 an hour per owner, so invite -> cancel -> invite can't be used to spam
 router.post("/:id/members", inviteMinuteLimiter, inviteHourlyLimiter, c.addMember);

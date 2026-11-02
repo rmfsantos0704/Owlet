@@ -10,7 +10,8 @@ import {
   DECLINE_COOLDOWN_MS, INVITE_TTL_MS, MAX_MEMBERS, MAX_PENDING_PER_USER, MAX_PENDING_PER_collection,
 } from "../services/invitations.js";
 import { atLeast, ensureDefaultcollection, roleIn, type Role } from "../services/access.js";
-import { analyzeText } from "../services/groq.js";
+import { analyzeText } from "../services/ai.js";
+import { AiQuotaExceededError, aiAvailableForUser } from "../services/aiUsage.js";
 import { publicLink } from "./joinLinkController.js";
 import { Activity } from "../models/Activity.js";
 import { recordActivity } from "../services/activityLog.js";
@@ -531,10 +532,25 @@ export async function testAi(req: Request, res: Response) {
   }
 
   try {
-    const ai = await analyzeText(title, text, p.data.aiSettings);
-    res.json({ summary: ai.summary, paraphrase: ai.paraphrase, tags: ai.tags, source });
+    const ai = await analyzeText(String(res.locals.userId), title, text, p.data.aiSettings);
+    res.json({
+      summary: ai.summary,
+      paraphrase: ai.paraphrase,
+      tags: ai.tags,
+      source,
+      aiEnabled: await aiAvailableForUser(String(res.locals.userId)),
+    });
   } catch (err) {
-    console.error("Groq test failed:", err);
+    if (
+      err instanceof AiQuotaExceededError ||
+      !(await aiAvailableForUser(String(res.locals.userId)))
+    ) {
+      return res.status(429).json({
+        error: "Your daily AI allowance is used up. Owlet's non-AI features are still available until tomorrow.",
+        code: "AI_QUOTA_EXCEEDED",
+      });
+    }
+    console.error("AI providers test failed:", err);
     res.status(502).json({
       error: "The AI service failed. If your instructions ask for a different output format, try removing that part.",
     });

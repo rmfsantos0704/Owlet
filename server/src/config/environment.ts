@@ -8,7 +8,27 @@ export function getEnvironmentProblems(isProd: boolean): string[] {
   need("JWT_SECRET");
 
   const aiOn = process.env.AI_ENABLED === "true";
-  if (aiOn) need("GROQ_API_KEY", " (required when AI_ENABLED=true)");
+  if (
+    process.env.AI_USER_DAILY_LIMIT &&
+    (!Number.isInteger(Number(process.env.AI_USER_DAILY_LIMIT)) || Number(process.env.AI_USER_DAILY_LIMIT) < 1)
+  ) {
+    problems.push("AI_USER_DAILY_LIMIT must be a positive whole number");
+  }
+  if (aiOn) {
+    const providerKeys = [
+      "GROQ_API_KEY",
+      "GEMINI_API_KEY",
+      "OPENROUTER_API_KEY",
+    ];
+    if (!providerKeys.some((key) => process.env[key])) {
+      problems.push(`At least one AI provider key is required when AI_ENABLED=true (${providerKeys.join(", ")})`);
+    }
+    if (process.env.GEMINI_API_KEY) need("GEMINI_MODEL", " (required when GEMINI_API_KEY is set)");
+    if (process.env.OPENROUTER_API_KEY) need("OPENROUTER_MODEL", " (required when OPENROUTER_API_KEY is set)");
+    if (process.env.OPENROUTER_MODEL && !process.env.OPENROUTER_MODEL.endsWith(":free")) {
+      problems.push("OPENROUTER_MODEL must use a :free model when AI_ENABLED=true");
+    }
+  }
 
   if (isProd) {
     for (const key of [
