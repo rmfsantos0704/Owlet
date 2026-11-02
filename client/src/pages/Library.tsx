@@ -104,16 +104,6 @@ export default function Library({ all = false }: { all?: boolean }) {
     setParams(next);
   }
 
-  function exportAs(format: "bibtex" | "csv" | "json") {
-    const p = new URLSearchParams({ format });
-    if (wid) p.set("collectionId", wid);
-    if (q.trim()) p.set("q", q.trim());
-    if (tag) p.set("tag", tag);
-    if (readingStatus) p.set("readingStatus", readingStatus);
-    download(`/research/export?${p}`, `owlet-export.${format === "bibtex" ? "bib" : format}`)
-      .catch((e) => setError(e.message));
-  }
-
   async function copyBibliography(selected: ResearchItem[]) {
     const references = selected
       .map((item) => item.citations?.[citationStyle]?.trim())
@@ -283,18 +273,6 @@ export default function Library({ all = false }: { all?: boolean }) {
             <option value="reading">Reading</option>
             <option value="done">Done</option>
           </select>
-          <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-            <FileDown className="ml-2 size-3.5 text-slate-400" />
-            {(["bibtex", "csv", "json"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => exportAs(f)}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-white hover:text-brand hover:shadow-sm"
-              >
-                {f === "bibtex" ? "BibTeX" : f.toUpperCase()}
-              </button>
-            ))}
-          </div>
         </div>
       }
       selectionActions={(selected) => (
