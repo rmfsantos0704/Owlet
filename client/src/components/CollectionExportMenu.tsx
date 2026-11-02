@@ -3,7 +3,7 @@ import { ChevronDown, FileDown } from "lucide-react";
 import { api, download } from "../services/api";
 
 type Mode = "full" | "citations";
-type FileFormat = "markdown" | "csv" | "bibtex" | "ris" | "json";
+type FileFormat = "docx" | "markdown" | "csv" | "bibtex" | "ris" | "json";
 
 type ExportOption =
   | { kind: "pdf"; mode: Mode; title: string; hint: string }
@@ -11,6 +11,7 @@ type ExportOption =
 
 const OPTIONS: ExportOption[] = [
   { kind: "pdf", mode: "full", title: "Full report · PDF", hint: "Highlights, comments, summaries, and citations" },
+  { kind: "file", format: "docx", extension: "docx", title: "Research report · Word", hint: "Editable document with notes, highlights, and citations" },
   { kind: "file", format: "markdown", extension: "md", title: "Research report · Markdown", hint: "Readable text with notes, highlights, and citations" },
   { kind: "pdf", mode: "citations", title: "Citations · PDF", hint: "APA, MLA, and Chicago lists" },
   { kind: "file", format: "csv", extension: "csv", title: "Source data · CSV", hint: "Open in Excel, Google Sheets, or similar" },
