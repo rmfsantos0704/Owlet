@@ -16,16 +16,12 @@ const ROLE_TEXT = {
 
 const daysLeft = (iso: string) => Math.max(1, Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000));
 
-// the server sends `collection`; the type says `Collection`, so accept either
-const invitedTo = (inv: Invitation) =>
-  (inv as any).Collection?.name ?? (inv as any).collection?.name ?? "a Collection";
-
 // Bell for the header: invitations waiting for you, plus what other people did in the collections you belong to.
 // Opening it marks activity read (the rows that were new stay highlighted until you close it).
 // Invitations stay until you accept or decline them, so they keep counting on the badge.
 export default function NotificationsBell() {
   const { user } = useAuth();
-  const { select, invitations, respondToInvitation } = useCollections();
+  const { select, invitations, refreshInvitations, respondToInvitation } = useCollections();
   const navigate = useNavigate();
   const box = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -85,7 +81,7 @@ export default function NotificationsBell() {
     setOpen(next);
     setError("");
     if (!next) return;
-    const r = await load(); // fresh list first, so what's new is highlighted
+    const [r] = await Promise.all([load(), refreshInvitations()]);
     if (r && r.unread > 0) {
       setUnread(0); // the activity count clears now; the rows keep their highlight until the panel closes
       api("/collections/notifications/read", { method: "POST" }).catch(() => {});
@@ -96,8 +92,8 @@ export default function NotificationsBell() {
     setOpen(false);
     if (a.item?.exists) {
       navigate(`/item/${a.item.id}`);
-    } else if (a.Collection) {
-      select(a.Collection.id);
+    } else if (a.collection) {
+      select(a.collection.id);
       navigate("/");
     }
   }
@@ -157,7 +153,7 @@ export default function NotificationsBell() {
                         </div>
                         <div className="min-w-0 text-sm">
                           <p className="font-semibold text-ink">
-                            Join <span className="break-words">“{invitedTo(inv)}”</span>?
+                            Join <span className="break-words">“{inv.collection.name}”</span>?
                           </p>
                           <p className="mt-0.5 text-xs leading-5 text-slate-600">
                             <span className="break-all font-medium">{inv.invitedBy}</span> invited you as{" "}

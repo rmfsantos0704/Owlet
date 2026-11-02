@@ -8,6 +8,7 @@ type Value = {
   current: Collection | null;
   ready: boolean;
   invitations: Invitation[];
+  refreshInvitations: () => Promise<void>;
   select: (id: string) => void;
   reload: () => Promise<Collection[]>;
   create: (name: string) => Promise<void>;
@@ -117,6 +118,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     current,
     ready,
     invitations,
+    refreshInvitations: reloadInvitations,
     pinned: prefs.pinned,
     archived: prefs.archived,
     togglePin: (id) =>

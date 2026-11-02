@@ -44,7 +44,7 @@ export default function InvitationsBanner() {
             </div>
             <div className="min-w-0 text-sm">
 <p className="font-semibold text-ink">
-  Join <span className="break-words">“{inv?.Collection?.name ?? "Collection"}”</span>?
+  Join <span className="break-words">“{inv.collection.name}”</span>?
 </p>
               <p className="mt-0.5 text-slate-600">
                 <span className="break-all font-medium">{inv.invitedBy}</span> invited you as {ROLE_TEXT[inv.role]}.

@@ -92,7 +92,7 @@ export type Invitation = {
   role: "editor" | "viewer";
   invitedBy: string;
   expiresAt: string;
-  Collection: { id: string; name: string; description: string };
+  collection: { id: string; name: string; description: string };
 };
 // an invitation the Collection owner sent that hasn't been answered yet
 export type SentInvitation = { id: string; email: string; role: "editor" | "viewer"; expiresAt: string };
@@ -118,7 +118,7 @@ export type ActivityEntry = {
   actor: ActivityPerson;
   target: ActivityPerson | null;
   item: { id: string; title: string; exists: boolean } | null;
-  Collection?: { id: string; name: string }; // only in notifications
+  collection?: { id: string; name: string }; // only in notifications
   unread?: boolean; // only in notifications
 };
 

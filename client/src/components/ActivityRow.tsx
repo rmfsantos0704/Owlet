@@ -52,7 +52,7 @@ export default function ActivityRow({ a, showCollection = false }: { a: Activity
         <span className="break-all font-medium text-ink">{name(a.actor)}</span> {s.text}
         {s.withTitle && a.item && <span className="break-words font-medium text-ink"> “{a.item.title}”</span>}
 <div className="mt-0.5 text-xs text-slate-400">
-  {showCollection && a?.Collection?.name ? `${a.Collection.name} · ` : ""}
+  {showCollection && a.collection?.name ? `${a.collection.name} · ` : ""}
   {timeAgo(a.createdAt)}
 </div>
       </div>
