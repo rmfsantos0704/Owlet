@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, ApiError } from "../services/api";
+import { api, ApiError, AI_QUOTA_EXHAUSTED_EVENT } from "../services/api";
 
 type User = { id?: string; email: string };
 type Session = { user: User; features?: { ai?: boolean } };
@@ -15,7 +15,7 @@ export type RegisterInput = {
 type AuthValue = {
   user: User | null;
   loading: boolean;
-  aiEnabled: boolean; // decided by the server (AI_ENABLED)
+  aiEnabled: boolean; // server feature flag and this account's daily allowance
   login: (email: string, password: string) => Promise<void>;
   // creating an account does NOT log you in: the user must confirm their email first
   register: (input: RegisterInput) => Promise<void>;
@@ -31,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    let quotaResetTimer: number;
 
     const load = () => {
       api<Session>("/auth/me")
@@ -50,20 +51,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
     };
 
+    const refreshAiAvailability = () => {
+      api<Session>("/auth/me")
+        .then((r) => {
+          if (!cancelled) setAiEnabled(!!r.features?.ai);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+            localStorage.removeItem("token");
+            setUser(null);
+            setAiEnabled(false);
+          } else {
+            console.warn("Could not refresh AI availability.", e);
+          }
+        });
+    };
+
     if (localStorage.getItem("token")) load();
+
+    const scheduleQuotaReset = () => {
+      const now = new Date();
+      const nextUtcDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 1);
+      quotaResetTimer = window.setTimeout(() => {
+        if (localStorage.getItem("token")) refreshAiAvailability();
+        scheduleQuotaReset();
+      }, nextUtcDay - now.getTime());
+    };
+    scheduleQuotaReset();
 
     // another tab (or the extension) logged in or out: follow it
     const onStorage = (e: StorageEvent) => {
       if (e.storageArea !== localStorage || (e.key !== "token" && e.key !== null)) return;
       if (localStorage.getItem("token")) load();
-      else setUser(null);
+      else {
+        setUser(null);
+        setAiEnabled(false);
+      }
     };
     window.addEventListener("storage", onStorage);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(quotaResetTimer);
       window.removeEventListener("storage", onStorage);
     };
+  }, []);
+
+  useEffect(() => {
+    const onAiQuotaExhausted = () => setAiEnabled(false);
+    window.addEventListener(AI_QUOTA_EXHAUSTED_EVENT, onAiQuotaExhausted);
+    return () => window.removeEventListener(AI_QUOTA_EXHAUSTED_EVENT, onAiQuotaExhausted);
   }, []);
 
   const value: AuthValue = {
@@ -85,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout: () => {
       localStorage.removeItem("token");
       setUser(null);
+      setAiEnabled(false);
     },
   };
 

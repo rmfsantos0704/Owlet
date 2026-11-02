@@ -3,6 +3,11 @@ const API_URL = ((import.meta.env.VITE_API_URL as string | undefined) ?? "").rep
 const TIMEOUT_MS = 120_000; // some requests wait for the AI, and a sleeping free server takes about a minute to wake
 const FILE_TIMEOUT_MS = 120_000;
 const TOO_MANY = "Too many attempts. Please wait a few minutes and try again.";
+export const AI_QUOTA_EXHAUSTED_EVENT = "owlet:ai-quota-exhausted";
+
+function notifyAiQuotaExhausted() {
+  window.dispatchEvent(new Event(AI_QUOTA_EXHAUSTED_EVENT));
+}
 
 // Errors from the server, carrying the HTTP status and (for a few cases) a machine-readable code.
 export class ApiError extends Error {
@@ -55,6 +60,7 @@ async function send(path: string, init: RequestInit, timeoutMs: number) {
 async function fail(res: Response, token: string | null, fallback: string): Promise<never> {
   const data = await res.json().catch(() => ({}));
   handleUnauthorized(res.status, token);
+  if (data?.code === "AI_QUOTA_EXCEEDED") notifyAiQuotaExhausted();
   throw new ApiError(typeof data?.error === "string" ? data.error : fallback, res.status, data?.code);
 }
 
@@ -83,7 +89,11 @@ export async function api<T>(
     TIMEOUT_MS
   );
   if (!res.ok) return fail(res, token, res.status === 429 ? TOO_MANY : "Request failed");
-  return (await res.json().catch(() => ({}))) as T;
+  const data = (await res.json().catch(() => ({}))) as T;
+  if (typeof data === "object" && data !== null && "aiEnabled" in data && data.aiEnabled === false) {
+    notifyAiQuotaExhausted();
+  }
+  return data;
 }
 
 // multipart upload: the browser sets the Content-Type (with boundary) itself
