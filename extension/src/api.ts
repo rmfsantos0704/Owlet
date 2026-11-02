@@ -1,5 +1,5 @@
-export const API_URL = "http://localhost:4000/api";
-export const DASHBOARD_URL = "http://localhost:5173";
+export const API_URL = "https://owlet-yqfj.vercel.app/api";
+export const DASHBOARD_URL = "https://owlet-nine.vercel.app";
 
 // the login token must only ever travel over https (or to your own machine while developing)
 const SAFE_API = /^https:\/\//i.test(API_URL) || /^http:\/\/localhost(:\d+)?\//i.test(API_URL);

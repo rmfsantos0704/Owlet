@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Owlet",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minimum_chrome_version": "111",
   "description": "Clip web pages into your Owlet research library, then highlight, cite, and share your research.",
   "icons": {
@@ -19,7 +19,10 @@
     }
   },
   "permissions": ["activeTab", "contextMenus", "scripting", "storage"],
-  "host_permissions": ["http://localhost:4000/*"],
+  "host_permissions": [
+    "https://owlet-yqfj.vercel.app/*",
+    "http://localhost:4000/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -33,13 +36,19 @@
   },
   "content_scripts": [
     {
-      "matches": ["http://localhost:5173/*"],
+      "matches": [
+        "https://owlet-nine.vercel.app/*",
+        "http://localhost:5173/*"
+      ],
       "js": ["pageHook.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["http://localhost:5173/*"],
+      "matches": [
+        "https://owlet-nine.vercel.app/*",
+        "http://localhost:5173/*"
+      ],
       "js": ["bridge.js"],
       "run_at": "document_start"
     }
