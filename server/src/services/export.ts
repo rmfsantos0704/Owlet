@@ -1,3 +1,4 @@
+import { deflateRawSync } from "node:zlib";
 import { splitName } from "./citations.js";
 
 const day = (d?: Date | string) => {
@@ -173,6 +174,180 @@ export function toCollectionMarkdown(
   }
 
   return lines.join("\n").trimEnd() + "\n";
+}
+
+function xmlText(value: unknown) {
+  return Array.from(String(value ?? ""))
+    .filter((char) => {
+      const code = char.codePointAt(0)!;
+      return code === 0x09 || code === 0x0a || code === 0x0d ||
+        (code >= 0x20 && code <= 0xd7ff) || (code >= 0xe000 && code <= 0xfffd) ||
+        (code >= 0x10000 && code <= 0x10ffff);
+    })
+    .join("")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function docxParagraph(value: unknown, style?: "Title" | "Heading1" | "Heading2") {
+  const properties = style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : "";
+  const runs = String(value ?? "").split(/\r\n?|\n/).map((line, index) =>
+    `${index ? "<w:r><w:br/></w:r>" : ""}<w:r><w:t xml:space="preserve">${xmlText(line)}</w:t></w:r>`
+  ).join("");
+  return `<w:p>${properties}${runs}</w:p>`;
+}
+
+const crcTable = Uint32Array.from({ length: 256 }, (_, value) => {
+  let crc = value;
+  for (let bit = 0; bit < 8; bit++) crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+  return crc >>> 0;
+});
+
+function crc32(data: Buffer) {
+  let crc = 0xffffffff;
+  for (const byte of data) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function zipFiles(files: { name: string; content: string }[]) {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const name = Buffer.from(file.name, "utf8");
+    const source = Buffer.from(file.content, "utf8");
+    const compressed = deflateRawSync(source);
+    const checksum = crc32(source);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0x0800, 6);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(checksum, 14);
+    local.writeUInt32LE(compressed.length, 18);
+    local.writeUInt32LE(source.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    localParts.push(local, name, compressed);
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0x0800, 8);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(checksum, 16);
+    central.writeUInt32LE(compressed.length, 20);
+    central.writeUInt32LE(source.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(offset, 42);
+    centralParts.push(central, name);
+    offset += local.length + name.length + compressed.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(centralDirectory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...localParts, centralDirectory, end]);
+}
+
+export function toCollectionDocx(
+  collection: { name: string; description?: string },
+  items: any[],
+  total: number
+) {
+  const paragraphs = [
+    docxParagraph(collection.name || "Collection", "Title"),
+    ...(collection.description ? [docxParagraph(collection.description)] : []),
+    docxParagraph(`Exported ${items.length} of ${total} sources.`),
+  ];
+
+  for (const item of items) {
+    const source = item.source ?? {};
+    paragraphs.push(docxParagraph(source.title || source.fileName || source.url || "Untitled", "Heading1"));
+    for (const [label, value] of [
+      ["Author", source.author],
+      ["Published", source.publishedDate],
+      ["URL", source.url],
+      ["Tags", item.tags?.join(", ")],
+    ]) {
+      if (value) paragraphs.push(docxParagraph(`${label}: ${value}`));
+    }
+
+    for (const [heading, value] of [
+      ["My note", item.personalNote],
+      ["My summary", item.userSummary],
+      ["Summary", item.aiOutput?.summary],
+      ["Key arguments", item.aiOutput?.paraphrase],
+    ]) {
+      if (value) paragraphs.push(docxParagraph(heading, "Heading2"), docxParagraph(value));
+    }
+
+    if (item.highlights?.length) {
+      paragraphs.push(docxParagraph("Highlights", "Heading2"));
+      for (const highlight of item.highlights) {
+        paragraphs.push(docxParagraph(`• “${highlight.text}”${highlight.note ? ` — ${highlight.note}` : ""}`));
+      }
+    }
+
+    if (item.comments?.length) {
+      paragraphs.push(docxParagraph("Comments", "Heading2"));
+      for (const comment of item.comments) {
+        paragraphs.push(docxParagraph(`${comment.text}${comment.authorEmail ? ` — ${comment.authorEmail}` : ""}`));
+      }
+    }
+
+    const citations = [
+      ["APA", item.citations?.apa],
+      ["MLA", item.citations?.mla],
+      ["Chicago", item.citations?.chicago],
+    ].filter((entry): entry is [string, string] => typeof entry[1] === "string" && !!entry[1].trim());
+    if (citations.length) {
+      paragraphs.push(docxParagraph("Citations", "Heading2"));
+      for (const [style, citation] of citations) paragraphs.push(docxParagraph(`${style}: ${citation}`));
+    }
+  }
+
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs.join("")}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:sz w:val="22"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:qFormat/><w:rPr><w:b/><w:sz w:val="36"/><w:color w:val="102B5C"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="102B5C"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style>
+</w:styles>`;
+
+  return zipFiles([
+    {
+      name: "[Content_Types].xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`,
+    },
+    {
+      name: "_rels/.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
+    },
+    {
+      name: "word/document.xml",
+      content: documentXml,
+    },
+    {
+      name: "word/_rels/document.xml.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+    },
+    {
+      name: "word/styles.xml",
+      content: stylesXml,
+    },
+  ]);
 }
 
 export function toLiteratureMatrixCsv(

@@ -17,7 +17,7 @@ import { recordActivity } from "../services/activityLog.js";
 import { streamcollectionPdf } from "../services/collectionPdf.js";
 import { Writable } from "node:stream";
 import { requireAi } from "../middlewares/requireAi.js";
-import { toBibtex, toCollectionMarkdown, toCsv, toLiteratureMatrixCsv, toRis } from "../services/export.js";
+import { toBibtex, toCollectionDocx, toCollectionMarkdown, toCsv, toLiteratureMatrixCsv, toRis } from "../services/export.js";
 
 const matrixColumnsSchema = z.array(z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
@@ -557,7 +557,7 @@ async function getCollectionExportItems(collectionId: mongoose.Types.ObjectId) {
 export async function exportCollectionFile(req: Request, res: Response) {
   const found = await load(req, res);
   if (!found) return;
-  const formatResult = z.enum(["markdown", "csv", "bibtex", "ris", "json"]).safeParse(req.query.format);
+  const formatResult = z.enum(["docx", "markdown", "csv", "bibtex", "ris", "json"]).safeParse(req.query.format);
   if (!formatResult.success) return res.status(400).json({ error: "Unsupported export format" });
 
   const { items, total } = await getCollectionExportItems(found.ws._id);
@@ -567,9 +567,13 @@ export async function exportCollectionFile(req: Request, res: Response) {
   const format = formatResult.data;
   let contentType: string;
   let extension: string;
-  let body: string;
+  let body: string | Buffer;
 
-  if (format === "markdown") {
+  if (format === "docx") {
+    contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    extension = "docx";
+    body = toCollectionDocx({ name: found.ws.name, description: found.ws.description ?? "" }, items, total);
+  } else if (format === "markdown") {
     contentType = "text/markdown";
     extension = "md";
     body = toCollectionMarkdown({ name: found.ws.name, description: found.ws.description ?? "" }, items, total);
