@@ -4,7 +4,7 @@
 
 1. Import this repository as a separate Vercel project for the API.
 2. Set **Root Directory** to `server`.
-3. Use the detected Express framework and Node.js settings. Vercel detects the default Express export in `src/app.ts`; `vercel.json` installs development dependencies for the TypeScript build.
+3. Use the detected Express framework and Node.js settings. Vercel detects the default Express export in `src/app.ts`; `vercel.json` installs development dependencies for the TypeScript build and includes PDFKit's dynamically loaded standard fonts.
 4. Add the environment variables below in **Project Settings > Environment Variables**. Add them to Production (and Preview if needed), then redeploy after changing them.
 
 ## Required environment variables
