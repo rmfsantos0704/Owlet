@@ -22,7 +22,19 @@
 | `MAIL_FROM` | Verified sender address/name for the SMTP provider. |
 | `SUPPORT_EMAIL` | Address that receives support requests. |
 
-`AI_ENABLED` defaults to off. To enable AI, set it to `true` and provide `GROQ_API_KEY`; `GROQ_MODEL` is optional. `EXTRA_ORIGINS` is an optional comma-separated list of additional exact HTTPS origins.
+`AI_ENABLED` defaults to off. To enable the managed provider pool, set it to `true` and configure one or more providers. Requests try providers in this order:
+
+| Variable | Value |
+| --- | --- |
+| `GROQ_API_KEY` | Groq API key. `GROQ_MODEL` is optional; defaults to `openai/gpt-oss-20b`. |
+| `GEMINI_API_KEY` | Optional Google AI Studio API key. |
+| `GEMINI_MODEL` | Gemini model ID; required when `GEMINI_API_KEY` is set. Use a model available on your account's free tier. |
+| `OPENROUTER_API_KEY` | Optional OpenRouter API key. |
+| `OPENROUTER_MODEL` | OpenRouter model ID ending in `:free`; required when `OPENROUTER_API_KEY` is set. |
+
+`AI_USER_DAILY_LIMIT` optionally sets the maximum AI generations per account per UTC day; it defaults to `2`. Each summary, regeneration, test, or AI workspace request counts as one generation, regardless of provider token usage. When an account reaches its limit, its AI-only interface switches off until the next UTC day; clips and non-AI research features remain available. This per-account allowance is stored in MongoDB and is independent between users.
+
+Keep provider keys in the API server's environment settings, never in the dashboard or extension. If a configured provider returns an error, times out, or returns an unusable response, Owlet tries the next configured provider, up to 45 seconds total. Provider quotas are still shared by all Owlet users; the per-account allowance prevents one account from using more than its limit but cannot guarantee the providers' overall free quotas will last. No provider guarantees unlimited free usage, and free-tier terms, rate limits, models, and availability can change. A free-tier pool can avoid AI API charges only while using models and accounts actually covered by those providers' free tiers; check each provider's current terms and billing settings. Research text is sent to whichever provider handles a request, so review their data-use terms before enabling them for users. `EXTRA_ORIGINS` is an optional comma-separated list of additional exact HTTPS origins.
 
 In MongoDB Atlas, configure a database user with only the permissions the app needs. Atlas must allow connections from Vercel; Vercel's serverless functions do not have a fixed outbound IP on every plan, so review Atlas's IP access list options for your plan before deployment.
 
