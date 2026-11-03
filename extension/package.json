@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "node build.mjs",
+    "build:prod": "node build.mjs --production",
     "check": "tsc"
   },
   "keywords": [],
