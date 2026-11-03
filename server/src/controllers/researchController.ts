@@ -59,6 +59,10 @@ const aiSettingsSchema = z.object({
   instructions: z.string().trim().max(500).default(""),
 });
 const setAiSettingsSchema = z.object({ aiSettings: aiSettingsSchema });
+const aiOutputSchema = z.object({
+  summary: z.string().max(20000),
+  paraphrase: z.string().max(20000),
+});
 const regenerateSchema = z.object({ aiSettings: aiSettingsSchema.optional() });
 const testAiSchema = z.object({ aiSettings: aiSettingsSchema, sample: z.boolean().optional() });
 
@@ -147,8 +151,13 @@ const askSchema = z.object({
   sessionId: z.string().optional(),
 });
 const renameSchema = z.object({
-  title: z.string().trim().max(MAX_TITLE),
-});
+  title: z.string().trim().max(MAX_TITLE).optional(),
+  summary: z.string().max(20000).optional(),
+  findings: z.array(z.object({
+    title: z.string().max(500),
+    text: z.string().max(20000),
+  })).max(8).optional(),
+}).refine((value) => value.title !== undefined || value.summary !== undefined || value.findings !== undefined);
 
 const SAMPLE_ARTICLE = {
   title: "Sample article: Sleep and memory",
@@ -896,6 +905,22 @@ export async function setAiSettings(req: Request, res: Response) {
   res.json({ aiSettings: item.aiSettings });
 }
 
+// PATCH /research/:id/ai-output: lets editors correct a saved summary without using AI quota.
+export async function setAiOutput(req: Request, res: Response) {
+  const p = aiOutputSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: "Summary and key arguments must be at most 20,000 characters" });
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await collectionIds(res.locals.userId, "editor");
+  const item = await ResearchItem.findOneAndUpdate(
+    { _id: id, collectionId: { $in: ids } },
+    { $set: { aiOutput: p.data } },
+    { returnDocument: "after" }
+  ).select("aiOutput");
+  if (!item) return res.status(404).json({ error: "Not found" });
+  res.json({ aiOutput: item.aiOutput });
+}
+
 // POST /research/:id/test-ai: tries settings on the clip or a built-in sample. Saves nothing.
 export async function testAi(req: Request, res: Response) {
   const p = testAiSchema.safeParse(req.body);
@@ -1153,18 +1178,26 @@ export async function listSessions(req: Request, res: Response) {
   res.json({ sessions: sessions.map(sessionView) });
 }
 
-// Renames one of the person's own sessions. An empty title clears the name (the UI falls back to the prompt).
+// Updates the title and/or a person's own saved answer without using AI quota.
 export async function renameSession(req: Request, res: Response) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
   const p = renameSchema.safeParse(req.body);
-  if (!p.success) return res.status(400).json({ error: `Title must be at most ${MAX_TITLE} characters` });
-  const session = await AiSession.findOneAndUpdate(
-    { _id: id, userId: res.locals.userId },
-    { $set: { title: p.data.title } },
-    { returnDocument: "after" }
-  );
+  if (!p.success) return res.status(400).json({ error: "Invalid session changes" });
+  const session = await AiSession.findOne({ _id: id, userId: res.locals.userId });
   if (!session) return res.status(404).json({ error: "Not found" });
+  if (p.data.findings && p.data.findings.length !== session.findings.length) {
+    return res.status(400).json({ error: "The saved findings have changed. Reload the session and try again." });
+  }
+  if (p.data.title !== undefined) session.title = p.data.title;
+  if (p.data.summary !== undefined) session.summary = p.data.summary;
+  if (p.data.findings) {
+    p.data.findings.forEach((finding, index) => {
+      session.findings[index].title = finding.title;
+      session.findings[index].text = finding.text;
+    });
+  }
+  await session.save();
   res.json({ session: sessionView(session) });
 }
 

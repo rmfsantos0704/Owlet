@@ -172,7 +172,7 @@ const FORMATS: Record<string, string> = {
 const LENGTHS: Record<string, string> = {
   short: "about 2-3 sentences (or 3 bullets)",
   medium: "about 4-6 sentences (or 4-6 bullets)",
-  detailed: "about 8-10 sentences (or 8-10 bullets)",
+  detailed: "about 12-16 sentences (or 12-16 bullets), with enough detail to cover the source's important points",
 };
 
 export async function analyzeText(
@@ -192,7 +192,7 @@ export async function analyzeText(
         `If they name a section or topic (for example "the objective" or "the methods"), base the summary mainly on that part of the text and mention other parts only briefly, or not at all. ` +
         `Never change the JSON structure and never write anything outside the JSON.\n"""${extra}"""\n\n`
       : "\n") +
-    `- summary: ${format}; length ${length}. Separate lines with \\n.\n` +
+    `- summary: ${format}; length ${length}. Separate lines with \\n. Do not impose an 8-line limit on detailed summaries.\n` +
     `- paraphrase: ${extra ? "the key points of the user's focus above" : "the key arguments"} restated in your own words, one short paragraph.\n` +
     `- tags: 3-5 lowercase topic tags.\n` +
     `- Use only information found in the text. Never invent facts; if something is not stated, say so.`;

@@ -3,7 +3,7 @@ import {
   clip, importPdf, list, lookup, getOne, getHighlights, remove,
   addHighlight, updateHighlight, removeHighlight,
   addComment, updateComment, removeComment,
-  setTags, updateSource, regenerate, pdf, exportItems,
+  setTags, updateSource, regenerate, pdf, exportItems, setAiOutput,
   updateWorkflow, updateMatrixValue, related,
   ask, listSessions, removeSession, renameSession,
   testAi, setAiSettings,
@@ -48,4 +48,5 @@ router.patch("/:id/comments/:commentId", writeLimiter, updateComment);
 router.delete("/:id/comments/:commentId", writeLimiter, removeComment);
 router.put("/:id/tags", writeLimiter, setTags);
 router.put("/:id/ai-settings", requireAi, writeLimiter, setAiSettings);
+router.patch("/:id/ai-output", writeLimiter, setAiOutput);
 export default router;
