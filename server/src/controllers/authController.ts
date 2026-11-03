@@ -7,7 +7,7 @@ import { User } from "../models/User.js";
 import { sendMail } from "../services/mailer.js";
 import * as tpl from "../services/emailTemplates.js";
 import { aiEnabled } from "../config/features.js";
-import { aiAvailableForUser } from "../services/aiUsage.js";
+import { aiDailyUsageForUser } from "../services/aiUsage.js";
 
 export const TERMS_VERSION = "2026-10-21"; // bump together with LEGAL.termsVersion on the client
 const VERIFY_TTL_MS = 24 * 60 * 60 * 1000;
@@ -197,16 +197,18 @@ export async function login(req: Request, res: Response) {
   if (user.emailVerified === false) {
     return res.status(403).json({ error: "Please verify your email before logging in.", code: "EMAIL_NOT_VERIFIED" });
   }
+  const aiUsage = await aiDailyUsageForUser(user.id);
   res.json({
     token: signToken(user.id),
     user: { id: user.id, email: user.email },
-    features: { ai: aiEnabled() && (await aiAvailableForUser(user.id)) },
+    features: { ai: aiEnabled() && aiUsage.remaining > 0, aiUsage },
   });
 }
 
 export async function me(_req: Request, res: Response) {
   const user = await User.findById(res.locals.userId).select("email age  emailVerified createdAt");
   if (!user) return res.status(404).json({ error: "User not found" });
+  const aiUsage = await aiDailyUsageForUser(user.id);
   res.json({
     user: {
       id: user.id,
@@ -215,6 +217,6 @@ export async function me(_req: Request, res: Response) {
       emailVerified: user.emailVerified !== false,
       createdAt: user.createdAt,
     },
-    features: { ai: aiEnabled() && (await aiAvailableForUser(user.id)) },
+    features: { ai: aiEnabled() && aiUsage.remaining > 0, aiUsage },
   });
 }

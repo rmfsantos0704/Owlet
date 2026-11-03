@@ -72,7 +72,7 @@ export async function accept(req: Request, res: Response) {
       $expr: { $lt: [{ $size: "$members" }, MAX_MEMBERS] },
     },
     { $push: { members: { userId: uid, role: inv.role } } },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!added) {

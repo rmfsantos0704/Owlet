@@ -246,7 +246,7 @@ export async function updatecollection(req: Request, res: Response) {
   if (p.data.description !== undefined) $set.description = p.data.description;
   for (const [k, v] of Object.entries(p.data.aiSettings ?? {})) $set[`aiSettings.${k}`] = v;
 
-  const ws = await collection.findByIdAndUpdate(found.ws._id, { $set }, { new: true, runValidators: true });
+  const ws = await collection.findByIdAndUpdate(found.ws._id, { $set }, { returnDocument: "after", runValidators: true });
   if (!ws) return res.status(404).json({ error: "Not found" });
   res.json({ collection: summary(ws, "owner") });
 }

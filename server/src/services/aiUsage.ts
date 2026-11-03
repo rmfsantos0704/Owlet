@@ -11,6 +11,12 @@ function currentUtcDay() {
   return new Date().toISOString().slice(0, 10);
 }
 
+export type AiDailyUsage = {
+  used: number;
+  limit: number;
+  remaining: number;
+};
+
 export class AiQuotaExceededError extends Error {
   constructor() {
     super("Daily AI allowance reached.");
@@ -23,14 +29,21 @@ function isDuplicateKeyError(error: unknown): boolean {
 }
 
 export async function aiAvailableForUser(userId: string): Promise<boolean> {
+  const usage = await aiDailyUsageForUser(userId);
+  return usage.remaining > 0;
+}
+
+export async function aiDailyUsageForUser(userId: string): Promise<AiDailyUsage> {
   const usage = await AiUsage.findOne({ userId, day: currentUtcDay() }).select("generations").lean();
-  return (usage?.generations ?? 0) < aiDailyUserLimit();
+  const limit = aiDailyUserLimit();
+  const used = usage?.generations ?? 0;
+  return { used, limit, remaining: Math.max(0, limit - used) };
 }
 
 export async function reserveAiGeneration(userId: string): Promise<void> {
   const day = currentUtcDay();
   const query = { userId, day, generations: { $lt: aiDailyUserLimit() } };
-  const updated = await AiUsage.findOneAndUpdate(query, { $inc: { generations: 1 } }, { new: true });
+  const updated = await AiUsage.findOneAndUpdate(query, { $inc: { generations: 1 } }, { returnDocument: "after" });
   if (updated) return;
 
   try {
@@ -43,7 +56,7 @@ export async function reserveAiGeneration(userId: string): Promise<void> {
   const retried = await AiUsage.findOneAndUpdate(
     query,
     { $inc: { generations: 1 } },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!retried) throw new AiQuotaExceededError();
 }

@@ -133,7 +133,7 @@ export async function confirmJoin(req: Request, res: Response) {
       ],
     },
     { $push: { members: { userId: uid, role: ws.joinLink!.role } }, $inc: { "joinLink.uses": 1 } },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   if (!added) {

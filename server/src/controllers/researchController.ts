@@ -492,7 +492,7 @@ async function mutate(req: Request, res: Response, update: UpdateQuery<any>, sta
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
   const ids = await collectionIds(res.locals.userId, "editor");
-  const item = await ResearchItem.findOneAndUpdate({ _id: id, collectionId: { $in: ids } }, update, { new: true });
+  const item = await ResearchItem.findOneAndUpdate({ _id: id, collectionId: { $in: ids } }, update, { returnDocument: "after" });
   if (!item) return res.status(404).json({ error: "Not found" });
   res.status(status).json({ highlights: item.highlights, comments: item.comments, tags: item.tags });
 }
@@ -576,7 +576,7 @@ export async function updateHighlight(req: Request, res: Response) {
   const item = await ResearchItem.findOneAndUpdate(
     { _id: id, collectionId: { $in: ids }, "highlights._id": hid },
     { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!item) return res.status(404).json({ error: "Highlight not found" });
   res.json({ highlights: item.highlights });
@@ -641,7 +641,7 @@ export async function updateComment(req: Request, res: Response) {
       comments: { $elemMatch: { _id: cid, userId: res.locals.userId } },
     },
     { $set: { "comments.$.text": p.data.text, "comments.$.updatedAt": new Date() } },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!item) return res.status(404).json({ error: "Comment not found, or it isn't yours" });
   res.json({ highlights: item.highlights, comments: item.comments, tags: item.tags });
@@ -685,7 +685,7 @@ export async function updateWorkflow(req: Request, res: Response) {
   const item = await ResearchItem.findOneAndUpdate(
     { _id: id, collectionId: { $in: ids } },
     { $set },
-    { new: true }
+    { returnDocument: "after" }
   ).select("readingStatus userSummary");
   if (!item) return res.status(404).json({ error: "Not found" });
   res.json({ readingStatus: item.readingStatus, userSummary: item.userSummary });
@@ -707,7 +707,7 @@ export async function updateMatrixValue(req: Request, res: Response) {
   const item = await ResearchItem.findOneAndUpdate(
     { _id: id, collectionId: clip.collectionId },
     { $set: { [`matrixValues.${parsed.data.columnId}`]: parsed.data.value } },
-    { new: true }
+    { returnDocument: "after" }
   ).select("matrixValues");
   if (!item) return res.status(404).json({ error: "Not found" });
   res.json({ matrixValues: item.matrixValues instanceof Map ? Object.fromEntries(item.matrixValues) : item.matrixValues });
@@ -826,7 +826,7 @@ export async function updateSource(req: Request, res: Response) {
         }),
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!item) return res.status(404).json({ error: "Not found" });
   res.json({ source: item.source, citations: item.citations });
@@ -889,7 +889,7 @@ export async function setAiSettings(req: Request, res: Response) {
   const item = await ResearchItem.findOneAndUpdate(
     { _id: id, collectionId: { $in: ids } },
     { $set: { aiSettings: p.data.aiSettings } },
-    { new: true }
+    { returnDocument: "after" }
   ).select("aiSettings");
   if (!item) return res.status(404).json({ error: "Not found" });
   // the client merges this response into its item state
@@ -1123,7 +1123,7 @@ async function saveSession(input: SaveSessionInput) {
       const updated = await AiSession.findOneAndUpdate(
         { _id: sessionId, userId, collectionId },
         { $set: { title, mode, prompt, sources, summary: out.summary, findings: out.findings } },
-        { new: true }
+        { returnDocument: "after" }
       );
       if (updated) return sessionView(updated);
       // the session was deleted in the meantime: save this run as a new one instead
@@ -1162,7 +1162,7 @@ export async function renameSession(req: Request, res: Response) {
   const session = await AiSession.findOneAndUpdate(
     { _id: id, userId: res.locals.userId },
     { $set: { title: p.data.title } },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!session) return res.status(404).json({ error: "Not found" });
   res.json({ session: sessionView(session) });
