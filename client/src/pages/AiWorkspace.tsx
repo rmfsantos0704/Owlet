@@ -26,7 +26,7 @@ type Result = {
 };
 
 export default function AiWorkspace() {
-  const { current, ready } = useCollections();
+  const { collections, current, ready, select } = useCollections();
   const { aiEnabled } = useAuth();
   const dialog = useDialog();
   const [items, setItems] = useState<ResearchItem[]>([]);
@@ -275,14 +275,36 @@ export default function AiWorkspace() {
             Ask questions across your saved sources and turn evidence into citation-ready briefs.
           </p>
         </div>
-        <button
-          onClick={newSession}
-          disabled={!aiEnabled}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="size-4" />
-          New session
-        </button>
+        <div className="flex flex-col gap-3 sm:items-end">
+          <label className="block min-w-56 space-y-1.5">
+            <span className="eyebrow block">Workspace collection</span>
+            <select
+              value={current?.id ?? ""}
+              onChange={(event) => select(event.target.value)}
+              disabled={!ready || collections.length === 0}
+              aria-label="AI workspace collection"
+              className="field py-2 text-sm font-medium"
+            >
+              {collections.length === 0 ? (
+                <option value="">No collections available</option>
+              ) : (
+                collections.map((collection) => (
+                  <option key={collection.id} value={collection.id}>
+                    {collection.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+          <button
+            onClick={newSession}
+            disabled={!aiEnabled}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="size-4" />
+            New session
+          </button>
+        </div>
       </section>
 
       {!aiEnabled && (
