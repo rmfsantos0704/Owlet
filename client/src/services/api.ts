@@ -4,6 +4,7 @@ const TIMEOUT_MS = 120_000; // some requests wait for the AI, and a sleeping fre
 const FILE_TIMEOUT_MS = 120_000;
 const TOO_MANY = "Too many attempts. Please wait a few minutes and try again.";
 export const AI_QUOTA_EXHAUSTED_EVENT = "owlet:ai-quota-exhausted";
+export const AI_USAGE_UPDATED_EVENT = "owlet:ai-usage-updated";
 
 function notifyAiQuotaExhausted() {
   window.dispatchEvent(new Event(AI_QUOTA_EXHAUSTED_EVENT));
@@ -90,8 +91,9 @@ export async function api<T>(
   );
   if (!res.ok) return fail(res, token, res.status === 429 ? TOO_MANY : "Request failed");
   const data = (await res.json().catch(() => ({}))) as T;
-  if (typeof data === "object" && data !== null && "aiEnabled" in data && data.aiEnabled === false) {
-    notifyAiQuotaExhausted();
+  if (typeof data === "object" && data !== null && "aiEnabled" in data && typeof data.aiEnabled === "boolean") {
+    if (data.aiEnabled) window.dispatchEvent(new Event(AI_USAGE_UPDATED_EVENT));
+    else notifyAiQuotaExhausted();
   }
   return data;
 }

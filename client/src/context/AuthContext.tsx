@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, ApiError, AI_QUOTA_EXHAUSTED_EVENT } from "../services/api";
+import { api, ApiError, AI_QUOTA_EXHAUSTED_EVENT, AI_USAGE_UPDATED_EVENT } from "../services/api";
 
 type User = { id?: string; email: string };
-type Session = { user: User; features?: { ai?: boolean } };
+type AiDailyUsage = { used: number; limit: number; remaining: number };
+type Session = { user: User; features?: { ai?: boolean; aiUsage?: AiDailyUsage } };
 
 export type RegisterInput = {
   email: string;
@@ -16,6 +17,7 @@ type AuthValue = {
   user: User | null;
   loading: boolean;
   aiEnabled: boolean; // server feature flag and this account's daily allowance
+  aiUsage: AiDailyUsage | null;
   login: (email: string, password: string) => Promise<void>;
   // creating an account does NOT log you in: the user must confirm their email first
   register: (input: RegisterInput) => Promise<void>;
@@ -27,6 +29,7 @@ const AuthContext = createContext<AuthValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiUsage, setAiUsage] = useState<AiDailyUsage | null>(null);
   const [loading, setLoading] = useState(!!localStorage.getItem("token"));
 
   useEffect(() => {
@@ -39,12 +42,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (cancelled) return;
           setUser(r.user);
           setAiEnabled(!!r.features?.ai);
+          setAiUsage(r.features?.aiUsage ?? null);
         })
         .catch((e) => {
           if (cancelled) return;
           // only a rejected login ends the session; a network hiccup or server error must not log anyone out
           if (e instanceof ApiError && (e.status === 401 || e.status === 403)) localStorage.removeItem("token");
           setUser(null);
+          setAiEnabled(false);
+          setAiUsage(null);
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -54,7 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshAiAvailability = () => {
       api<Session>("/auth/me")
         .then((r) => {
-          if (!cancelled) setAiEnabled(!!r.features?.ai);
+          if (!cancelled) {
+            setAiEnabled(!!r.features?.ai);
+            setAiUsage(r.features?.aiUsage ?? null);
+          }
         })
         .catch((e) => {
           if (cancelled) return;
@@ -62,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.removeItem("token");
             setUser(null);
             setAiEnabled(false);
+            setAiUsage(null);
           } else {
             console.warn("Could not refresh AI availability.", e);
           }
@@ -87,27 +97,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       else {
         setUser(null);
         setAiEnabled(false);
+        setAiUsage(null);
       }
     };
+    const onAiQuotaExhausted = () => {
+      setAiEnabled(false);
+      refreshAiAvailability();
+    };
+    const onAiUsageUpdated = () => refreshAiAvailability();
     window.addEventListener("storage", onStorage);
+    window.addEventListener(AI_QUOTA_EXHAUSTED_EVENT, onAiQuotaExhausted);
+    window.addEventListener(AI_USAGE_UPDATED_EVENT, onAiUsageUpdated);
 
     return () => {
       cancelled = true;
       window.clearTimeout(quotaResetTimer);
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener(AI_QUOTA_EXHAUSTED_EVENT, onAiQuotaExhausted);
+      window.removeEventListener(AI_USAGE_UPDATED_EVENT, onAiUsageUpdated);
     };
-  }, []);
-
-  useEffect(() => {
-    const onAiQuotaExhausted = () => setAiEnabled(false);
-    window.addEventListener(AI_QUOTA_EXHAUSTED_EVENT, onAiQuotaExhausted);
-    return () => window.removeEventListener(AI_QUOTA_EXHAUSTED_EVENT, onAiQuotaExhausted);
   }, []);
 
   const value: AuthValue = {
     user,
     loading,
     aiEnabled,
+    aiUsage,
     login: async (email, password) => {
       const r = await api<Session & { token: string }>("/auth/login", {
         method: "POST",
@@ -116,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("token", r.token);
       setUser(r.user);
       setAiEnabled(!!r.features?.ai);
+      setAiUsage(r.features?.aiUsage ?? null);
     },
     register: async (input) => {
       await api("/auth/register", { method: "POST", body: input });
@@ -124,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("token");
       setUser(null);
       setAiEnabled(false);
+      setAiUsage(null);
     },
   };
 

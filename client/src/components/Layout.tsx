@@ -26,6 +26,7 @@ import { useDialog } from "../context/DialogContext";
 import NotificationsBell from "./NotificationsBell";
 import CollectionMenu from "./CollectionMenu";
 import WorkspaceMenu from "./WorkspaceMenu";
+import AiUsageIndicator from "./AiUsageIndicator";
 
 // pages where the header search filters what's shown (everywhere else it jumps to the collection page)
 const SEARCHABLE = ["/all", "/highlights", "/comments"];
@@ -286,6 +287,7 @@ export default function Layout() {
         </div>
 
         <WorkspaceMenu onNavigate={() => setOpen(false)} />
+        <AiUsageIndicator />
 
         <nav className="mt-7 flex min-h-0 flex-1 flex-col">
           <div className="mb-2 flex shrink-0 items-center justify-between px-3">
