@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Owlet",
+  "version": "0.2.1",
+  "minimum_chrome_version": "111",
+  "description": "Clip web pages into your Owlet research library, then highlight, cite, and share your research.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Clip to Owlet",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "permissions": ["activeTab", "contextMenus", "scripting", "storage"],
+  "host_permissions": ["https://owlet-yqfj.vercel.app/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "save-selection": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Save selected text to Owlet"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://owlet-nine.vercel.app/*"],
+      "js": ["pageHook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://owlet-nine.vercel.app/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

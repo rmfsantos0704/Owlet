@@ -10,6 +10,7 @@ type Collection = {
 };
 
 type AiSettings = { format: string; length: string; instructions: string };
+type AiDailyUsage = { used: number; limit: number; remaining: number };
 const AI_DEFAULTS: AiSettings = { format: "paragraph", length: "medium", instructions: "" };
 
 type JoinLink = { token: string; role: string; expiresAt: string; maxUses: number | null; uses: number; expired: boolean };
@@ -165,6 +166,25 @@ async function loadFeatures() {
     const on = !!r.data?.features?.ai;
     $("aiSettings").hidden = !on;
     $("aiHintRow").hidden = !on;
+    const usage = r.data?.features?.aiUsage as AiDailyUsage | undefined;
+    if (
+      usage &&
+      Number.isFinite(usage.used) &&
+      Number.isInteger(usage.limit) &&
+      usage.limit > 0 &&
+      Number.isFinite(usage.remaining)
+    ) {
+      const exhausted = usage.remaining === 0;
+      $("aiUsage").hidden = false;
+      $("aiUsageCount").textContent = `${usage.used} / ${usage.limit}`;
+      $("aiUsageLabel").textContent = exhausted
+        ? "Daily allowance used. AI is off for your account until midnight UTC."
+        : `${usage.remaining} ${usage.remaining === 1 ? "use" : "uses"} left today. AI pauses for your account when used up.`;
+      const progress = $("aiUsageProgress");
+      progress.setAttribute("aria-valuemax", String(usage.limit));
+      progress.setAttribute("aria-valuenow", String(Math.min(usage.used, usage.limit)));
+      $("aiUsageBar").style.width = `${Math.min(100, (usage.used / usage.limit) * 100)}%`;
+    }
   } catch {
     /* offline: the AI parts stay hidden */
   }
@@ -688,6 +708,7 @@ $("clipBtn").addEventListener("click", async () => {
       return status("info", "Already in this collection.", link);
     }
     if (!r.ok) return status("err", r.data.error ?? "Clip failed");
+    void loadFeatures();
 
     const id = r.data.item?._id;
     clipTags = [];
