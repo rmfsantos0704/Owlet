@@ -718,12 +718,14 @@ $("clipBtn").addEventListener("click", async () => {
     if (clippedCollection) void loadTagSuggestions(clippedCollection.id);
     const link = id ? { label: "View in Owlet", url: `${DASHBOARD_URL}/item/${id}` } : undefined;
     status(
-      r.data.aiFailed ? "info" : "ok",
-      r.data.aiFailed
-        ? "Saved, but the AI summary failed."
-        : r.data.aiEnabled === false
-          ? "Saved."
-          : "Saved with an AI summary.",
+      r.data.aiLimitReached || r.data.aiFailed ? "info" : "ok",
+      r.data.aiLimitReached
+        ? "Saved without AI. Open it for Owlet's Quick Summary; you can generate an AI summary after the daily limit resets."
+        : r.data.aiFailed
+          ? "Saved, but the AI summary failed."
+          : r.data.aiEnabled === false
+            ? "Saved."
+            : "Saved with an AI summary.",
       link
     );
     flashClipDone();
