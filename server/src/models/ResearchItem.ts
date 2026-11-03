@@ -31,6 +31,7 @@ const researchItemSchema = new Schema(
     readingStatus: { type: String, enum: ["to_read", "reading", "done"], default: "to_read", index: true },
     userSummary: { type: String, trim: true, maxlength: 2000, default: "" },
     aiOutput: { summary: String, paraphrase: String },
+    aiQuotaExceeded: { type: Boolean, default: false },
     // per-clip summary settings (set from the AI settings modal on the clip page)
     aiSettings: {
       format: { type: String, enum: ["paragraph", "bullets", "academic", "simple"], default: "paragraph" },

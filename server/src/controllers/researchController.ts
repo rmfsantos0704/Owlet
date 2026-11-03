@@ -269,6 +269,7 @@ export async function clip(req: Request, res: Response) {
       content: { rawText: d.rawText, wordCount: d.rawText.split(/\s+/).length },
       personalNote: d.personalNote ?? "",
       aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
+      aiQuotaExceeded: aiLimitReached,
       aiSettings,
       citations: buildCitations({
         ...source,
@@ -280,6 +281,7 @@ export async function clip(req: Request, res: Response) {
     res.status(201).json({
       item,
       aiFailed,
+      aiLimitReached,
       aiEnabled: aiEnabled() && !aiLimitReached && (await aiAvailableForUser(userId)),
     });
   } catch (e) {
@@ -342,6 +344,7 @@ export async function importPdf(req: Request, res: Response) {
       },
       content: { rawText, wordCount: rawText.split(/\s+/).length, pageOffsets: pdf.pageOffsets },
       aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
+      aiQuotaExceeded: aiLimitReached,
       aiSettings,
       citations: buildCitations({ author, title }),
       tags: ai.tags,
@@ -349,6 +352,7 @@ export async function importPdf(req: Request, res: Response) {
     res.status(201).json({
       item,
       aiFailed,
+      aiLimitReached,
       truncated: pdf.text.length > rawText.length,
       aiEnabled: aiEnabled() && !aiLimitReached && (await aiAvailableForUser(userId)),
     });
@@ -914,11 +918,11 @@ export async function setAiOutput(req: Request, res: Response) {
   const ids = await collectionIds(res.locals.userId, "editor");
   const item = await ResearchItem.findOneAndUpdate(
     { _id: id, collectionId: { $in: ids } },
-    { $set: { aiOutput: p.data } },
+    { $set: { aiOutput: p.data, aiQuotaExceeded: false } },
     { returnDocument: "after" }
-  ).select("aiOutput");
+  ).select("aiOutput aiQuotaExceeded");
   if (!item) return res.status(404).json({ error: "Not found" });
-  res.json({ aiOutput: item.aiOutput });
+  res.json({ aiOutput: item.aiOutput, aiQuotaExceeded: item.aiQuotaExceeded });
 }
 
 // POST /research/:id/test-ai: tries settings on the clip or a built-in sample. Saves nothing.
@@ -1014,12 +1018,14 @@ export async function regenerate(req: Request, res: Response) {
   const $set: Record<string, unknown> = {
     "aiOutput.summary": ai.summary,
     "aiOutput.paraphrase": ai.paraphrase,
+    aiQuotaExceeded: false,
   };
   if (body.data.aiSettings) $set.aiSettings = body.data.aiSettings; // saved only after the AI succeeded
   await ResearchItem.updateOne({ _id: item._id }, { $set });
 
   res.json({
     aiOutput: { summary: ai.summary, paraphrase: ai.paraphrase },
+    aiQuotaExceeded: false,
     ...(body.data.aiSettings ? { aiSettings: body.data.aiSettings } : {}),
     aiEnabled: aiEnabled() && (await aiAvailableForUser(String(res.locals.userId))),
   });
