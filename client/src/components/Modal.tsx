@@ -69,7 +69,7 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/40 p-4 backdrop-blur-[2px] sm:items-center"
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/40 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-[2px] sm:items-center sm:p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -77,7 +77,7 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`flex max-h-[calc(100vh-2rem)] w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20`}
+        className={`flex max-h-[calc(100dvh-1.5rem)] w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20 sm:max-h-[calc(100dvh-2rem)]`}
       >
         <div className="flex items-start justify-between gap-4 px-6 pt-5">
           <h2 id={titleId} className="text-lg font-semibold tracking-tight text-ink">

@@ -11,16 +11,24 @@
 
 * { box-sizing: border-box; }
 
+html, #root {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--color-canvas);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-button, input, textarea, select { font: inherit; }
+button, input, textarea, select {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
 button { cursor: pointer; }
 ::selection { background: #cfe4ff; color: #102b5c; }
 p, h1, h2, a, li {
@@ -48,5 +56,29 @@ p, h1, h2, a, li {
   }
   .eyebrow {
     @apply text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400;
+  }
+}
+
+@media (max-width: 639px) {
+  .app-header {
+    min-height: calc(3.5rem + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+  }
+
+  .app-content {
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+
+  .app-sidebar {
+    padding-top: max(0.875rem, env(safe-area-inset-top));
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+
+  .field {
+    font-size: 16px;
   }
 }

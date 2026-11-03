@@ -195,7 +195,7 @@ export default function FilterBar({
 
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {filterControls}
-        <div className="ml-auto flex shrink-0 items-center gap-3 text-[11px] text-slate-400">
+        <div className="ml-auto flex w-full flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 sm:w-auto sm:shrink-0 sm:justify-start sm:gap-3">
           <span>
             Showing {shown} of {total} {noun}
           </span>

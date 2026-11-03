@@ -27,8 +27,8 @@ export default function ResearchCard({ item, onTag, collectionName }: Props) {
   const comments = item.comments?.length ?? 0;
 
   return (
-    <div className="flex items-start gap-4 px-5 py-4 transition hover:bg-slate-50/80">
-      <div className={`mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl ${palette(item.source.domain ?? item.source.fileName)}`}>
+    <div className="flex items-start gap-3 px-4 py-4 transition hover:bg-slate-50/80 sm:gap-4 sm:px-5">
+      <div className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl sm:size-10 ${palette(item.source.domain ?? item.source.fileName)}`}>
         <FileText className="size-4.5" strokeWidth={1.9} />
       </div>
       <div className="min-w-0 flex-1">

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 export default function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f3f6fa] text-slate-900">
-      <main className="mx-auto flex min-h-[calc(100vh-80px)] max-w-6xl flex-col items-center justify-center gap-10 px-5 py-10 lg:flex-row lg:gap-20 lg:px-10">
+      <main className="mx-auto flex min-h-[calc(100dvh-80px)] max-w-6xl flex-col items-center justify-center gap-6 px-4 py-8 sm:gap-10 sm:px-5 sm:py-10 lg:flex-row lg:gap-20 lg:px-10">
         <section className="flex w-full max-w-xl flex-col items-center text-center lg:items-start lg:text-left">
           <div className="self-start">
             <h1 className="max-w-md text-3xl font-semibold leading-tight tracking-tight text-[#0a234d] sm:text-4xl">
@@ -20,13 +20,13 @@ export default function AuthShell({ children }: { children: ReactNode }) {
             <img
               src="/owlet-lockup.png"
               alt="Owlet mascot"
-              className="relative mx-auto w-full max-w-[260px] object-contain drop-shadow-xl lg:mx-0 lg:max-w-[320px]"
+              className="relative mx-auto w-full max-w-[180px] object-contain drop-shadow-xl sm:max-w-[260px] lg:mx-0 lg:max-w-[320px]"
             />
           </div>
         </section>
         <section className="w-full max-w-md">{children}</section>
       </main>
-      <footer className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-400">
+      <footer className="border-t border-slate-200 bg-white px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center text-xs text-slate-400 sm:px-5">
                 English (US) ·{" "}
         <Link to="/privacy" className="hover:text-slate-600 hover:underline">
           Privacy

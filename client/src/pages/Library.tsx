@@ -20,9 +20,9 @@ const isPdf = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name
 
 function StatCard({ label, value, icon: Icon, accent }: { label: string; value: number; icon: LucideIcon; accent: string }) {
   return (
-    <div className="card p-5">
-      <div className="mb-5 flex items-start justify-between">
-        <span className="text-sm font-medium text-slate-500">{label}</span>
+    <div className="card p-3 sm:p-5">
+      <div className="mb-3 flex items-start justify-between sm:mb-5">
+        <span className="text-xs font-medium text-slate-500 sm:text-sm">{label}</span>
         <span className={`flex size-9 items-center justify-center rounded-xl ${accent}`}>
           <Icon className="size-4.5" strokeWidth={1.9} />
         </span>
@@ -334,7 +334,7 @@ export default function Library({ all = false }: { all?: boolean }) {
         </div>
       )}
 
-      <section className="mb-8 flex items-start justify-between gap-4">
+      <section className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">
             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
@@ -347,7 +347,7 @@ export default function Library({ all = false }: { all?: boolean }) {
           </p>
         </div>
         {!all && current && (
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
             {canImport && (
               <>
                 <input
@@ -375,7 +375,7 @@ export default function Library({ all = false }: { all?: boolean }) {
       </section>
 
       {!filtering && items.length > 0 && (
-        <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
           {stats.map((s) => <StatCard key={s.label} {...s} />)}
         </section>
       )}

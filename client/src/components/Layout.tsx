@@ -88,6 +88,20 @@ export default function Layout() {
 
   useEffect(() => () => window.clearTimeout(peekTimer.current), []);
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
   // After clicking the icon to hide the sidebar, the floating icon appears right under the cursor and would
   // instantly "hover" it open again. Ignore hovers until the cursor has left that icon once.
   const suppressPeek = useRef(false);
@@ -219,7 +233,7 @@ export default function Layout() {
 
   return (
     <div
-      className={`min-h-screen bg-canvas text-slate-900 ${dragging ? "cursor-col-resize select-none" : ""}`}
+      className={`min-h-screen min-w-0 overflow-x-clip bg-canvas text-slate-900 ${dragging ? "cursor-col-resize select-none" : ""}`}
       style={{ "--dock": collapsed ? "0px" : `${width}px` } as CSSProperties}
     >
       {/* the Owlet icon that stays behind when the sidebar is hidden: hover to peek, click to bring it back */}
@@ -244,7 +258,7 @@ export default function Layout() {
         style={{ width, maxWidth: "85vw", opacity: willHide ? 0.55 : 1 }}
         onMouseEnter={() => collapsed && showPeek()}
         onMouseLeave={() => collapsed && hidePeek()}
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r border-slate-200 bg-white px-4 pb-5 pt-3.5 transition-transform duration-200 ${mobileShown} ${desktopShown} ${floating}`}
+        className={`app-sidebar fixed inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r border-slate-200 bg-white px-4 pb-5 pt-3.5 transition-transform duration-200 ${mobileShown} ${desktopShown} ${floating}`}
       >
         <div className="mb-9 flex shrink-0 items-center justify-between gap-2 px-2">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -266,7 +280,7 @@ export default function Layout() {
               <div className="eyebrow truncate tracking-[0.16em]">Research smarter</div>
             </Link>
           </div>
-          <button className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(false)}>
+          <button type="button" aria-label="Close navigation" className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(false)}>
             <X className="size-5" />
           </button>
         </div>
@@ -350,21 +364,27 @@ export default function Layout() {
       </aside>
 
       {open && (
-        <button className="fixed inset-0 z-30 bg-slate-950/30 lg:hidden" onClick={() => setOpen(false)}>
+        <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-slate-950/30 lg:hidden" onClick={() => setOpen(false)}>
           <span className="sr-only">Close navigation</span>
         </button>
       )}
 
-      <main className={`min-h-screen lg:pl-[var(--dock)] ${dragging ? "" : "transition-[padding-left] duration-200"}`}>
+      <main className={`min-h-screen min-w-0 lg:pl-[var(--dock)] ${dragging ? "" : "transition-[padding-left] duration-200"}`}>
         <header
-          className={`sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200/80 bg-white/90 px-6 backdrop-blur-xl sm:px-10 ${
+          className={`app-header sticky top-0 z-20 flex min-h-14 items-center gap-2 border-b border-slate-200/80 bg-white/90 px-3 backdrop-blur-xl sm:h-16 sm:gap-4 sm:px-10 ${
             collapsed ? "lg:pl-20" : ""
           }`}
         >
-          <button className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(true)}>
+          <button
+            type="button"
+            aria-label="Open navigation"
+            aria-expanded={open}
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden"
+            onClick={() => setOpen(true)}
+          >
             <Menu className="size-5" />
           </button>
-          <div className="relative max-w-md flex-1">
+          <div className="relative min-w-0 max-w-md flex-1">
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               value={q}
@@ -373,9 +393,9 @@ export default function Layout() {
               className="field pl-10"
             />
           </div>
-          <div className="ml-auto flex items-center gap-2.5">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
             <NotificationsBell />
-            <Link to="/account" className="ml-auto flex items-center gap-2.5 rounded-xl p-1 transition hover:bg-slate-100" title="Account settings">
+            <Link to="/account" className="flex shrink-0 items-center gap-2.5 rounded-xl p-1 transition hover:bg-slate-100" title="Account settings">
               <div className="flex size-9 items-center justify-center rounded-xl bg-[#dbeafe] text-xs font-bold text-[#174ea6]">
                 {initials}
               </div>
@@ -392,7 +412,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <div className="mx-auto max-w-5xl px-6 py-8 sm:px-10 lg:py-10">
+        <div className="app-content mx-auto max-w-5xl px-4 py-6 sm:px-10 sm:py-8 lg:py-10">
           <Outlet />
         </div>
       </main>
