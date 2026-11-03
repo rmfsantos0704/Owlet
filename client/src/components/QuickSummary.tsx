@@ -9,11 +9,11 @@ type Props = {
   onAddTag: (tag: string) => Promise<unknown> | void;
 };
 
-const SIZES = [3, 5, 8] as const;
+const SIZES = [3, 5, 8, 12, 16] as const;
 const MAX_TAGS = 20; // same limit as the server
 
 export default function QuickSummary({ text, tags, canEdit, onAddTag }: Props) {
-  const [size, setSize] = useState<number>(5);
+  const [size, setSize] = useState<number>(12);
   const [adding, setAdding] = useState("");
 
   const sentences = useMemo(() => keySentences(text, size), [text, size]);

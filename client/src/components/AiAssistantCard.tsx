@@ -94,6 +94,12 @@ export default function AiAssistantCard({ items }: { items: ResearchItem[] }) {
         >
           Build a brief <ArrowUpRight className="size-3.5" />
         </Link>
+        <Link
+          to="/ai"
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 py-2.5 text-xs font-semibold text-white hover:bg-white/10"
+        >
+          View saved AI results <ArrowUpRight className="size-3.5" />
+        </Link>
       </div>
     );
   }

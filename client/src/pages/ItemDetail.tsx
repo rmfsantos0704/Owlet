@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Check, ChevronLeft, ChevronRight, FileDown, FileText, Highlighter, Loader2, MessageSquareText,
-  RefreshCw, Settings, Sparkles, Trash2,
+  Pencil, RefreshCw, Save, Settings, Sparkles, Trash2, X,
 } from "lucide-react";
 import { api, download } from "../services/api";
 import CitationBox from "../components/CitationBox";
@@ -31,6 +31,10 @@ export default function ItemDetail() {
   const [actionError, setActionError] = useState("");
   const [regenerating, setRegenerating] = useState(false);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [editingAiOutput, setEditingAiOutput] = useState(false);
+  const [aiSummaryDraft, setAiSummaryDraft] = useState("");
+  const [aiParaphraseDraft, setAiParaphraseDraft] = useState("");
+  const [savingAiOutput, setSavingAiOutput] = useState(false);
   const [regenOpen, setRegenOpen] = useState(false);
   const [highlightsOpen, setHighlightsOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -108,6 +112,24 @@ export default function ItemDetail() {
 
   // throws on failure so the modal can show the error
   const saveAiSettings = (aiSettings: AiSettings) => act("/ai-settings", "PUT", { aiSettings });
+
+  function editAiOutput() {
+    setAiSummaryDraft(item?.aiOutput?.summary ?? "");
+    setAiParaphraseDraft(item?.aiOutput?.paraphrase ?? "");
+    setEditingAiOutput(true);
+  }
+
+  async function saveAiOutput() {
+    setSavingAiOutput(true);
+    try {
+      await act("/ai-output", "PATCH", { summary: aiSummaryDraft, paraphrase: aiParaphraseDraft });
+      setEditingAiOutput(false);
+    } catch {
+      // act() reports the failure in the page-level action error.
+    } finally {
+      setSavingAiOutput(false);
+    }
+  }
 
   async function saveWorkflow() {
     setWorkflowSaving(true);
@@ -270,7 +292,7 @@ export default function ItemDetail() {
             </div>
           </section>
 
-          {aiEnabled ? (
+          {aiEnabled || item.aiOutput?.summary || item.aiOutput?.paraphrase ? (
           <section className="rounded-2xl bg-brand p-5 text-white shadow-lg shadow-blue-950/10 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -279,38 +301,96 @@ export default function ItemDetail() {
                 </div>
                 <h2 className="font-semibold">AI summary</h2>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setAiSettingsOpen(true)}
-                  title="AI summary settings for this clip"
-                  aria-label="AI summary settings"
-                  className="inline-flex items-center justify-center rounded-lg bg-white/10 p-1.5 text-white transition hover:bg-white/20"
-                >
-                  <Settings className="size-4" />
-                </button>
-                {canEdit && (
+              {canEdit && (
+                <div className="flex items-center gap-2">
+                  {aiEnabled && (
+                    <>
+                      <button
+                        onClick={() => setAiSettingsOpen(true)}
+                        title="AI summary settings for this clip"
+                        aria-label="AI summary settings"
+                        className="inline-flex items-center justify-center rounded-lg bg-white/10 p-1.5 text-white transition hover:bg-white/20"
+                      >
+                        <Settings className="size-4" />
+                      </button>
+                      <button
+                        onClick={() => setRegenOpen(true)}
+                        disabled={regenerating}
+                        title="Rewrite using this clip's AI settings"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
+                      >
+                        <RefreshCw className={`size-3.5 ${regenerating ? "animate-spin" : ""}`} />
+                        {regenerating ? "Regenerating…" : "Regenerate"}
+                      </button>
+                    </>
+                  )}
                   <button
-                    onClick={() => setRegenOpen(true)}
-                    disabled={regenerating}
-                    title="Rewrite using this clip's AI settings"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
+                    onClick={editingAiOutput ? () => setEditingAiOutput(false) : editAiOutput}
+                    disabled={savingAiOutput}
+                    title={editingAiOutput ? "Cancel edits" : "Edit saved AI answer"}
+                    aria-label={editingAiOutput ? "Cancel edits" : "Edit AI answer"}
+                    className="inline-flex items-center justify-center rounded-lg bg-white/10 p-1.5 text-white transition hover:bg-white/20 disabled:opacity-60"
                   >
-                    <RefreshCw className={`size-3.5 ${regenerating ? "animate-spin" : ""}`} />
-                    {regenerating ? "Regenerating…" : "Regenerate"}
+                    {editingAiOutput ? <X className="size-4" /> : <Pencil className="size-4" />}
                   </button>
-                )}
-              </div>
-            </div>
-            <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-white/90">
-              {item.aiOutput.summary || "No AI summary for this clip."}
-            </p>
-            {item.aiOutput.paraphrase && (
-              <>
-                <div className="mt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
-                  Key arguments (paraphrased)
                 </div>
-                <p className="mt-2 text-sm leading-relaxed text-blue-100/80">{item.aiOutput.paraphrase}</p>
+              )}
+            </div>
+            {editingAiOutput ? (
+              <div className="mt-4 space-y-4">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-semibold text-cyan-200">Summary</span>
+                  <textarea
+                    value={aiSummaryDraft}
+                    onChange={(event) => setAiSummaryDraft(event.target.value)}
+                    maxLength={20000}
+                    rows={8}
+                    aria-label="Edit AI summary"
+                    className="w-full rounded-xl border border-white/15 bg-white p-3 text-sm leading-relaxed text-slate-800 outline-none focus:ring-4 focus:ring-cyan-300/20"
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-semibold text-cyan-200">Key arguments</span>
+                  <textarea
+                    value={aiParaphraseDraft}
+                    onChange={(event) => setAiParaphraseDraft(event.target.value)}
+                    maxLength={20000}
+                    rows={5}
+                    aria-label="Edit key arguments"
+                    className="w-full rounded-xl border border-white/15 bg-white p-3 text-sm leading-relaxed text-slate-800 outline-none focus:ring-4 focus:ring-cyan-300/20"
+                  />
+                </label>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={saveAiOutput}
+                    disabled={savingAiOutput}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-ink hover:bg-cyan-300 disabled:opacity-60"
+                  >
+                    <Save className="size-3.5" />
+                    {savingAiOutput ? "Saving…" : "Save edits"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-white/90">
+                  {item.aiOutput.summary || "No AI summary for this clip."}
+                </p>
+                {item.aiOutput.paraphrase && (
+                  <>
+                    <div className="mt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
+                      Key arguments (paraphrased)
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-blue-100/80">{item.aiOutput.paraphrase}</p>
+                  </>
+                )}
               </>
+            )}
+            {!aiEnabled && (
+              <p className="mt-4 text-xs text-blue-100/60">
+                AI generation is unavailable. This saved answer remains available{canEdit ? " and can still be edited" : ""}.
+              </p>
             )}
           </section>
           ) : (

@@ -51,7 +51,7 @@ function ToLogin() {
 }
 
 export default function App() {
-  const { user, loading, aiEnabled } = useAuth();
+  const { user, loading } = useAuth();
   if (loading) return <p className="p-6 text-gray-500">Loading…</p>;
 
   const guest = (page: ReactElement) => (user ? <Navigate to={peekReturnTo()} replace /> : page);
@@ -73,7 +73,7 @@ export default function App() {
       <Route element={user ? <Layout /> : <ToLogin />}>
         <Route path="/" element={<Library />} />
         <Route path="/all" element={<Library all />} />
-        <Route path="/ai" element={aiEnabled ? <AiWorkspace /> : <Navigate to="/highlights" replace />} />
+        <Route path="/ai" element={<AiWorkspace />} />
         <Route path="/highlights" element={<Highlights />} />
         <Route path="/comments" element={<Comments />} />
         <Route path="/matrix" element={<LiteratureMatrix />} />

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Bot, Check, Copy, FileText, Plus, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Bot, Check, Copy, FileText, Pencil, Plus, Save, Sparkles, X } from "lucide-react";
 import { api } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
 import Modal from "../components/Modal";
@@ -26,6 +27,7 @@ type Result = {
 
 export default function AiWorkspace() {
   const { current, ready } = useCollections();
+  const { aiEnabled } = useAuth();
   const dialog = useDialog();
   const [items, setItems] = useState<ResearchItem[]>([]);
   const [sessions, setSessions] = useState<AiSession[]>([]);
@@ -39,6 +41,10 @@ export default function AiWorkspace() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [showResult, setShowResult] = useState(false); // the results modal
+  const [editingResult, setEditingResult] = useState(false);
+  const [draftSummary, setDraftSummary] = useState("");
+  const [draftFindings, setDraftFindings] = useState<{ title: string; text: string }[]>([]);
+  const [savingEdits, setSavingEdits] = useState(false);
   const [copied, setCopied] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null); // set when "New session" is clicked; drives the notice
 
@@ -89,6 +95,7 @@ export default function AiWorkspace() {
     setNewId(null);
     setResult(null);
     setShowResult(false);
+    setEditingResult(false);
     setTitle("");
     setPrompt("");
     setError("");
@@ -105,6 +112,7 @@ export default function AiWorkspace() {
     setPrompt(s.prompt);
     setSelected(s.sources.map((x) => x.id).filter((id) => existing.has(id)));
     setResult({ title: s.title ?? "", summary: s.summary, findings: s.findings, sources: s.sources, mode: s.mode });
+    setEditingResult(false);
     setError("");
     setShowResult(true);
   }
@@ -144,6 +152,7 @@ export default function AiWorkspace() {
         setActiveId(null);
         setResult(null);
         setShowResult(false);
+        setEditingResult(false);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not delete the session");
@@ -151,6 +160,7 @@ export default function AiWorkspace() {
   }
 
   async function run() {
+    if (!aiEnabled) return;
     setError("");
     setRunning(true);
     try {
@@ -167,6 +177,7 @@ export default function AiWorkspace() {
         sources: r.sources,
         mode,
       });
+      setEditingResult(false);
       setShowResult(true); // open the results as soon as they are ready
       if (saved) {
         const isNew = !sessions.some((x) => x.id === saved.id);
@@ -185,6 +196,42 @@ export default function AiWorkspace() {
       setError(e instanceof Error ? e.message : "Analysis failed");
     } finally {
       setRunning(false);
+    }
+  }
+
+  function startEditingResult() {
+    if (!result) return;
+    setDraftSummary(result.summary);
+    setDraftFindings(result.findings.map(({ title, text }) => ({ title, text })));
+    setEditingResult(true);
+  }
+
+  async function saveResultEdits() {
+    if (!activeId || !result) return;
+    setSavingEdits(true);
+    setError("");
+    try {
+      const response = await api<{ session: AiSession }>(`/research/sessions/${activeId}`, {
+        method: "PATCH",
+        body: { summary: draftSummary, findings: draftFindings },
+      });
+      setResult((currentResult) => currentResult
+        ? {
+            ...currentResult,
+            summary: response.session.summary,
+            findings: currentResult.findings.map((finding, index) => ({
+              ...finding,
+              title: response.session.findings[index].title,
+              text: response.session.findings[index].text,
+            })),
+          }
+        : currentResult);
+      setSessions((list) => list.map((session) => session.id === activeId ? response.session : session));
+      setEditingResult(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save your edits");
+    } finally {
+      setSavingEdits(false);
     }
   }
 
@@ -230,12 +277,19 @@ export default function AiWorkspace() {
         </div>
         <button
           onClick={newSession}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+          disabled={!aiEnabled}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="size-4" />
           New session
         </button>
       </section>
+
+      {!aiEnabled && (
+        <p role="status" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          AI generation is unavailable right now. Your saved results are still available to read and edit.
+        </p>
+      )}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-6">
@@ -287,11 +341,11 @@ export default function AiWorkspace() {
               </div>
               <button
                 onClick={run}
-                disabled={running || selected.length === 0}
+                disabled={!aiEnabled || running || selected.length === 0}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-bold text-ink hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Sparkles className="size-4" />
-                {running ? "Analyzing…" : activeId ? "Re-run analysis" : "Run analysis"}
+                {running ? "Analyzing…" : !aiEnabled ? "AI unavailable" : activeId ? "Re-run analysis" : "Run analysis"}
               </button>
             </div>
             {error && <p className="mt-3 text-xs font-medium text-red-300">{error}</p>}
@@ -376,33 +430,77 @@ export default function AiWorkspace() {
           title={result.title || result.mode}
           maxWidth="max-w-3xl"
           footer={
-            <>
-              <button
-                type="button"
-                onClick={copy}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                {copied ? "Copied" : "Copy"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowResult(false)}
-                className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#173b77]"
-              >
-                Close
-              </button>
-            </>
+            editingResult ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEditingResult(false)}
+                  disabled={savingEdits}
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveResultEdits}
+                  disabled={savingEdits}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#173b77] disabled:opacity-60"
+                >
+                  <Save className="size-4" />
+                  {savingEdits ? "Saving…" : "Save edits"}
+                </button>
+              </>
+            ) : (
+              <>
+                {activeId && (
+                  <button
+                    type="button"
+                    onClick={startEditingResult}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <Pencil className="size-4" />
+                    Edit answer
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={copy}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowResult(false)}
+                  className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#173b77]"
+                >
+                  Close
+                </button>
+              </>
+            )
           }
         >
           <div>
+            {error && <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
             <p className="mb-4 text-xs text-slate-400">
               {result.title ? `${result.mode} · ` : ""}Based on {result.sources.length} sources
               {removedSources > 0 ? ` · ${removedSources} no longer in this collection` : ""}
             </p>
             <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
               <div className="eyebrow mb-2 text-blue-600">Executive summary</div>
-              <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{result.summary}</p>
+              {editingResult ? (
+                <textarea
+                  value={draftSummary}
+                  onChange={(event) => setDraftSummary(event.target.value)}
+                  maxLength={20000}
+                  rows={6}
+                  aria-label="Edit executive summary"
+                  className="field"
+                />
+              ) : (
+                <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{result.summary}</p>
+              )}
             </div>
             <div className="space-y-5">
               {result.findings.map((f, i) => (
@@ -411,8 +509,34 @@ export default function AiWorkspace() {
                     {i + 1}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-slate-800">{f.title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-slate-500">{f.text}</p>
+                    {editingResult ? (
+                      <div className="space-y-2">
+                        <input
+                          value={draftFindings[i]?.title ?? ""}
+                          onChange={(event) => setDraftFindings((findings) => findings.map((finding, index) =>
+                            index === i ? { ...finding, title: event.target.value } : finding
+                          ))}
+                          maxLength={500}
+                          aria-label={`Edit finding ${i + 1} title`}
+                          className="field font-semibold"
+                        />
+                        <textarea
+                          value={draftFindings[i]?.text ?? ""}
+                          onChange={(event) => setDraftFindings((findings) => findings.map((finding, index) =>
+                            index === i ? { ...finding, text: event.target.value } : finding
+                          ))}
+                          maxLength={20000}
+                          rows={4}
+                          aria-label={`Edit finding ${i + 1}`}
+                          className="field"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <h3 className="text-sm font-semibold text-slate-800">{f.title}</h3>
+                        <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-500">{f.text}</p>
+                      </>
+                    )}
                     <p className="mt-2 text-xs font-semibold text-blue-700">
                       {f.sources.map((n) => result.sources[n - 1]?.title).filter(Boolean).join(" · ")}
                     </p>
