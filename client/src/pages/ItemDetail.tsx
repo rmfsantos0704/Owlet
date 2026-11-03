@@ -292,7 +292,7 @@ export default function ItemDetail() {
             </div>
           </section>
 
-          {aiEnabled || item.aiOutput?.summary || item.aiOutput?.paraphrase ? (
+          {item.aiOutput?.summary || item.aiOutput?.paraphrase ? (
           <section className="rounded-2xl bg-brand p-5 text-white shadow-lg shadow-blue-950/10 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -394,12 +394,34 @@ export default function ItemDetail() {
             )}
           </section>
           ) : (
-            <QuickSummary
-              text={item.content?.rawText ?? ""}
-              tags={item.tags}
-              canEdit={canEdit}
-              onAddTag={(t) => run("/tags", "PUT", { tags: [...new Set([...item.tags, t])] })}
-            />
+            <>
+              {(item.aiQuotaExceeded || (aiEnabled && canEdit)) && (
+                <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm text-amber-950">
+                    {item.aiQuotaExceeded
+                      ? "The daily AI limit was reached while clipping. This Quick Summary is made by Owlet without AI. You can generate an AI summary after the limit resets at midnight UTC."
+                      : "No AI summary has been generated for this clip yet."}
+                  </p>
+                  {canEdit && aiEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => setRegenOpen(true)}
+                      disabled={regenerating}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60"
+                    >
+                      <Sparkles className="size-3.5" />
+                      Generate AI summary
+                    </button>
+                  )}
+                </section>
+              )}
+              <QuickSummary
+                text={item.content?.rawText ?? ""}
+                tags={item.tags}
+                canEdit={canEdit}
+                onAddTag={(t) => run("/tags", "PUT", { tags: [...new Set([...item.tags, t])] })}
+              />
+            </>
           )}
         </div>
 
@@ -568,6 +590,7 @@ export default function ItemDetail() {
             setRegenOpen(false);
             setAiSettingsOpen(true);
           }}
+          hasSummary={!!item.aiOutput?.summary}
         />
       )}
     </div>

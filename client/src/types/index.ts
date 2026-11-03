@@ -78,6 +78,7 @@ export type ResearchItem = {
   content?: { rawText?: string; wordCount?: number };
   matrixValues?: Record<string, string>;
   aiOutput: { summary?: string; paraphrase?: string };
+  aiQuotaExceeded?: boolean;
   aiSettings?: AiSettings; // per-clip summary settings; missing on clips saved before this existed
   citations: { apa?: string; mla?: string; chicago?: string };
   tags: string[];
