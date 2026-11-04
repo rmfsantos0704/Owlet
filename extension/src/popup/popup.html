@@ -31,6 +31,36 @@
       --err: #b91c1c;
       --err-bg: #fef2f2;
       --err-line: #fecaca;
+      --surface: #fff;
+      --field-bg: #f8fafc;
+      --hover: #f1f5f9;
+      --divider: #f1f5f9;
+      --outline: #93c5fd;
+    }
+
+    body.dark {
+      color-scheme: dark;
+      --brand: #7da5f2;
+      --brand-hover: #91b4f5;
+      --ink: #e2e8f0;
+      --canvas: #0b1220;
+      --line: #26364d;
+      --text: #d3dce7;
+      --muted: #a4b1c2;
+      --faint: #8292a8;
+      --blue: #93c5fd;
+      --blue-bg: #172b45;
+      --ok: #6ee7b7;
+      --ok-bg: #12352f;
+      --ok-line: #256653;
+      --err: #fca5a5;
+      --err-bg: #3b2029;
+      --err-line: #71323b;
+      --surface: #111c2f;
+      --field-bg: #172338;
+      --hover: #1b2b42;
+      --divider: #26364d;
+      --outline: #60a5fa;
     }
 
     * { box-sizing: border-box; }
@@ -67,7 +97,7 @@
     /* header */
     .top {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--line);
+      padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line);
     }
     .brand { display: flex; align-items: center; gap: 10px; }
     .brand img { width: 34px; height: 34px; border-radius: 23.4%; box-shadow: 0 4px 10px rgba(16, 43, 92, 0.2); }
@@ -79,13 +109,13 @@
       width: 32px; height: 32px; border: 0; border-radius: 10px;
       background: transparent; color: var(--muted); transition: background 0.15s, color 0.15s;
     }
-    .icon-btn:hover { background: #f1f5f9; color: var(--brand); }
+    .icon-btn:hover { background: var(--hover); color: var(--brand); }
 
     .body { display: flex; flex-direction: column; gap: 14px; padding: 16px; }
 
     /* cards */
     .card {
-      background: #fff; border: 1px solid rgba(226, 232, 240, 0.9);
+      background: var(--surface); border: 1px solid var(--line);
       border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
     }
     .page { display: flex; gap: 12px; align-items: center; padding: 12px; }
@@ -107,11 +137,11 @@
     label { display: block; margin-bottom: 6px; }
     .field {
       width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px;
-      background: #f8fafc; font-size: 13.5px; outline: none;
+      background: var(--field-bg); font-size: 13.5px; outline: none;
       transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
     }
     .field::placeholder { color: var(--faint); }
-    .field:focus { border-color: #93c5fd; background: #fff; box-shadow: 0 0 0 4px var(--blue-bg); }
+    .field:focus { border-color: var(--outline); background: var(--surface); box-shadow: 0 0 0 4px var(--blue-bg); }
     .field:disabled { opacity: 0.6; cursor: not-allowed; }
     textarea.field { resize: vertical; min-height: 64px; }
     select.field {
@@ -121,7 +151,7 @@
     }
     .hint { display: flex; align-items: center; gap: 6px; margin: 8px 2px 0; font-size: 12px; color: var(--muted); }
     .hint .i { width: 13px; height: 13px; color: var(--accent); }
-    .ai-usage { padding: 9px 11px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+    .ai-usage { padding: 9px 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
     .ai-usage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
     .ai-usage-track { height: 5px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: var(--line); }
     .ai-usage-fill { height: 100%; border-radius: inherit; background: var(--blue); transition: width 0.2s; }
@@ -132,13 +162,13 @@
       width: 100%; padding: 10px 16px; border-radius: 12px; border: 1px solid transparent;
       font-size: 14px; font-weight: 600; transition: background 0.15s, border-color 0.15s, opacity 0.15s;
     }
-    .btn:focus-visible, .icon-btn:focus-visible, summary:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+    .btn:focus-visible, .icon-btn:focus-visible, summary:focus-visible { outline: 2px solid var(--outline); outline-offset: 2px; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: var(--brand); color: #fff; box-shadow: 0 10px 15px -3px rgba(16, 43, 92, 0.18); }
     .btn-primary:hover:not(:disabled) { background: var(--brand-hover); }
     .btn-primary.done, .btn-primary.done:hover:not(:disabled) { background: #059669; opacity: 1; }
-    .btn-secondary { background: #fff; border-color: var(--line); color: #334155; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
-    .btn-secondary:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
+    .btn-secondary { background: var(--surface); border-color: var(--line); color: var(--text); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
+    .btn-secondary:hover:not(:disabled) { background: var(--field-bg); border-color: var(--muted); }
     .btn-lg { padding: 12px 16px; font-size: 14.5px; }
     .btn-inline { width: auto; flex: none; }
     .btn-sm { padding: 9px 10px; font-size: 13px; }
@@ -177,7 +207,7 @@
     .settings summary .chev { margin-left: auto; color: var(--faint); transition: transform 0.2s; }
     .settings[open] summary .chev { transform: rotate(180deg); }
     .settings .inner { padding: 2px 14px 14px; }
-    .divider { height: 1px; background: #f1f5f9; margin: 4px 0; }
+    .divider { height: 1px; background: var(--divider); margin: 4px 0; }
     .row { display: flex; gap: 8px; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .row .field { min-width: 0; }
@@ -196,6 +226,22 @@
     .login { display: flex; flex-direction: column; gap: 14px; padding: 28px 24px 24px; }
     .login .owl { width: 100px; height: auto; align-self: flex-start; margin: -8px 0 -2px -8px; }
     .login p { margin: 0; }
+
+    .tour-overlay {
+      position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-start;
+      padding: 62px 14px 14px; background: rgba(2, 6, 23, 0.48);
+    }
+    .tour-card {
+      width: 100%; padding: 16px; border: 1px solid var(--line); border-radius: 16px;
+      background: var(--surface); color: var(--text); box-shadow: 0 16px 36px rgba(2, 6, 23, 0.25);
+    }
+    .tour-card h2 { margin: 4px 0 8px; color: var(--ink); font-size: 17px; line-height: 1.25; }
+    .tour-card p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+    .tour-head, .tour-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .tour-controls { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--divider); }
+    .tour-controls .btn { width: auto; padding: 7px 10px; font-size: 12px; }
+    .tour-skip { width: auto; padding: 4px 0; border: 0; background: none; color: var(--muted); font-size: 12px; }
+    .tour-target { outline: 2px solid #60a5fa; outline-offset: 3px; border-radius: 12px; position: relative; z-index: 21; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -231,6 +277,13 @@
         </div>
       </div>
       <div class="actions">
+        <button id="themeToggle" class="icon-btn" type="button" title="Turn on dark mode" aria-label="Turn on dark mode" aria-pressed="false">
+          <svg id="themeMoon" class="i" viewBox="0 0 24 24"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/></svg>
+          <svg id="themeSun" class="i" viewBox="0 0 24 24" hidden><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+        </button>
+        <button id="tourBtn" class="icon-btn" type="button" title="Show extension guide" aria-label="Show extension guide">
+          <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        </button>
         <button id="openDash" class="icon-btn" type="button" title="Open dashboard" aria-label="Open dashboard">
           <svg class="i" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
         </button>
@@ -253,7 +306,7 @@
         </div>
       </div>
 
-      <div>
+      <div id="tourCollection">
         <label class="eyebrow" for="collection">Save to Collection</label>
         <select id="collection" class="field"></select>
         <div id="newCollectionRow" class="new-collection" hidden>
@@ -285,7 +338,7 @@
         </div>
       </div>
 
-      <div>
+      <div id="tourDetails">
         <label class="eyebrow" for="clipTags">Tags <span class="muted">(optional)</span></label>
         <input id="clipTags" class="field" list="tagSuggestions" maxlength="400" placeholder="Type a tag and press Enter" autocomplete="off" />
         <datalist id="tagSuggestions"></datalist>
@@ -294,16 +347,18 @@
         <input id="personalNote" class="field" maxlength="280" placeholder="A short reminder for later" />
       </div>
 
-      <button id="clipBtn" class="btn btn-primary btn-lg" type="button" disabled>
-        <span id="clipSpinner" class="spinner" hidden></span>
-        <svg id="clipIcon" class="i" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
-        <span id="clipLabel">Clip this page</span>
-      </button>
+      <div id="tourClipActions" class="stack">
+        <button id="clipBtn" class="btn btn-primary btn-lg" type="button" disabled>
+          <span id="clipSpinner" class="spinner" hidden></span>
+          <svg id="clipIcon" class="i" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+          <span id="clipLabel">Clip this page</span>
+        </button>
 
-      <button id="showHighlightsBtn" class="btn btn-secondary" type="button" disabled>
-        <svg class="i" viewBox="0 0 24 24"><path d="M4 5h16"/><path d="M4 10h10"/><path d="M4 15h16"/><path d="M4 20h10"/></svg>
-        Show my highlights
-      </button>
+        <button id="showHighlightsBtn" class="btn btn-secondary" type="button" disabled>
+          <svg class="i" viewBox="0 0 24 24"><path d="M4 5h16"/><path d="M4 10h10"/><path d="M4 15h16"/><path d="M4 20h10"/></svg>
+          Show my highlights
+        </button>
+      </div>
 
       <div id="status" class="status" role="status" hidden>
         <span id="statusText"></span><button id="statusLink" class="link" type="button" hidden></button>
@@ -345,7 +400,7 @@
       </details>
 
       <!-- Collection settings (join link) -->
-      <details id="settings" class="card settings">
+      <details id="settings" class="card settings" data-tour-target="settings">
         <summary>
           <svg class="i" viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></svg>
           Collection settings
@@ -403,6 +458,25 @@
         </div>
       </details>
     </main>
+    <div id="tourOverlay" class="tour-overlay" hidden>
+      <section class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourDescription">
+        <div class="tour-head">
+          <span id="tourCount" class="eyebrow">Extension guide · 1 of 4</span>
+          <button id="tourClose" class="icon-btn" type="button" aria-label="Close guide" title="Close guide">
+            <svg class="i" viewBox="0 0 24 24"><path d="m18 6-12 12M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <h2 id="tourTitle"></h2>
+        <p id="tourDescription"></p>
+        <div class="tour-controls">
+          <button id="tourSkip" class="tour-skip" type="button">Skip guide</button>
+          <div class="actions">
+            <button id="tourBack" class="btn btn-secondary" type="button" hidden>Back</button>
+            <button id="tourNext" class="btn btn-primary" type="button">Next</button>
+          </div>
+        </div>
+      </section>
+    </div>
   </section>
 
   <script src="popup.js"></script>

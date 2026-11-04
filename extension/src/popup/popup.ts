@@ -25,6 +25,30 @@ const FORMATS: Record<string, string> = {
 };
 const LENGTHS: Record<string, string> = { short: "Short", medium: "Medium", detailed: "Detailed" };
 const OFFLINE = "Can't reach Owlet. Is the server running?";
+const THEME_KEY = "popupTheme";
+const TOUR_KEY = "extensionOnboardingSeen";
+const TOUR_STEPS = [
+  {
+    target: "tourCollection",
+    title: "Choose a Collection",
+    description: "Collections keep different projects separate. Pick where this page should be saved, or create a new Collection right from the extension.",
+  },
+  {
+    target: "tourDetails",
+    title: "Add context",
+    description: "Add tags to find this clip later, or a short note to remember why you saved it. Both are optional.",
+  },
+  {
+    target: "tourClipActions",
+    title: "Clip and revisit highlights",
+    description: "Clip this page to your selected Collection. Select text on a page and use the context menu or Alt+Shift+S to save a passage; Show my highlights displays saved passages on the current page.",
+  },
+  {
+    target: "settings",
+    title: "More tools when you need them",
+    description: "Collection settings can create a shareable join link. Open the dashboard for members and other Collection controls. If AI is enabled, its summary preferences are here too.",
+  },
+];
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -34,6 +58,7 @@ let clipping = false;
 let lastCollectionId = ""; // last real selection, so Cancel can go back to it
 let hasLink = false; // whether the selected collection currently has a usable join link
 let clipTags: string[] = [];
+let tourStep = 0;
 
 const open = (url: string) => chrome.tabs.create({ url });
 const selected = () => collections.find((w) => w.id === $<HTMLSelectElement>("collection").value);
@@ -55,6 +80,49 @@ function loginMsg(text = "") {
   const el = $("loginMsg");
   el.textContent = text;
   el.hidden = !text;
+}
+
+function updateThemeButton(dark: boolean) {
+  const button = $<HTMLButtonElement>("themeToggle");
+  button.setAttribute("aria-pressed", String(dark));
+  button.title = dark ? "Turn off dark mode" : "Turn on dark mode";
+  button.setAttribute("aria-label", button.title);
+  $("themeMoon").hidden = dark;
+  $("themeSun").hidden = !dark;
+}
+
+async function applyTheme(loggedIn: boolean) {
+  const { [THEME_KEY]: theme } = await chrome.storage.local.get(THEME_KEY);
+  const dark = loggedIn && theme === "dark";
+  document.body.classList.toggle("dark", dark);
+  updateThemeButton(dark);
+}
+
+function closeTour() {
+  $("tourOverlay").hidden = true;
+  document.querySelectorAll(".tour-target").forEach((target) => target.classList.remove("tour-target"));
+  void chrome.storage.local.set({ [TOUR_KEY]: true });
+}
+
+function showTour(index = 0) {
+  tourStep = Math.min(Math.max(index, 0), TOUR_STEPS.length - 1);
+  document.querySelectorAll(".tour-target").forEach((target) => target.classList.remove("tour-target"));
+  const step = TOUR_STEPS[tourStep];
+  const target = $(step.target);
+  target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  target.classList.add("tour-target");
+  $("tourCount").textContent = `Extension guide · ${tourStep + 1} of ${TOUR_STEPS.length}`;
+  $("tourTitle").textContent = step.title;
+  $("tourDescription").textContent = step.description;
+  $<HTMLButtonElement>("tourBack").hidden = tourStep === 0;
+  $("tourNext").textContent = tourStep === TOUR_STEPS.length - 1 ? "Done" : "Next";
+  $("tourOverlay").hidden = false;
+  $("tourNext").focus();
+}
+
+async function showTourForFirstUse() {
+  const { [TOUR_KEY]: seen } = await chrome.storage.local.get(TOUR_KEY);
+  if (!seen && !$("viewMain").hidden) showTour();
 }
 
 function updateClipEnabled() {
@@ -425,9 +493,11 @@ async function render() {
   const loggedIn = !!(await getToken());
   $("viewLogin").hidden = loggedIn;
   $("viewMain").hidden = !loggedIn;
+  await applyTheme(loggedIn);
   if (!loggedIn) return;
   status("");
   await Promise.all([loadPage(), loadCollections(), loadAi(), loadFeatures()]);
+  await showTourForFirstUse();
 }
 
 // ---------- events ----------
@@ -496,6 +566,22 @@ $("newCollection").addEventListener("keydown", (e) => {
 });
 
 $("registerLink").addEventListener("click", () => open(`${DASHBOARD_URL}/register`));
+$<HTMLButtonElement>("themeToggle").addEventListener("click", async () => {
+  const dark = $<HTMLButtonElement>("themeToggle").getAttribute("aria-pressed") !== "true";
+  await chrome.storage.local.set({ [THEME_KEY]: dark ? "dark" : "light" });
+  await applyTheme(!$("viewMain").hidden);
+});
+$("tourBtn").addEventListener("click", () => showTour());
+$("tourClose").addEventListener("click", closeTour);
+$("tourSkip").addEventListener("click", closeTour);
+$("tourBack").addEventListener("click", () => showTour(tourStep - 1));
+$("tourNext").addEventListener("click", () => {
+  if (tourStep === TOUR_STEPS.length - 1) closeTour();
+  else showTour(tourStep + 1);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !$("tourOverlay").hidden) closeTour();
+});
 $("openDash").addEventListener("click", () => open(DASHBOARD_URL));
 $("openSettings").addEventListener("click", () => {
   const ws = selected();
@@ -740,9 +826,12 @@ render();
 
 // the dashboard logged in or out (bridge.ts): follow it while the popup is open
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !changes.token) return;
-  collections = [];
-  void render();
+  if (area !== "local") return;
+  if (changes[THEME_KEY]) void applyTheme(!$("viewMain").hidden);
+  if (changes.token) {
+    collections = [];
+    void render();
+  }
 });
 
 // ---------- login ----------
