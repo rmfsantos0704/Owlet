@@ -59,6 +59,11 @@ html.dark [class~="bg-white"] {
   background-color: #111c2f;
 }
 
+html.dark .card {
+  background-color: #111c2f;
+  border-color: #26364d;
+}
+
 html.dark .appearance-switch-knob {
   background-color: #fff;
 }
