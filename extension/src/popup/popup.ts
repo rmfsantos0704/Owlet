@@ -276,7 +276,7 @@ async function loadFeatures() {
     ) {
       const exhausted = usage.remaining === 0;
       $("aiUsage").hidden = false;
-      $("aiUsageCount").textContent = `${usage.used} / ${usage.limit}`;
+      $("aiUsageCount").textContent = `${usage.used}/${usage.limit}`;
       $("aiUsageLabel").textContent = exhausted
         ? "Daily allowance used. AI is off for your account until midnight UTC."
         : `${usage.remaining} ${usage.remaining === 1 ? "use" : "uses"} left today. AI pauses for your account when used up.`;
