@@ -17,7 +17,7 @@ export const privacySections: Section[] = [
       [
         "your email address;",
         "your password, which we store only as a salted one-way hash (we cannot read it);",
-        "your age and your role (student, teacher, researcher, working professional, or other);",
+        "your age;",
         "which version of these documents you agreed to, and when.",
       ],
       "Content you create:",

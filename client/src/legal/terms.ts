@@ -22,9 +22,9 @@ export const termsSections: Section[] = [
     id: "account",
     title: "Your account",
     body: [
-      "Give us accurate information (including your email address, age, and role) and keep it up to date. You must confirm your email address before you can use your account.",
+      "Give us accurate information (including your email address and age) and keep it up to date. You must confirm your email address before you can use your account.",
       "Keep your password private and don't share your account. You are responsible for everything that happens under it. Tell us promptly if you think someone else has gained access.",
-      "From the Account page you can change your password, email, age, and role, sign out of all devices, download your data, or delete your account at any time.",
+      "From the Account page you can change your password, email, and age, sign out of all devices, download your data, or delete your account at any time.",
     ],
   },
   {
