@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Puzzle } from "lucide-react";
+import { ArrowUpRight, Puzzle } from "lucide-react";
 import { chromeExtensionUrl } from "../../utils/chromeExtension";
 // The page frame shared by every auth screen: mascot on the left, the card on the right.
 export default function AuthShell({ children }: { children: ReactNode }) {
@@ -30,10 +30,17 @@ export default function AuthShell({ children }: { children: ReactNode }) {
               href={chromeExtensionUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 hover:text-blue-800"
+              className="mt-3 flex w-full max-w-md items-center gap-3 rounded-2xl border border-blue-200 bg-white p-4 text-left shadow-md shadow-blue-900/5 transition hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
-              <Puzzle className="size-4" />
-              Get Owlet for Chrome
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
+                <Puzzle className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold uppercase tracking-wide text-blue-600">Browser extension</span>
+                <span className="mt-0.5 block text-sm font-bold text-[#0a234d]">Get Owlet for Chrome</span>
+                <span className="mt-0.5 block text-xs text-slate-500">Clip pages straight to your research library.</span>
+              </span>
+              <ArrowUpRight className="size-5 shrink-0 text-blue-600" />
             </a>
           ) : null}
         </section>

@@ -85,13 +85,9 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Safety timeout: force ready=true after 5s if the server hangs completely
-    const safetyTimer = setTimeout(() => setReady(true), 5000);
-
     reload()
       .catch(() => {})
       .finally(() => {
-        clearTimeout(safetyTimer);
         setReady(true);
       });
   }, [user, reload]);

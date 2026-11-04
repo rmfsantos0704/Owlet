@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  Archive, Bot, Copy, FileDown, Highlighter, MessageSquareText, Quote, Search, Settings, Tag, Upload, X, type LucideIcon,
+  Archive, Bot, Copy, FileDown, Highlighter, LoaderCircle, MessageSquareText, Quote, Search, Settings, Tag, Upload, X, type LucideIcon,
 } from "lucide-react";
 import { api, download, upload } from "../services/api";
 import type { ResearchItem } from "../types";
@@ -232,7 +232,16 @@ export default function Library({ all = false }: { all?: boolean }) {
     { label: "Comments", value: items.reduce((n, i) => n + (i.comments?.length ?? 0), 0), icon: MessageSquareText, accent: "bg-emerald-50 text-emerald-700" },
   ];
 
-  if (!all && ready && !current) {
+  if (!all && !ready) {
+    return (
+      <div role="status" className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-sm text-slate-500">
+        <LoaderCircle className="size-6 animate-spin text-blue-600" aria-hidden="true" />
+        <span>Loading your collections…</span>
+      </div>
+    );
+  }
+
+  if (!all && !current) {
     return <p className="text-red-600">Couldn't load your collections. Check that the server is running, then refresh.</p>;
   }
 
