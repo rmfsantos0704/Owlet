@@ -100,8 +100,34 @@ async function applyTheme(loggedIn: boolean) {
 
 function closeTour() {
   $("tourOverlay").hidden = true;
+  $("tourCard").hidden = true;
   document.querySelectorAll(".tour-target").forEach((target) => target.classList.remove("tour-target"));
+  window.removeEventListener("resize", positionTour);
+  window.removeEventListener("scroll", positionTour, true);
   void chrome.storage.local.set({ [TOUR_KEY]: true });
+}
+
+function positionTour() {
+  const target = document.getElementById(TOUR_STEPS[tourStep].target);
+  if (!target || $("tourOverlay").hidden) return;
+  const targetRect = target.getBoundingClientRect();
+  const card = $("tourCard");
+  const cardRect = card.getBoundingClientRect();
+  const margin = 12;
+  let top = targetRect.bottom + 10;
+  if (top + cardRect.height > window.innerHeight - margin) {
+    top = targetRect.top - cardRect.height - 10;
+  }
+  top = Math.max(margin, Math.min(top, window.innerHeight - cardRect.height - margin));
+  const left = Math.max(
+    margin,
+    Math.min(
+      targetRect.left + targetRect.width / 2 - cardRect.width / 2,
+      window.innerWidth - cardRect.width - margin
+    )
+  );
+  card.style.top = `${top}px`;
+  card.style.left = `${left}px`;
 }
 
 function showTour(index = 0) {
@@ -117,6 +143,12 @@ function showTour(index = 0) {
   $<HTMLButtonElement>("tourBack").hidden = tourStep === 0;
   $("tourNext").textContent = tourStep === TOUR_STEPS.length - 1 ? "Done" : "Next";
   $("tourOverlay").hidden = false;
+  $("tourCard").hidden = false;
+  window.removeEventListener("resize", positionTour);
+  window.removeEventListener("scroll", positionTour, true);
+  window.addEventListener("resize", positionTour);
+  window.addEventListener("scroll", positionTour, true);
+  requestAnimationFrame(positionTour);
   $("tourNext").focus();
 }
 
