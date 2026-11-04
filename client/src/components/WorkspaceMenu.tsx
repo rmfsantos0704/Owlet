@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Archive, ChevronRight, Highlighter, MessageSquareText, Sparkles, Table } from "lucide-react";
+import { Archive, ChevronRight, CircleHelp, Highlighter, MessageSquareText, Sparkles, Table } from "lucide-react";
+import { openOnboardingAt } from "../utils/onboarding";
 
 const WORKSPACE_LINKS = [
   { to: "/all", label: "All clips", icon: Archive },
@@ -30,11 +31,13 @@ const writeOpen = (open: boolean) => {
 type Props = {
   /** Called after a link is clicked (the layout uses it to close the mobile drawer). */
   onNavigate?: () => void;
+  tourActive?: boolean;
 };
 
-export default function WorkspaceMenu({ onNavigate }: Props) {
+export default function WorkspaceMenu({ onNavigate, tourActive = false }: Props) {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(readOpen);
+  const expanded = open || tourActive;
 
   const activeLink = WORKSPACE_LINKS.find((l) => pathname === l.to || pathname.startsWith(`${l.to}/`));
 
@@ -46,30 +49,39 @@ export default function WorkspaceMenu({ onNavigate }: Props) {
   }
 
   return (
-    <nav className="shrink-0">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        aria-controls="workspace-links"
-        className="group mb-2 flex w-full items-center justify-between gap-2 px-3"
-      >
-        {/* same markup as the "Collections" heading so the text renders at the same size */}
-        <span className="flex items-center gap-1.5">
-          <ChevronRight
-            className={`size-3 text-slate-400 transition-transform group-hover:text-slate-600 ${open ? "rotate-90" : ""}`}
-          />
-          <span className="eyebrow">Workspaces</span>
-        </span>
-        {/* when closed, still show where you are */}
-        {!open && activeLink && (
-          <span className="truncate text-[11px] font-semibold normal-case tracking-normal text-brand">
-            {activeLink.label}
+    <nav className="shrink-0" id="owlet-tour-workspaces" data-onboarding-target="workspaces">
+      <div className="mb-2 flex items-center justify-between gap-2 px-3">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={expanded}
+          aria-controls="workspace-links"
+          className="group flex min-w-0 flex-1 items-center justify-between gap-2"
+        >
+          <span className="flex items-center gap-1.5">
+            <ChevronRight
+              className={`size-3 text-slate-400 transition-transform group-hover:text-slate-600 ${expanded ? "rotate-90" : ""}`}
+            />
+            <span className="eyebrow">Workspaces</span>
           </span>
-        )}
-      </button>
+          {!expanded && activeLink && (
+            <span className="truncate text-[11px] font-semibold normal-case tracking-normal text-brand">
+              {activeLink.label}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => openOnboardingAt(0)}
+          title="About workspaces"
+          aria-label="About workspaces"
+          className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-brand"
+        >
+          <CircleHelp className="size-3.5" />
+        </button>
+      </div>
 
-      {open && (
+      {expanded && (
         <div id="workspace-links" className="space-y-0.5">
           {WORKSPACE_LINKS.map(({ to, label, icon: Icon }) => (
             <NavLink

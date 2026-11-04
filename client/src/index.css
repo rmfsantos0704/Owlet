@@ -75,6 +75,15 @@ html.dark [class~="bg-slate-950/30"] {
   background-color: rgb(2 6 23 / 40%);
 }
 
+.onboarding-highlight {
+  position: relative;
+  z-index: 80;
+  border-radius: 0.75rem;
+  outline: 2px solid #60a5fa;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgb(59 130 246 / 18%);
+}
+
 button, input, textarea, select {
   font: inherit;
   -webkit-tap-highlight-color: transparent;

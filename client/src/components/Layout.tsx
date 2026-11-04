@@ -28,6 +28,7 @@ import CollectionMenu from "./CollectionMenu";
 import WorkspaceMenu from "./WorkspaceMenu";
 import AiUsageIndicator from "./AiUsageIndicator";
 import OnboardingModal from "./OnboardingModal";
+import { ONBOARDING_EVENT } from "../utils/onboarding";
 
 // pages where the header search filters what's shown (everywhere else it jumps to the collection page)
 const SEARCHABLE = ["/all", "/highlights", "/comments"];
@@ -72,6 +73,7 @@ export default function Layout() {
   const [onboardingOpen, setOnboardingOpen] = useState(
     () => Boolean(onboardingKey && readStore(onboardingKey) !== "1")
   );
+  const [onboardingStep, setOnboardingStep] = useState(0);
 
   function closeOnboarding() {
     if (onboardingKey) {
@@ -84,6 +86,16 @@ export default function Layout() {
     setOnboardingOpen(false);
   }
 
+  useEffect(() => {
+    const handleOpen = (event: Event) => {
+      const requestedStep = (event as CustomEvent<number>).detail;
+      setOnboardingStep(Number.isInteger(requestedStep) ? Math.min(Math.max(requestedStep, 0), 2) : 0);
+      setOnboardingOpen(true);
+    };
+    window.addEventListener(ONBOARDING_EVENT, handleOpen);
+    return () => window.removeEventListener(ONBOARDING_EVENT, handleOpen);
+  }, []);
+
   // desktop sidebar: draggable width, can be hidden, and peeks out when you hover the Owlet icon
   const [width, setWidth] = useState(() => {
     const saved = Number(readStore(WIDTH_KEY));
@@ -95,6 +107,15 @@ export default function Layout() {
   const [willHide, setWillHide] = useState(false); // edge is dragged far enough left that releasing will hide it
   const peekTimer = useRef<number | undefined>(undefined);
   const draggingRef = useRef(false);
+
+  useEffect(() => {
+    if (!onboardingOpen) return;
+    if (window.matchMedia("(max-width: 639px)").matches) setOpen(true);
+    if (collapsed) setPeek(true);
+    return () => {
+      if (collapsed) setPeek(false);
+    };
+  }, [onboardingOpen, collapsed]);
 
   useEffect(() => {
     if (!dragging) writeStore(WIDTH_KEY, String(width));
@@ -303,15 +324,29 @@ export default function Layout() {
           </button>
         </div>
 
-        <WorkspaceMenu onNavigate={() => setOpen(false)} />
+        <WorkspaceMenu onNavigate={() => setOpen(false)} tourActive={onboardingOpen} />
         <AiUsageIndicator />
 
         <nav className="mt-7 flex min-h-0 flex-1 flex-col">
-          <div className="mb-2 flex shrink-0 items-center justify-between px-3">
+          <div id="owlet-tour-collections" className="mb-2 flex shrink-0 items-center justify-between px-3" data-onboarding-target="collections">
             <span className="eyebrow">Collections</span>
-            <button onClick={() => setAdding((v) => !v)} className="text-slate-400 hover:text-brand" title="New Collection">
-              <Plus className="size-3.5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setOnboardingStep(1);
+                  setOnboardingOpen(true);
+                }}
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-brand"
+                title="About Collections"
+                aria-label="About Collections"
+              >
+                <CircleHelp className="size-3.5" />
+              </button>
+              <button onClick={() => setAdding((v) => !v)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-brand" title="New Collection" aria-label="New Collection">
+                <Plus className="size-3.5" />
+              </button>
+            </div>
           </div>
           {adding && (
             <form onSubmit={addCollection} className="shrink-0 px-1 pb-1">
@@ -325,7 +360,7 @@ export default function Layout() {
               />
             </form>
           )}
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <div id="owlet-tour-collection-list" className="min-h-0 flex-1 overflow-y-auto pr-1" data-onboarding-target="collection-list">
             <div className="space-y-0.5">{visible.map(row)}</div>
             {archivedList.length > 0 && (
               <div className="mt-4">
@@ -435,7 +470,7 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
-      <OnboardingModal open={onboardingOpen} onClose={closeOnboarding} />
+      <OnboardingModal key={onboardingStep} open={onboardingOpen} onClose={closeOnboarding} initialStep={onboardingStep} />
     </div>
   );
 }

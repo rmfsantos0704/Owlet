@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import SupportModal from "../components/SupportModal"; // adjust path to match where the file lives
 import { useAuth } from "../context/AuthContext";
-import OnboardingModal from "../components/OnboardingModal";
+import { openOnboardingAt } from "../utils/onboarding";
 
 type Guide = { icon: LucideIcon; title: string; text: string; accent: string };
 
@@ -166,7 +166,6 @@ export default function HelpSupport() {
   const { aiEnabled } = useAuth();
   const [open, setOpen] = useState<number | null>(0);
   const [supportOpen, setSupportOpen] = useState(false);
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   const GUIDES = guides(aiEnabled);
   const FAQ = faq(aiEnabled);
@@ -189,7 +188,7 @@ export default function HelpSupport() {
           <h2 className="font-semibold text-ink">New to Owlet?</h2>
           <p className="mt-1 text-sm text-slate-500">Take a quick tour of clipping, organizing, and working with your research.</p>
         </div>
-        <button type="button" onClick={() => setOnboardingOpen(true)} className="btn-secondary shrink-0">
+        <button type="button" onClick={() => openOnboardingAt(0)} className="btn-secondary shrink-0">
           <Play className="size-4" /> Show the introduction
         </button>
       </section>
@@ -269,7 +268,6 @@ export default function HelpSupport() {
       </section>
 
       <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
-      <OnboardingModal open={onboardingOpen} onClose={() => setOnboardingOpen(false)} />
     </div>
   );
 }
