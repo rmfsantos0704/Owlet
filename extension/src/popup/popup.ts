@@ -275,11 +275,13 @@ async function loadFeatures() {
       Number.isFinite(usage.remaining)
     ) {
       const exhausted = usage.remaining === 0;
-      $("aiUsage").hidden = false;
+      const usageIndicator = $("aiUsage");
+      usageIndicator.hidden = false;
+      usageIndicator.classList.toggle("ai-usage-exhausted", exhausted);
       $("aiUsageCount").textContent = `${usage.used}/${usage.limit}`;
-      $("aiUsageLabel").textContent = exhausted
-        ? "Daily allowance used. AI is off for your account until midnight UTC."
-        : `${usage.remaining} ${usage.remaining === 1 ? "use" : "uses"} left today. AI pauses for your account when used up.`;
+      $("aiUsageToast").textContent = exhausted
+        ? "You've used all your AI uses for today. Your allowance resets at midnight UTC."
+        : `${usage.remaining} ${usage.remaining === 1 ? "use" : "uses"} left today.`;
       const progress = $("aiUsageProgress");
       progress.setAttribute("aria-valuemax", String(usage.limit));
       progress.setAttribute("aria-valuenow", String(Math.min(usage.used, usage.limit)));

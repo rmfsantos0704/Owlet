@@ -75,6 +75,44 @@ html.dark .btn-secondary:hover {
   border-color: #3a4b63;
 }
 
+.ai-usage-popover {
+  position: relative;
+}
+
+.ai-usage-toast {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 70;
+  width: 15rem;
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: white;
+  color: #475569;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  box-shadow: 0 10px 24px rgb(15 23 42 / 14%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.ai-usage-popover:hover .ai-usage-toast,
+.ai-usage-popover:focus-within .ai-usage-toast,
+.ai-usage-popover.ai-usage-exhausted .ai-usage-toast {
+  opacity: 1;
+  visibility: visible;
+}
+
+html.dark .ai-usage-toast {
+  border-color: #26364d;
+  background: #111c2f;
+  color: #d3dce7;
+}
+
 html.dark .appearance-switch-knob {
   background-color: #fff;
 }
