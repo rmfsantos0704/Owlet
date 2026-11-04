@@ -1,9 +1,18 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
 type Theme = "light" | "dark";
 type ThemeValue = { theme: Theme; setTheme: (theme: Theme) => void };
 
 const STORAGE_KEY = "owlet.theme";
+const AUTH_PATHS = new Set([
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+  "/confirm-email-change",
+]);
 const ThemeContext = createContext<ThemeValue | null>(null);
 
 function readTheme(): Theme {
@@ -16,15 +25,16 @@ function readTheme(): Theme {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(readTheme);
+  const { pathname } = useLocation();
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.classList.toggle("dark", theme === "dark" && !AUTH_PATHS.has(pathname));
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {
       // The preference still applies for this session when storage is unavailable.
     }
-  }, [theme]);
+  }, [theme, pathname]);
 
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }
