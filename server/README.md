@@ -16,10 +16,11 @@
 | `JWT_SECRET` | A randomly generated secret with at least 32 characters. |
 | `CLIENT_URL` | The dashboard's exact HTTPS origin, with no path. |
 | `TRUST_PROXY` | `1` |
-| `SMTP_HOST` | SMTP server hostname. |
-| `SMTP_USER` | SMTP username. |
-| `SMTP_PASS` | SMTP password or provider app password. |
-| `MAIL_FROM` | Verified sender address/name for the SMTP provider. |
+| `RESEND_API_KEY` | Resend API key. Recommended for Vercel deployments because email is sent over HTTPS rather than SMTP. |
+| `SMTP_HOST` | SMTP server hostname. Required with `SMTP_USER` and `SMTP_PASS` only when `RESEND_API_KEY` is not set. |
+| `SMTP_USER` | SMTP username (SMTP fallback only). |
+| `SMTP_PASS` | SMTP password or provider app password (SMTP fallback only). |
+| `MAIL_FROM` | Verified sender address/name for the selected email provider. |
 | `SUPPORT_EMAIL` | Address that receives support requests. |
 
 `AI_ENABLED` defaults to off. To enable the managed provider pool, set it to `true` and configure one or more providers. Requests try providers in this order:
@@ -37,6 +38,8 @@
 Keep provider keys in the API server's environment settings, never in the dashboard or extension. If a configured provider returns an error, times out, or returns an unusable response, Owlet tries the next configured provider, up to 45 seconds total. Provider quotas are still shared by all Owlet users; the per-account allowance prevents one account from using more than its limit but cannot guarantee the providers' overall free quotas will last. No provider guarantees unlimited free usage, and free-tier terms, rate limits, models, and availability can change. A free-tier pool can avoid AI API charges only while using models and accounts actually covered by those providers' free tiers; check each provider's current terms and billing settings. Research text is sent to whichever provider handles a request, so review their data-use terms before enabling them for users. `EXTRA_ORIGINS` is an optional comma-separated list of additional exact HTTPS origins.
 
 In MongoDB Atlas, configure a database user with only the permissions the app needs. Atlas must allow connections from Vercel; Vercel's serverless functions do not have a fixed outbound IP on every plan, so review Atlas's IP access list options for your plan before deployment.
+
+For Vercel, configure `RESEND_API_KEY` and a `MAIL_FROM` address on a domain verified with Resend, then redeploy. Owlet sends registration, verification, password-reset, and support messages through Resend's HTTPS API when the key is present. SMTP remains available as a fallback for non-serverless deployments.
 
 ## Verify and connect the clients
 
