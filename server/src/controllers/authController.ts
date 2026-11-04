@@ -112,7 +112,7 @@ export async function register(req: Request, res: Response) {
       { _id: existing._id },
       { $set: { passwordHash, age, termsVersion: TERMS_VERSION, termsAcceptedAt: new Date() } }
     );
-    if (await claimEmailSlot(existing._id)) fire(issueVerification(existing));
+    if (await claimEmailSlot(existing._id)) await issueVerification(existing);
   } else {
     try {
       const user = await User.create({
@@ -122,7 +122,7 @@ export async function register(req: Request, res: Response) {
         termsVersion: TERMS_VERSION,
         termsAcceptedAt: new Date(),
       });
-      fire(issueVerification(user));
+      await issueVerification(user);
     } catch (err) {
       if ((err as { code?: number })?.code !== 11000) throw err; // lost a race with a parallel signup: same answer
     }
@@ -150,7 +150,7 @@ export async function resendVerification(req: Request, res: Response) {
   if (!parsed.success) return res.status(400).json({ error: firstError(parsed.error) });
 
   const user = await User.findOne({ email: parsed.data.email });
-  if (user && user.emailVerified === false && (await claimEmailSlot(user._id))) fire(issueVerification(user));
+  if (user && user.emailVerified === false && (await claimEmailSlot(user._id))) await issueVerification(user);
   res.status(202).json({ message: "If that account needs verifying, we've sent a new link." });
 }
 
