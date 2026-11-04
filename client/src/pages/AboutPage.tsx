@@ -22,9 +22,6 @@ export default function AboutPage() {
           <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600">
             Owlet helps you collect useful sources, keep track of the ideas inside them, and bring your research together in focused Collections.
           </p>
-          <Link to="/extension" className="btn-primary mt-7 inline-flex items-center gap-2">
-            Explore the Chrome extension <ArrowRight className="size-4" />
-          </Link>
         </section>
 
         <section className="mt-12 grid gap-4 md:grid-cols-3">

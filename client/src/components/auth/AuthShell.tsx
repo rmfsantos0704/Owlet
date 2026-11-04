@@ -27,17 +27,6 @@ export default function AuthShell({ children }: { children: ReactNode }) {
               className="relative mx-auto w-full max-w-[180px] object-contain drop-shadow-xl sm:max-w-[260px] lg:mx-0 lg:max-w-[320px]"
             />
           </div>
-          <Link
-            to="/extension"
-            className="mt-3 inline-flex w-full max-w-md items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-white p-4 text-left shadow-md shadow-blue-900/5 transition hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-          >
-            <span>
-              <span className="block text-xs font-semibold uppercase tracking-wide text-blue-600">Browser extension</span>
-              <span className="mt-0.5 block text-sm font-bold text-[#0a234d]">Discover Owlet for Chrome</span>
-              <span className="mt-0.5 block text-xs text-slate-500">See how it works and get started.</span>
-            </span>
-            <ArrowRight className="size-5 shrink-0 text-blue-600" />
-          </Link>
         </section>
         <section className="w-full max-w-md">{children}</section>
       </main>
