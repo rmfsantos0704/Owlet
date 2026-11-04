@@ -2,11 +2,13 @@
 // localStorage calls. When the dashboard logs in, logs out or drops an expired token, it tells bridge.ts
 // straight away. It never reads or sends the token anywhere else.
 const KEY = "token";
+const PAGE_STAMP_KEY = "owlet.tokenAt";
 
 function announce() {
   let token: string | null = null;
   try {
     token = localStorage.getItem(KEY);
+    localStorage.setItem(PAGE_STAMP_KEY, String(Date.now()));
   } catch {
     /* storage blocked */
   }
