@@ -31,15 +31,12 @@ export function getEnvironmentProblems(isProd: boolean): string[] {
   }
 
   if (isProd) {
-    for (const key of [
-      "SMTP_HOST",
-      "SMTP_USER",
-      "SMTP_PASS",
-      "MAIL_FROM",
-      "SUPPORT_EMAIL",
-      "CLIENT_URL",
-      "TRUST_PROXY",
-    ]) {
+    if (!process.env.RESEND_API_KEY) {
+      for (const key of ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"]) {
+        need(key, " (required when RESEND_API_KEY is not set)");
+      }
+    }
+    for (const key of ["MAIL_FROM", "SUPPORT_EMAIL", "CLIENT_URL", "TRUST_PROXY"]) {
       need(key, " (required in production)");
     }
     if (process.env.CLIENT_URL && !process.env.CLIENT_URL.startsWith("https://")) {

@@ -2,7 +2,7 @@ import nodemailer, { type Transporter } from "nodemailer";
 
 export type Mail = { to: string; subject: string; text: string; html?: string; replyTo?: string };
 
-// Development only (no SMTP configured): emails are printed to the server console and kept here.
+// Development only (no email provider configured): emails are printed to the server console and kept here.
 export const outbox: Mail[] = [];
 
 let transport: Transporter | null | undefined;
@@ -32,13 +32,41 @@ function getTransport() {
   return transport;
 }
 
+async function sendWithResend(mail: Mail) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: process.env.MAIL_FROM,
+      to: mail.to,
+      subject: mail.subject,
+      text: mail.text,
+      ...(mail.html ? { html: mail.html } : {}),
+      ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Resend email request failed with HTTP ${response.status}`);
+  }
+}
+
 export async function sendMail(mail: Mail) {
+  if (process.env.RESEND_API_KEY) {
+    await sendWithResend(mail);
+    return;
+  }
+
   const t = getTransport();
   if (!t) {
     outbox.push(mail);
     if (outbox.length > 20) outbox.shift();
     console.log(
-      `\n--- email (dev: SMTP not configured) ---\nTo: ${mail.to}\nSubject: ${mail.subject}\n\n${mail.text}\n----------------------------------------\n`
+      `\n--- email (dev: no email provider configured) ---\nTo: ${mail.to}\nSubject: ${mail.subject}\n\n${mail.text}\n----------------------------------------\n`
     );
     return;
   }

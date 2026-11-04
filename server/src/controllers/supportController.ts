@@ -59,7 +59,7 @@ export async function sendSupport(req: Request, res: Response) {
 
   const to = process.env.SUPPORT_EMAIL;
   if (!to) {
-    console.error("Support email isn't configured: set SUPPORT_EMAIL (and SMTP settings in production)");
+    console.error("Support email isn't configured: set SUPPORT_EMAIL and configure RESEND_API_KEY or SMTP settings in production");
     return res.status(503).json({ error: "Support email isn't available right now. Please try again later." });
   }
 
