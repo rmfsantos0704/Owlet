@@ -15,8 +15,11 @@ contains only the deployed Owlet API and dashboard origins. Zip the **contents**
 of `dist/` (so `manifest.json` is at the ZIP root), then upload that ZIP in the
 Chrome Web Store Developer Dashboard.
 
-Before publishing an update, increment `version` in both `manifest.json` and
-`manifest.prod.json`. The Chrome Web Store version must be higher than the
+The popup introduces clipping and Collection features on first use, has a
+replayable guide, and includes a saved light/dark theme preference.
+
+Before publishing another update, increment `version` in both `manifest.json`
+and `manifest.prod.json`. The Chrome Web Store version must be higher than the
 previously published version.
 
 ## Local development
