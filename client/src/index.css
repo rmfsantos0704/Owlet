@@ -25,6 +25,56 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+html.dark {
+  color-scheme: dark;
+  --color-canvas: #0b1220;
+  --color-ink: #e2e8f0;
+  --color-brand: #4b78d1;
+  --color-brand-hover: #5d8be5;
+  --color-slate-50: #111c2f;
+  --color-slate-100: #172338;
+  --color-slate-200: #26364d;
+  --color-slate-300: #3a4b63;
+  --color-slate-400: #8292a8;
+  --color-slate-500: #a4b1c2;
+  --color-slate-600: #c0cad7;
+  --color-slate-700: #d3dce7;
+  --color-slate-800: #e2e8f0;
+  --color-slate-900: #edf2f7;
+  --color-slate-950: #f8fafc;
+  --color-gray-50: #111c2f;
+  --color-gray-100: #172338;
+  --color-gray-200: #26364d;
+  --color-gray-300: #3a4b63;
+  --color-gray-400: #8292a8;
+  --color-gray-500: #a4b1c2;
+  --color-gray-600: #c0cad7;
+  --color-gray-700: #d3dce7;
+  --color-gray-800: #e2e8f0;
+  --color-gray-900: #edf2f7;
+  --color-gray-950: #f8fafc;
+}
+
+html.dark [class~="bg-white"] {
+  background-color: #111c2f;
+}
+
+html.dark .appearance-switch-knob {
+  background-color: #fff;
+}
+
+html.dark [class~="bg-white/90"] {
+  background-color: rgb(17 28 47 / 90%);
+}
+
+html.dark [class~="bg-white/10"] {
+  background-color: rgb(255 255 255 / 10%);
+}
+
+html.dark [class~="bg-slate-950/30"] {
+  background-color: rgb(2 6 23 / 40%);
+}
+
 button, input, textarea, select {
   font: inherit;
   -webkit-tap-highlight-color: transparent;

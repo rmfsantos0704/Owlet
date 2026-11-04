@@ -9,12 +9,14 @@ import {
   LifeBuoy,
   ListChecks,
   Mail,
+  Play,
   Share2,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import SupportModal from "../components/SupportModal"; // adjust path to match where the file lives
 import { useAuth } from "../context/AuthContext";
+import OnboardingModal from "../components/OnboardingModal";
 
 type Guide = { icon: LucideIcon; title: string; text: string; accent: string };
 
@@ -164,6 +166,7 @@ export default function HelpSupport() {
   const { aiEnabled } = useAuth();
   const [open, setOpen] = useState<number | null>(0);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   const GUIDES = guides(aiEnabled);
   const FAQ = faq(aiEnabled);
@@ -179,6 +182,16 @@ export default function HelpSupport() {
         <p className="mt-2 max-w-2xl text-sm text-slate-500">
           Quick guides for the things you'll do most, answers to common questions, and a way to reach us.
         </p>
+      </section>
+
+      <section className="card mb-8 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-ink">New to Owlet?</h2>
+          <p className="mt-1 text-sm text-slate-500">Take a quick tour of clipping, organizing, and working with your research.</p>
+        </div>
+        <button type="button" onClick={() => setOnboardingOpen(true)} className="btn-secondary shrink-0">
+          <Play className="size-4" /> Show the introduction
+        </button>
       </section>
 
       <section className="mb-8">
@@ -256,6 +269,7 @@ export default function HelpSupport() {
       </section>
 
       <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+      <OnboardingModal open={onboardingOpen} onClose={() => setOnboardingOpen(false)} />
     </div>
   );
 }

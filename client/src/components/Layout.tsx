@@ -27,6 +27,7 @@ import NotificationsBell from "./NotificationsBell";
 import CollectionMenu from "./CollectionMenu";
 import WorkspaceMenu from "./WorkspaceMenu";
 import AiUsageIndicator from "./AiUsageIndicator";
+import OnboardingModal from "./OnboardingModal";
 
 // pages where the header search filters what's shown (everywhere else it jumps to the collection page)
 const SEARCHABLE = ["/all", "/highlights", "/comments"];
@@ -66,6 +67,22 @@ export default function Layout() {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const onboardingUser = user ? user.id ?? user.email.toLowerCase() : null;
+  const onboardingKey = onboardingUser ? `owlet.onboarding.dismissed:${encodeURIComponent(onboardingUser)}` : null;
+  const [onboardingOpen, setOnboardingOpen] = useState(
+    () => Boolean(onboardingKey && readStore(onboardingKey) !== "1")
+  );
+
+  function closeOnboarding() {
+    if (onboardingKey) {
+      try {
+        localStorage.setItem(onboardingKey, "1");
+      } catch {
+        // The tour can still be dismissed for this session if storage is unavailable.
+      }
+    }
+    setOnboardingOpen(false);
+  }
 
   // desktop sidebar: draggable width, can be hidden, and peeks out when you hover the Owlet icon
   const [width, setWidth] = useState(() => {
@@ -418,6 +435,7 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+      <OnboardingModal open={onboardingOpen} onClose={closeOnboarding} />
     </div>
   );
 }

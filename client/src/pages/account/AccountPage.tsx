@@ -7,6 +7,7 @@ import PasswordCard from "../../components/account/PasswordCard";
 import SessionsCard from "../../components/account/SessionsCard";
 import DataCard from "../../components/account/DataCard";
 import DeleteAccountCard from "../../components/account/DeleteAccountCard";
+import AppearanceCard from "../../components/account/AppearanceCard";
 
 export default function AccountPage() {
   const [data, setData] = useState<AccountData | null>(null);
@@ -44,6 +45,7 @@ export default function AccountPage() {
         </p>
       </div>
 
+      <AppearanceCard />
       <EmailCard account={account} onChanged={load} />
       <PasswordCard />
       <SessionsCard />

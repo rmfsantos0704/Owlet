@@ -5,6 +5,7 @@ import "./index.css";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { CollectionProvider } from "./context/CollectionContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { wakeServer } from "./services/api";
 
 wakeServer(); // free hosts sleep when idle: start waking the server before anyone clicks anything
@@ -12,11 +13,13 @@ wakeServer(); // free hosts sleep when idle: start waking the server before anyo
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <CollectionProvider>
-          <App />
-        </CollectionProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <CollectionProvider>
+            <App />
+          </CollectionProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </StrictMode>
 );
