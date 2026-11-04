@@ -1,6 +1,4 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 import PublicSiteFooter from "../PublicSiteFooter";
 import PublicSiteHeader from "../PublicSiteHeader";
 // The page frame shared by every auth screen: mascot on the left, the card on the right.
