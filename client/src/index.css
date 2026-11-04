@@ -64,6 +64,17 @@ html.dark .card {
   border-color: #26364d;
 }
 
+html.dark .btn-secondary {
+  background-color: #111c2f;
+  border-color: #26364d;
+  color: #d3dce7;
+}
+
+html.dark .btn-secondary:hover {
+  background-color: #172338;
+  border-color: #3a4b63;
+}
+
 html.dark .appearance-switch-knob {
   background-color: #fff;
 }
