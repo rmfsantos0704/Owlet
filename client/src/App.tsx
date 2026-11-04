@@ -20,6 +20,8 @@ import Highlights from "./pages/Highlights";
 import Comments from "./pages/Comments";
 import LiteratureMatrix from "./pages/LiteratureMatrix";
 import HelpSupport from "./pages/HelpSupport";
+import AboutPage from "./pages/AboutPage";
+import ExtensionPage from "./pages/ExtensionPage";
 import { DialogProvider } from "./context/DialogContext";
 
 // A join link opened while logged out: remember it, send the person to log in, then bring them back.
@@ -69,6 +71,8 @@ export default function App() {
       <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/extension" element={<ExtensionPage />} />
 
       <Route element={user ? <Layout /> : <ToLogin />}>
         <Route path="/" element={<Library />} />
