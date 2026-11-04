@@ -13,13 +13,13 @@ wakeServer(); // free hosts sleep when idle: start waking the server before anyo
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <ThemeProvider>
           <CollectionProvider>
             <App />
           </CollectionProvider>
-        </AuthProvider>
-      </ThemeProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>
 );

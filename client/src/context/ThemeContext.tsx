@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "./AuthContext";
 
 type Theme = "light" | "dark";
 type ThemeValue = { theme: Theme; setTheme: (theme: Theme) => void };
@@ -26,15 +27,16 @@ function readTheme(): Theme {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(readTheme);
   const { pathname } = useLocation();
+  const { user } = useAuth();
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark" && !AUTH_PATHS.has(pathname));
+    document.documentElement.classList.toggle("dark", theme === "dark" && !!user && !AUTH_PATHS.has(pathname));
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {
       // The preference still applies for this session when storage is unavailable.
     }
-  }, [theme, pathname]);
+  }, [theme, pathname, user]);
 
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }

@@ -49,12 +49,12 @@ export default function LegalLayout({
   };
 
   return (
-    <div className="min-h-screen bg-[#f3f6fa] text-slate-900">
+    <div className="min-h-screen bg-canvas text-slate-900">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3">
           <Link to="/" className="flex items-center gap-2.5">
             <img src="/logo.png" alt="" className="size-8 rounded-[23.4%] shadow-md shadow-blue-950/15" />
-            <span className="text-[15px] font-bold tracking-tight text-[#0a234d]">Owlet</span>
+            <span className="text-[15px] font-bold tracking-tight text-ink">Owlet</span>
           </Link>
           <button
             type="button"
@@ -78,7 +78,7 @@ export default function LegalLayout({
         ) : null}
 
         <article className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-300/30 sm:p-9">
-          <h1 className="text-3xl font-semibold tracking-tight text-[#0a234d]">{title}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-ink">{title}</h1>
           <p className="mt-2 text-sm text-slate-400">
             Last updated {LEGAL.lastUpdated} · Version {LEGAL.termsVersion}
           </p>
@@ -107,7 +107,7 @@ export default function LegalLayout({
           <div className="mt-8 space-y-8">
             {sections.map((s, i) => (
               <section key={s.id} id={s.id} className="scroll-mt-6">
-                <h2 className="text-lg font-semibold text-[#0a234d]">
+                <h2 className="text-lg font-semibold text-ink">
                   {i + 1}. {s.title}
                 </h2>
                 <div className="mt-2 space-y-3 text-[15px] leading-7 text-slate-600">
