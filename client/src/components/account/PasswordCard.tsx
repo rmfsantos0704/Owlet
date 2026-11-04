@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { api } from "../../services/api";
+import { setSessionToken } from "../../services/session";
 import { useAction } from "../../hooks/useAction";
 import { passwordProblem } from "../../utils/password";
 import PasswordStrength from "../auth/PasswordStrength";
@@ -25,7 +26,7 @@ export default function PasswordCard() {
         body: { currentPassword: current, newPassword: next, confirmPassword: confirm },
       });
       // the old token stopped working with the change, so keep this device signed in with the new one
-      localStorage.setItem("token", r.token);
+      setSessionToken(r.token);
       return "Password updated. Every other device was signed out.";
     });
     if (ok) {

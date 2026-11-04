@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError, AI_QUOTA_EXHAUSTED_EVENT, AI_USAGE_UPDATED_EVENT } from "../services/api";
+import { clearSessionToken, setSessionToken } from "../services/session";
 
 type User = { id?: string; email: string };
 type AiDailyUsage = { used: number; limit: number; remaining: number };
@@ -47,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .catch((e) => {
           if (cancelled) return;
           // only a rejected login ends the session; a network hiccup or server error must not log anyone out
-          if (e instanceof ApiError && (e.status === 401 || e.status === 403)) localStorage.removeItem("token");
+          if (e instanceof ApiError && (e.status === 401 || e.status === 403)) clearSessionToken();
           setUser(null);
           setAiEnabled(false);
           setAiUsage(null);
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .catch((e) => {
           if (cancelled) return;
           if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
-            localStorage.removeItem("token");
+            clearSessionToken();
             setUser(null);
             setAiEnabled(false);
             setAiUsage(null);
@@ -128,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         body: { email, password },
       });
-      localStorage.setItem("token", r.token);
+      setSessionToken(r.token);
       setUser(r.user);
       setAiEnabled(!!r.features?.ai);
       setAiUsage(r.features?.aiUsage ?? null);
@@ -137,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api("/auth/register", { method: "POST", body: input });
     },
     logout: () => {
-      localStorage.removeItem("token");
+      clearSessionToken();
       setUser(null);
       setAiEnabled(false);
       setAiUsage(null);

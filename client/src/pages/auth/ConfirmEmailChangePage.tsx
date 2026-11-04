@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import { api } from "../../services/api";
+import { clearSessionToken } from "../../services/session";
 import AuthShell, { AuthCard } from "../../components/auth/AuthShell";
 
 const BAD_LINK = "This link is invalid or has expired.";
@@ -53,7 +54,7 @@ export default function ConfirmEmailChangePage() {
           {/* a full page load on purpose: it clears the old session from this tab */}
           <a
             href="/login"
-            onClick={() => localStorage.removeItem("token")}
+            onClick={clearSessionToken}
             className="flex w-full items-center justify-center rounded-lg bg-[#102b5c] py-3.5 text-base font-bold text-white shadow-sm hover:bg-[#173b77]"
           >
             Log in

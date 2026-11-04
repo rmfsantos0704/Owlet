@@ -103,21 +103,20 @@ window.addEventListener("message", (e) => {
 setInterval(() => onPageChange(pageToken()), 2000);
 
 // 3. Live changes made in the extension (login or logout in the popup).
-chrome.storage.onChanged.addListener(async (changes, area) => {
-  if (area !== "local" || !changes.token) return;
-  try {
-    const next = clean(changes.token.newValue);
-    if (next === pageToken()) {
-      lastPage = next; // this was the dashboard's own change coming back
-      return;
-    }
-    const { tokenAt } = await chrome.storage.local.get("tokenAt");
-    lastPage = next;
-    writePage(next, typeof tokenAt === "number" ? tokenAt : Date.now());
-    reloadPage();
-  } catch (error) {
-    reportSyncError(error);
+async function syncExtensionToken(next: string | null) {
+  if (next === pageToken()) {
+    lastPage = next; // this was the dashboard's own change coming back
+    return;
   }
+  const { tokenAt } = await chrome.storage.local.get("tokenAt");
+  lastPage = next;
+  writePage(next, typeof tokenAt === "number" ? tokenAt : Date.now());
+  reloadPage();
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.token) return;
+  void syncExtensionToken(clean(changes.token.newValue)).catch(reportSyncError);
 });
 
 void initialSync().catch(reportSyncError);

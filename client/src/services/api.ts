@@ -1,3 +1,5 @@
+import { clearSessionToken } from "./session";
+
 const API_URL = ((import.meta.env.VITE_API_URL as string | undefined) ?? "").replace(/\/+$/, "");
 
 const TIMEOUT_MS = 120_000; // some requests wait for the AI, and a sleeping free server takes about a minute to wake
@@ -42,7 +44,7 @@ function networkError(e: unknown) {
 
 function handleUnauthorized(status: number, token: string | null) {
   if (status === 401 && token) {
-    localStorage.removeItem("token");
+    clearSessionToken();
     window.location.href = "/login";
   }
 }
