@@ -346,7 +346,16 @@ function restoreSelection() {
 // Collection settings: only the join link lives here now, and only the owner of a shared collection gets it.
 function fillSettings() {
   const ws = selected();
-  const canShare = !!(ws?.role === "owner" && !ws.isDefault); // the Personal collection can't be shared
+  const canShare = !!(ws?.role === "owner" && !ws.isDefault);
+  const hint = $("settingsHint");
+  hint.hidden = canShare;
+  hint.textContent = !ws
+    ? "Choose a Collection to see its settings."
+    : ws.isDefault
+      ? "Join links aren't available for your Personal Collection. Choose a Collection you own to manage sharing."
+      : ws.role !== "owner"
+        ? "Only the Collection owner can manage join links. Other Collection settings are available in the dashboard."
+        : "";
   $("shareRow").hidden = !canShare;
   shareNote();
   if (canShare) void refreshLinkInfo();
@@ -411,12 +420,14 @@ async function refreshLinkInfo() {
     const got = await api(`/collections/${ws.id}`);
     if (selected()?.id !== ws.id) return; // the person switched collections meanwhile
     if (!got.ok) {
-      $("linkInfo").textContent = "";
+      $("linkInfo").textContent = got.data.error ?? "Couldn't load the join link. Try again.";
       return;
     }
     applyLink(got.data.collection?.joinLink);
   } catch {
-    if (selected()?.id === ws.id) $("linkInfo").textContent = "";
+    if (selected()?.id === ws.id) {
+      $("linkInfo").textContent = "Couldn't reach Owlet. Check your connection and try again.";
+    }
   }
 }
 
