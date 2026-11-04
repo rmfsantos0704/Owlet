@@ -1,7 +1,7 @@
 import { Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
-export default function AiUsageIndicator() {
+export default function AiUsageIndicator({ compact = false }: { compact?: boolean }) {
   const { aiUsage } = useAuth();
   if (!aiUsage) return null;
 
@@ -11,14 +11,19 @@ export default function AiUsageIndicator() {
   return (
     <section
       aria-label="Daily AI allowance"
-      className="mx-1 mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3"
+      title={`${aiUsage.remaining} ${aiUsage.remaining === 1 ? "use" : "uses"} left today${exhausted ? ". Daily allowance used; AI is off until midnight UTC." : "."}`}
+      className={
+        compact
+          ? "flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5"
+          : "mx-1 mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3"
+      }
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-          <Sparkles className="size-4 text-brand" />
-          AI today
+      <div className={`flex items-center ${compact ? "gap-1.5" : "justify-between gap-2"}`}>
+        <div className={`flex items-center text-xs font-semibold text-slate-700 ${compact ? "gap-1" : "gap-2"}`}>
+          <Sparkles className={`${compact ? "size-3.5" : "size-4"} text-brand`} />
+          {compact ? <span className="sr-only">AI today</span> : "AI today"}
         </div>
-        <span className="text-xs font-semibold tabular-nums text-slate-700">
+        <span className={`font-semibold tabular-nums text-slate-700 ${compact ? "text-[10px]" : "text-xs"}`}>
           {aiUsage.used} / {aiUsage.limit}
         </span>
       </div>
@@ -28,15 +33,17 @@ export default function AiUsageIndicator() {
         aria-valuemin={0}
         aria-valuemax={aiUsage.limit}
         aria-valuenow={Math.min(aiUsage.used, aiUsage.limit)}
-        className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"
+        className={`overflow-hidden rounded-full bg-slate-200 ${compact ? "h-1 w-8" : "mt-2 h-1.5"}`}
       >
         <div className="h-full rounded-full bg-brand transition-[width]" style={{ width: `${percentage}%` }} />
       </div>
-      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-        {exhausted
-          ? "Daily allowance used. AI is off for your account until midnight UTC."
-          : `${aiUsage.remaining} ${aiUsage.remaining === 1 ? "use" : "uses"} left today. AI pauses for your account when used up.`}
-      </p>
+      {!compact && (
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+          {exhausted
+            ? "Daily allowance used. AI is off for your account until midnight UTC."
+            : `${aiUsage.remaining} ${aiUsage.remaining === 1 ? "use" : "uses"} left today. AI pauses for your account when used up.`}
+        </p>
+      )}
     </section>
   );
 }

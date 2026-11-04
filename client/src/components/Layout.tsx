@@ -325,8 +325,6 @@ export default function Layout() {
         </div>
 
         <WorkspaceMenu onNavigate={() => setOpen(false)} tourActive={onboardingOpen} />
-        <AiUsageIndicator />
-
         <nav className="mt-7 flex min-h-0 flex-1 flex-col">
           <div id="owlet-tour-collections" className="mb-2 flex shrink-0 items-center justify-between px-3" data-onboarding-target="collections">
             <span className="eyebrow">Collections</span>
@@ -448,6 +446,7 @@ export default function Layout() {
             />
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+            <AiUsageIndicator compact />
             <NotificationsBell />
             <Link to="/account" className="flex shrink-0 items-center gap-2.5 rounded-xl p-1 transition hover:bg-slate-100" title="Account settings">
               <div className="flex size-9 items-center justify-center rounded-xl bg-[#dbeafe] text-xs font-bold text-[#174ea6]">
