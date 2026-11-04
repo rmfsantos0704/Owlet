@@ -11,6 +11,11 @@ const JWT = /^[\w-]+\.[\w-]+\.[\w-]+$/;
 
 const clean = (t: unknown) => (typeof t === "string" && JWT.test(t) ? t : null);
 
+function reportSyncError(error: unknown) {
+  if (error instanceof Error && error.message.includes("Extension context invalidated")) return;
+  console.error("Could not sync the Owlet dashboard and extension sessions:", error);
+}
+
 function pageToken(): string | null {
   try {
     return clean(localStorage.getItem(TOKEN));
@@ -69,7 +74,7 @@ function onPageChange(token: string | null) {
   lastPage = token;
   const at = Date.now();
   writePage(token, at);
-  void writeExt(token, at);
+  void writeExt(token, at).catch(reportSyncError);
 }
 
 // 1. When the dashboard opens: if the two sides disagree, the newer change wins.
@@ -100,15 +105,19 @@ setInterval(() => onPageChange(pageToken()), 2000);
 // 3. Live changes made in the extension (login or logout in the popup).
 chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== "local" || !changes.token) return;
-  const next = clean(changes.token.newValue);
-  if (next === pageToken()) {
-    lastPage = next; // this was the dashboard's own change coming back
-    return;
+  try {
+    const next = clean(changes.token.newValue);
+    if (next === pageToken()) {
+      lastPage = next; // this was the dashboard's own change coming back
+      return;
+    }
+    const { tokenAt } = await chrome.storage.local.get("tokenAt");
+    lastPage = next;
+    writePage(next, typeof tokenAt === "number" ? tokenAt : Date.now());
+    reloadPage();
+  } catch (error) {
+    reportSyncError(error);
   }
-  const { tokenAt } = await chrome.storage.local.get("tokenAt");
-  lastPage = next;
-  writePage(next, typeof tokenAt === "number" ? tokenAt : Date.now());
-  reloadPage();
 });
 
-void initialSync();
+void initialSync().catch(reportSyncError);
