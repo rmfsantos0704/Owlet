@@ -1,16 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, BookOpen, FolderKanban, Layers3, Puzzle, X } from "lucide-react";
-
-const extensionUrl = (() => {
-  const value = import.meta.env.VITE_CHROME_EXTENSION_URL;
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" ? url.href : null;
-  } catch {
-    return null;
-  }
-})();
+import { chromeExtensionUrl } from "../utils/chromeExtension";
 
 const steps = [
   {
@@ -140,8 +130,8 @@ export default function OnboardingModal({ open, onClose, initialStep = 0 }: Prop
           )}
           {lastStep ? (
             <div className="mt-4 border-t border-slate-100 pt-3">
-              {extensionUrl ? (
-                <a href={extensionUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
+              {chromeExtensionUrl ? (
+                <a href={chromeExtensionUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
                   <Puzzle className="size-3.5" /> Get the Chrome extension <ArrowRight className="size-3.5" />
                 </a>
               ) : (

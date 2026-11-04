@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { Puzzle } from "lucide-react";
+import { chromeExtensionUrl } from "../../utils/chromeExtension";
 // The page frame shared by every auth screen: mascot on the left, the card on the right.
 export default function AuthShell({ children }: { children: ReactNode }) {
   return (
@@ -23,6 +25,17 @@ export default function AuthShell({ children }: { children: ReactNode }) {
               className="relative mx-auto w-full max-w-[180px] object-contain drop-shadow-xl sm:max-w-[260px] lg:mx-0 lg:max-w-[320px]"
             />
           </div>
+          {chromeExtensionUrl ? (
+            <a
+              href={chromeExtensionUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 hover:text-blue-800"
+            >
+              <Puzzle className="size-4" />
+              Get Owlet for Chrome
+            </a>
+          ) : null}
         </section>
         <section className="w-full max-w-md">{children}</section>
       </main>
