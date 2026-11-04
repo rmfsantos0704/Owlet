@@ -13,7 +13,7 @@ export default function PublicSiteHeader() {
     <header className="border-b border-slate-200/80 bg-white/90">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-10">
         <Link to="/about" aria-label="Owlet home" className="shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-          <img src="/owlet-lockup.png" alt="Owlet" className="h-10 w-auto object-contain" />
+          <img src="/logo.png" alt="Owlet" className="h-10 w-auto object-contain" />
         </Link>
         <nav aria-label="Main navigation" className="flex items-center gap-1 sm:gap-2">
           {links.map(({ label, to }) => {
