@@ -362,7 +362,7 @@ export default function HelpSupport() {
             src="/owl.png"
             alt=""
             aria-hidden="true"
-            className="hidden size-36 shrink-0 object-contain drop-shadow-lg sm:block lg:size-40"
+            className="hidden size-44 shrink-0 object-contain drop-shadow-lg sm:block lg:size-48"
           />
           <div className="mx-auto min-w-0 max-w-xl flex-1 text-center">
           <h1 className="flex items-center justify-center gap-2 text-xl font-semibold tracking-tight">
@@ -512,7 +512,7 @@ export default function HelpSupport() {
                 <div className="flex size-10 items-center justify-center rounded-xl bg-white text-violet-700 shadow-sm dark:bg-violet-500/20 dark:text-violet-300 dark:shadow-none">
                   <Link2 className="size-4.5" />
                 </div>
-                <h2 className="mt-4 font-semibold text-ink dark:text-slate-100">Get the Chrome extension</h2>
+                <h2 className="help-extension-title mt-4 font-semibold">Get the Chrome extension</h2>
                 <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
                   Save articles, selections, and highlights to Owlet without leaving the page you're reading.
                 </p>

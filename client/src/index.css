@@ -69,6 +69,14 @@ html.dark .help-extension-card {
   border-color: rgb(167 139 250 / 20%);
 }
 
+.help-extension-title {
+  color: #0a234d;
+}
+
+html.dark .help-extension-title {
+  color: #f8fafc;
+}
+
 html.dark .btn-secondary {
   background-color: #111c2f;
   border-color: #26364d;
