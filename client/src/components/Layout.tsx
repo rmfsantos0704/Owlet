@@ -423,7 +423,7 @@ export default function Layout() {
 
       <main className={`min-h-screen min-w-0 lg:pl-[var(--dock)] ${dragging ? "" : "transition-[padding-left] duration-200"}`}>
         <header
-          className={`app-header sticky top-0 z-20 flex min-h-14 items-center gap-2 border-b border-slate-200/80 bg-white/90 px-3 backdrop-blur-xl sm:h-16 sm:gap-4 sm:px-10 ${
+          className={`app-header sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-2 border-b border-slate-200/80 bg-white/90 px-3 pb-2 pt-2 backdrop-blur-xl sm:h-16 sm:flex-nowrap sm:gap-4 sm:px-10 sm:py-0 ${
             collapsed ? "lg:pl-20" : ""
           }`}
         >
@@ -436,7 +436,7 @@ export default function Layout() {
           >
             <Menu className="size-5" />
           </button>
-          <div className="relative min-w-0 max-w-md flex-1">
+          <div className="relative order-last min-w-0 basis-full sm:order-none sm:max-w-md sm:flex-1">
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               value={q}

@@ -77,7 +77,7 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`flex max-h-[calc(100dvh-1.5rem)] w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20 sm:max-h-[calc(100dvh-2rem)]`}
+        className={`flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20`}
       >
         <div className="flex items-start justify-between gap-4 px-6 pt-5">
           <h2 id={titleId} className="text-lg font-semibold tracking-tight text-ink">

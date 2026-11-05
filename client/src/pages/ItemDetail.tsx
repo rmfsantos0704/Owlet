@@ -294,12 +294,12 @@ export default function ItemDetail() {
 
           {item.aiOutput?.summary || item.aiOutput?.paraphrase ? (
           <section className="rounded-2xl bg-brand p-5 text-white shadow-lg shadow-blue-950/10 sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-2 sm:gap-3">
+              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                 <div className="flex size-10 items-center justify-center rounded-xl bg-white/10 text-cyan-300">
                   <Sparkles className="size-5" />
                 </div>
-                <h2 className="font-semibold">AI summary</h2>
+                <h2 className="whitespace-nowrap font-semibold">AI summary</h2>
               </div>
               {canEdit && (
                 <div className="flex items-center gap-2">
@@ -317,10 +317,11 @@ export default function ItemDetail() {
                         onClick={() => setRegenOpen(true)}
                         disabled={regenerating}
                         title="Rewrite using this clip's AI settings"
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
+                        aria-label={regenerating ? "Regenerating AI summary" : "Regenerate AI summary"}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-1.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-60 sm:px-3"
                       >
                         <RefreshCw className={`size-3.5 ${regenerating ? "animate-spin" : ""}`} />
-                        {regenerating ? "Regenerating…" : "Regenerate"}
+                        <span className="hidden sm:inline">{regenerating ? "Regenerating…" : "Regenerate"}</span>
                       </button>
                     </>
                   )}

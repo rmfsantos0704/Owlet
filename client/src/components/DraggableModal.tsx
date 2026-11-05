@@ -18,15 +18,15 @@ type Props = {
   className?: string;
 };
 
-const DEFAULT_SIZE = "h-[min(34rem,calc(100vh-2rem))] w-[min(26rem,calc(100vw-1rem))]";
+const DEFAULT_SIZE = "h-[min(34rem,calc(100dvh-2rem))] w-[min(26rem,calc(100vw-1rem))]";
 
 // shared by every popup so the one you touch last comes to the front
 let topZ = 50;
 
-// keep the panel on screen, and always keep its header reachable
+// Keep the panel on screen when its size allows.
 const clamp = (x: number, y: number, el: HTMLElement) => ({
   x: Math.max(0, Math.min(x, window.innerWidth - el.offsetWidth)),
-  y: Math.max(0, Math.min(y, window.innerHeight - 56)),
+  y: Math.max(0, Math.min(y, window.innerHeight - el.offsetHeight)),
 });
 
 export default function DraggableModal({
@@ -51,8 +51,13 @@ export default function DraggableModal({
 
   // first open: place it near the top. Later opens remember where you left it.
   useLayoutEffect(() => {
-    if (!open || pos || !panelRef.current) return;
+    if (!open || !panelRef.current) return;
     const el = panelRef.current;
+    if (pos) {
+      const next = clamp(pos.x, pos.y, el);
+      if (next.x !== pos.x || next.y !== pos.y) setPos(next);
+      return;
+    }
     const x = align === "right" ? window.innerWidth - el.offsetWidth - 24 : (window.innerWidth - el.offsetWidth) / 2;
     setPos(clamp(x, 96, el));
   }, [open, pos, align]);
