@@ -162,12 +162,25 @@ export default function LiteratureMatrix() {
                 className="field min-w-0 flex-1"
                 disabled={columns.length >= 12}
               />
-              <button type="submit" disabled={!newColumn.trim() || columns.length >= 12} className="btn-secondary">
-                <Plus className="size-4" /> Add
+              <button
+                type="submit"
+                disabled={!newColumn.trim() || columns.length >= 12}
+                aria-label="Add column"
+                title="Add column"
+                className="btn-secondary shrink-0 px-3"
+              >
+                <Plus className="size-4" />
               </button>
             </form>
-            <button type="button" onClick={() => void saveColumns()} disabled={savingColumns || !columnsDirty} className="btn-primary">
-              <Save className="size-4" /> {savingColumns ? "Saving…" : "Save columns"}
+            <button
+              type="button"
+              onClick={() => void saveColumns()}
+              disabled={savingColumns || !columnsDirty}
+              aria-label={savingColumns ? "Saving columns" : "Save columns"}
+              title={savingColumns ? "Saving columns" : "Save columns"}
+              className="btn-primary shrink-0 px-3"
+            >
+              <Save className="size-4" />
             </button>
             {notice && <span role="status" className="text-xs text-emerald-700">{notice}</span>}
           </div>

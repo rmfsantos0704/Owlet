@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { Bell, MailPlus } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -24,6 +25,7 @@ export default function NotificationsBell() {
   const { select, invitations, refreshInvitations, respondToInvitation } = useCollections();
   const navigate = useNavigate();
   const box = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ActivityEntry[]>([]);
   const [unread, setUnread] = useState(0);
@@ -65,7 +67,8 @@ export default function NotificationsBell() {
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (!box.current?.contains(target) && !panel.current?.contains(target)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDown);
@@ -136,8 +139,8 @@ export default function NotificationsBell() {
         )}
       </button>
 
-      {open && (
-        <div className="card fixed inset-x-2 bottom-[max(0.75rem,env(safe-area-inset-bottom))] top-[calc(7rem+env(safe-area-inset-top))] z-50 flex min-h-0 flex-col overflow-hidden shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100dvh-6rem)] sm:w-[22rem] sm:max-w-[calc(100vw-2rem)]">
+      {open && createPortal(
+        <div ref={panel} className="card fixed inset-x-2 bottom-[max(0.75rem,env(safe-area-inset-bottom))] top-[calc(7rem+env(safe-area-inset-top))] z-[120] flex min-h-0 flex-col overflow-hidden shadow-xl sm:inset-x-auto sm:right-4 sm:top-16 sm:bottom-auto sm:max-h-[calc(100dvh-5rem)] sm:w-[22rem] sm:max-w-[calc(100vw-2rem)]">
           <div className="shrink-0 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-ink">Notifications</div>
 
           <div className="min-h-0 flex-1 overflow-y-auto sm:max-h-[28rem]">
@@ -215,7 +218,8 @@ export default function NotificationsBell() {
               </>
             ) : null}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

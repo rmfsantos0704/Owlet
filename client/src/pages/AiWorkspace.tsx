@@ -255,7 +255,7 @@ export default function AiWorkspace() {
   const justCreated = !!result && !!activeId && activeId === newId;
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full">
       <Link
         to="/"
         className="mb-5 inline-flex max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-brand"
@@ -275,14 +275,14 @@ export default function AiWorkspace() {
             Ask questions across your saved sources and turn evidence into citation-ready briefs.
           </p>
         </div>
-        <label className="block min-w-56 space-y-1.5 sm:self-end">
+        <label className="block w-full min-w-0 space-y-1.5 sm:w-auto sm:min-w-56 sm:self-end">
             <span className="eyebrow block">Workspace collection</span>
             <select
               value={current?.id ?? ""}
               onChange={(event) => select(event.target.value)}
               disabled={!ready || collections.length === 0}
               aria-label="AI workspace collection"
-              className="field py-2 text-sm font-medium"
+              className="field min-w-0 py-2 text-sm font-medium"
             >
               {collections.length === 0 ? (
                 <option value="">No collections available</option>
@@ -303,9 +303,9 @@ export default function AiWorkspace() {
         </p>
       )}
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="space-y-6">
-          <div className="overflow-hidden rounded-2xl bg-brand p-5 text-white shadow-xl shadow-blue-950/10 sm:p-6">
+      <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 space-y-6">
+          <div className="min-w-0 overflow-hidden rounded-2xl bg-brand p-4 text-white shadow-xl shadow-blue-950/10 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
                 {MODES.map((m) => (
@@ -374,7 +374,7 @@ export default function AiWorkspace() {
           </div>
         </div>
 
-        <div className="space-y-6 xl:self-start">
+        <div className="min-w-0 space-y-6 xl:self-start">
           <Sources items={items} selected={selected} max={MAX_SOURCES} onToggle={toggle} />
 
           <RecentSessions
