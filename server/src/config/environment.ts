@@ -31,7 +31,9 @@ export function getEnvironmentProblems(isProd: boolean): string[] {
   }
 
   if (isProd) {
-    if (!process.env.RESEND_API_KEY) {
+    if (process.env.VERCEL === "1") {
+      need("RESEND_API_KEY", " (required on Vercel; use the HTTPS email API instead of SMTP)");
+    } else if (!process.env.RESEND_API_KEY) {
       for (const key of ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"]) {
         need(key, " (required when RESEND_API_KEY is not set)");
       }

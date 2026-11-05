@@ -45,14 +45,14 @@ export function resetEmail(to: string, token: string): Mail {
 }
 
 export function alreadyRegisteredEmail(to: string): Mail {
-  const url = `${clientUrl()}/login`;
+  const url = `${clientUrl()}/forgot-password`;
   const intro = "Someone tried to create an Owlet account with this email address, but you already have one.";
-  const note = "If it was you, log in or reset your password from the login page. If it wasn't, you can ignore this email; nothing changed.";
+  const note = "If this was you, use the link to reset your password. If it wasn't, you can ignore this email; nothing changed.";
   return {
     to,
     subject: "You already have an Owlet account",
-    text: `${intro}\n\nLog in: ${url}\n\n${note}`,
-    html: layout({ title: "You already have an account", intro, button: { label: "Go to login", url }, note }),
+    text: `${intro}\n\nReset your password: ${url}\n\n${note}`,
+    html: layout({ title: "You already have an account", intro, button: { label: "Reset password", url }, note }),
   };
 }
 
