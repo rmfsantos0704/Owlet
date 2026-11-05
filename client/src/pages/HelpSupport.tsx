@@ -357,7 +357,14 @@ export default function HelpSupport() {
       {/* hero + search */}
       <section className="relative mb-6 overflow-hidden rounded-2xl bg-brand text-white shadow-lg shadow-blue-950/10">
         <div className="absolute -right-16 -top-20 size-48 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="relative mx-auto max-w-xl px-5 py-6 text-center sm:px-8">
+        <div className="relative mx-auto flex max-w-2xl items-center gap-5 px-5 py-5 sm:px-8">
+          <img
+            src="/owl.png"
+            alt=""
+            aria-hidden="true"
+            className="hidden size-24 shrink-0 object-contain drop-shadow-lg sm:block"
+          />
+          <div className="min-w-0 flex-1 text-center">
           <h1 className="flex items-center justify-center gap-2 text-xl font-semibold tracking-tight">
             <LifeBuoy className="size-5 text-cyan-300" />
             How can we help?
@@ -366,17 +373,12 @@ export default function HelpSupport() {
             Quick guides for the things you'll do most, answers to common questions, and a way to reach us.
           </p>
           <div className="relative mx-auto mt-4 max-w-sm">
-            <img
-              src="/owl.png"
-              alt=""
-              aria-hidden="true"
-              className="absolute left-2.5 top-1/2 size-6 -translate-y-1/2 object-contain"
-            />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Search the help center"
-              className="h-9 w-full rounded-xl border border-white/10 bg-white pl-11 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-300/20"
+              className="h-9 w-full rounded-xl border border-white/10 bg-white pl-9 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-300/20"
               placeholder="Search the help center..."
             />
           </div>
@@ -392,6 +394,7 @@ export default function HelpSupport() {
                 {term}
               </button>
             ))}
+          </div>
           </div>
         </div>
       </section>
