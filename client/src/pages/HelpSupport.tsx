@@ -383,7 +383,7 @@ export default function HelpSupport() {
             />
           </div>
           <div className="mt-3 flex flex-wrap justify-center gap-2 text-[11px] text-blue-100/60">
-            <span>Popular:</span>
+            <span></span>
             {["install extension", "import PDF", "share a collection"].map((term) => (
               <button
                 key={term}
