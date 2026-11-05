@@ -7,7 +7,7 @@ export const LEGAL = {
   address: "Bataan, Philippines",
   governingLaw: "the laws of the Republic of the Philippines",
   hostingProviders: "Vercel",
-  emailProvider: "Resend",
+  emailProvider: "SMTP",
   backupDays: "30",
   // keep termsVersion identical to TERMS_VERSION in the server's authController.ts
   termsVersion: "2026-10-30",

@@ -97,10 +97,11 @@ export default function RegisterPage() {
             <MailCheck className="size-6" />
           </div>
           <p className="text-sm leading-6 text-slate-600">
-            We sent a confirmation link to <span className="font-semibold text-slate-800">{sentTo}</span>. Open it to
-            activate your account. The link expires in 24 hours.
+            Check <span className="font-semibold text-slate-800">{sentTo}</span> for an email from Owlet with next
+            steps. If an account already uses this address, the email will explain how to reset its password;
+            otherwise, use the confirmation link to activate your account.
           </p>
-          <p className="mt-2 text-xs text-slate-400">Can't find it? Check your spam folder.</p>
+          <p className="mt-2 text-xs text-slate-400">Can't find it? Check your spam folder. Confirmation links expire in 24 hours.</p>
           <div className="mt-4 flex items-center gap-2">
             <TextButton onClick={resend} disabled={cooldown.left > 0}>
               {cooldown.left > 0 ? `Resend in ${cooldown.left}s` : "Resend email"}
