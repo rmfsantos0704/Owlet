@@ -355,41 +355,41 @@ export default function HelpSupport() {
   return (
     <div>
       {/* hero + search */}
-      <section className="relative mb-6 overflow-hidden rounded-2xl bg-brand text-white shadow-lg shadow-blue-950/10">
+      <section className="relative mb-8 overflow-hidden rounded-3xl bg-brand text-white shadow-lg shadow-blue-950/10">
         <div className="absolute -right-16 -top-20 size-48 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="relative flex items-center gap-4 py-4 pl-2 pr-5 sm:pl-3 sm:pr-8">
+        <div className="relative flex items-center gap-6 px-5 py-7 sm:px-7 sm:py-9">
           <img
             src="/owl.png"
             alt=""
             aria-hidden="true"
-            className="hidden size-44 shrink-0 object-contain drop-shadow-lg sm:block lg:size-48"
+            className="hidden size-52 shrink-0 object-contain drop-shadow-lg md:block lg:size-60"
           />
-          <div className="mx-auto min-w-0 max-w-xl flex-1 text-center">
-          <h1 className="flex items-center justify-center gap-2 text-xl font-semibold tracking-tight">
-            <LifeBuoy className="size-5 text-cyan-300" />
+          <div className="mx-auto min-w-0 max-w-2xl flex-1 text-center">
+          <h1 className="flex items-center justify-center gap-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+            <LifeBuoy className="size-6 text-cyan-300" />
             How can we help?
           </h1>
-          <p className="mt-1.5 text-xs leading-5 text-blue-100/70">
+          <p className="mt-2 text-sm leading-6 text-blue-100/70 sm:text-base">
             Quick guides for the things you'll do most, answers to common questions, and a way to reach us.
           </p>
-          <div className="relative mx-auto mt-4 max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <div className="relative mx-auto mt-6 max-w-lg">
+            <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Search the help center"
-              className="h-9 w-full rounded-xl border border-white/10 bg-white pl-9 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-300/20"
+              className="h-12 w-full rounded-xl border border-white/10 bg-white pl-12 pr-4 text-base text-slate-800 outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-300/20"
               placeholder="Search the help center..."
             />
           </div>
-          <div className="mt-3 flex flex-wrap justify-center gap-2 text-[11px] text-blue-100/60">
+          <div className="mt-4 flex flex-wrap justify-center gap-2.5 text-xs text-blue-100/70 sm:text-sm">
             <span></span>
             {["install extension", "import PDF", "share a collection"].map((term) => (
               <button
                 key={term}
                 type="button"
                 onClick={() => setQuery(term)}
-                className="font-semibold text-blue-100 hover:text-white hover:underline"
+                className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-blue-100 transition hover:bg-white/20 hover:text-white"
               >
                 {term}
               </button>
