@@ -357,14 +357,14 @@ export default function HelpSupport() {
       {/* hero + search */}
       <section className="relative mb-6 overflow-hidden rounded-2xl bg-brand text-white shadow-lg shadow-blue-950/10">
         <div className="absolute -right-16 -top-20 size-48 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="relative mx-auto flex max-w-2xl items-center gap-5 px-5 py-5 sm:px-8">
+        <div className="relative flex items-center gap-4 py-4 pl-2 pr-5 sm:pl-3 sm:pr-8">
           <img
             src="/owl.png"
             alt=""
             aria-hidden="true"
-            className="hidden size-24 shrink-0 object-contain drop-shadow-lg sm:block"
+            className="hidden size-36 shrink-0 object-contain drop-shadow-lg sm:block lg:size-40"
           />
-          <div className="min-w-0 flex-1 text-center">
+          <div className="mx-auto min-w-0 max-w-xl flex-1 text-center">
           <h1 className="flex items-center justify-center gap-2 text-xl font-semibold tracking-tight">
             <LifeBuoy className="size-5 text-cyan-300" />
             How can we help?
@@ -508,7 +508,7 @@ export default function HelpSupport() {
 
           <div className="space-y-6 xl:self-start">
             {showExtension && (
-              <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-5 dark:border-violet-400/20 dark:bg-violet-500/10">
+              <div className="help-extension-card rounded-2xl border border-violet-100 bg-violet-50/60 p-5 dark:border-violet-400/20 dark:bg-violet-500/10">
                 <div className="flex size-10 items-center justify-center rounded-xl bg-white text-violet-700 shadow-sm dark:bg-violet-500/20 dark:text-violet-300 dark:shadow-none">
                   <Link2 className="size-4.5" />
                 </div>
