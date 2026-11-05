@@ -64,11 +64,6 @@ html.dark .card {
   border-color: #26364d;
 }
 
-html.dark .help-extension-card {
-  border-color: rgb(167 139 250 / 20%);
-  background-color: rgb(139 92 246 / 10%);
-}
-
 html.dark .btn-secondary {
   background-color: #111c2f;
   border-color: #26364d;
