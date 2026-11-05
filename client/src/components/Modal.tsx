@@ -77,9 +77,9 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20`}
+        className={`flex max-h-[calc(100dvh-1.5rem)] w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20 sm:max-h-[calc(100dvh-2rem)]`}
       >
-        <div className="flex items-start justify-between gap-4 px-6 pt-5">
+        <div className="flex items-start justify-between gap-4 px-4 pt-4 sm:px-6 sm:pt-5">
           <h2 id={titleId} className="text-lg font-semibold tracking-tight text-ink">
             {title}
           </h2>
@@ -94,8 +94,8 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
             </button>
           )}
         </div>
-        <div className="overflow-y-auto px-6 py-4 text-sm leading-6 text-slate-600">{children}</div>
-        {footer && <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/70 px-6 py-4 sm:flex-row sm:justify-end">{footer}</div>}
+        <div className="overflow-y-auto px-4 py-4 text-sm leading-6 text-slate-600 sm:px-6">{children}</div>
+        {footer && <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-4 sm:flex-row sm:justify-end sm:px-6">{footer}</div>}
       </div>
     </div>,
     document.body

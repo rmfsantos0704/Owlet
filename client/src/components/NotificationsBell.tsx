@@ -137,10 +137,10 @@ export default function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="card fixed inset-x-2 bottom-[max(0.75rem,env(safe-area-inset-bottom))] top-[calc(7rem+env(safe-area-inset-top))] z-50 flex flex-col overflow-hidden shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100dvh-6rem)] sm:w-[22rem] sm:max-w-[calc(100vw-2rem)]">
+        <div className="card fixed inset-x-2 bottom-[max(0.75rem,env(safe-area-inset-bottom))] top-[calc(7rem+env(safe-area-inset-top))] z-50 flex min-h-0 flex-col overflow-hidden shadow-xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100dvh-6rem)] sm:w-[22rem] sm:max-w-[calc(100vw-2rem)]">
           <div className="shrink-0 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-ink">Notifications</div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto sm:max-h-[28rem] sm:flex-none">
+          <div className="min-h-0 flex-1 overflow-y-auto sm:max-h-[28rem]">
             {invitations.length > 0 && (
               <section aria-label="Collection invitations" className="border-b border-slate-100">
                 <div className="eyebrow px-4 pb-1 pt-3">Invitations</div>

@@ -223,4 +223,11 @@ p, h1, h2, a, li {
   .field {
     font-size: 16px;
   }
+
+  .ai-usage-toast {
+    position: fixed;
+    top: calc(7rem + env(safe-area-inset-top));
+    right: max(0.75rem, env(safe-area-inset-right));
+    width: min(15rem, calc(100vw - 1.5rem));
+  }
 }

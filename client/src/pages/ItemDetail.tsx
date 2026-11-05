@@ -294,15 +294,15 @@ export default function ItemDetail() {
 
           {item.aiOutput?.summary || item.aiOutput?.paraphrase ? (
           <section className="rounded-2xl bg-brand p-5 text-white shadow-lg shadow-blue-950/10 sm:p-6">
-            <div className="flex items-center justify-between gap-2 sm:gap-3">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-white/10 text-cyan-300">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-cyan-300">
                   <Sparkles className="size-5" />
                 </div>
                 <h2 className="whitespace-nowrap font-semibold">AI summary</h2>
               </div>
               {canEdit && (
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                   {aiEnabled && (
                     <>
                       <button

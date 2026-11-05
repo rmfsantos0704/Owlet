@@ -88,8 +88,6 @@ export default function WorkspaceMenu({ onNavigate, tourActive = false }: Props)
               key={to}
               to={to}
               onClick={onNavigate}
-              title={label}
-              aria-label={label}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
                   isActive ? "bg-brand text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
@@ -97,7 +95,7 @@ export default function WorkspaceMenu({ onNavigate, tourActive = false }: Props)
               }
             >
               <Icon className="size-4 shrink-0" strokeWidth={1.9} />
-              <span className="max-sm:sr-only">{label}</span>
+              {label}
             </NavLink>
           ))}
         </div>

@@ -135,7 +135,7 @@ export default function LiteratureMatrix() {
                     setColumnsDirty(true);
                     setColumns((previous) => previous.map((entry) => entry.id === column.id ? { ...entry, name } : entry));
                   }}
-                  className="field text-base sm:text-sm"
+                  className="field"
                 />
                 <button
                   type="button"
@@ -153,13 +153,13 @@ export default function LiteratureMatrix() {
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <form onSubmit={addColumn} className="flex min-w-0 flex-1 gap-2 sm:max-w-md">
+            <form onSubmit={addColumn} className="flex w-full min-w-0 flex-1 gap-2 sm:w-auto sm:max-w-md">
               <input
                 value={newColumn}
                 onChange={(event) => setNewColumn(event.target.value)}
                 maxLength={50}
                 placeholder="New column name"
-                className="field text-base sm:text-sm"
+                className="field min-w-0 flex-1"
                 disabled={columns.length >= 12}
               />
               <button type="submit" disabled={!newColumn.trim() || columns.length >= 12} className="btn-secondary">
@@ -213,7 +213,7 @@ export default function LiteratureMatrix() {
                                   : row));
                               }}
                               onBlur={() => void saveCell(clip, column.id)}
-                              className="field min-w-64 resize-y text-sm sm:text-xs"
+                              className="field min-w-64 resize-y text-xs"
                             />
                           ) : (
                             <p className="min-h-16 whitespace-pre-wrap px-2 py-1 text-xs text-slate-600">{clip.values?.[column.id]}</p>

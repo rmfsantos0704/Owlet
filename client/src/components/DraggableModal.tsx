@@ -23,7 +23,7 @@ const DEFAULT_SIZE = "h-[min(34rem,calc(100dvh-2rem))] w-[min(26rem,calc(100vw-1
 // shared by every popup so the one you touch last comes to the front
 let topZ = 50;
 
-// Keep the panel on screen when its size allows.
+// Keep the full panel, including its footer, inside the viewport.
 const clamp = (x: number, y: number, el: HTMLElement) => ({
   x: Math.max(0, Math.min(x, window.innerWidth - el.offsetWidth)),
   y: Math.max(0, Math.min(y, window.innerHeight - el.offsetHeight)),
