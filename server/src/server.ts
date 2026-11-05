@@ -11,8 +11,8 @@ const problems = getEnvironmentProblems(isProd);
 if (!isProd) {
   // not fatal in development, but worth knowing
   const smtpConfigured = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
-  if (!process.env.SUPPORT_EMAIL || (!process.env.RESEND_API_KEY && !smtpConfigured)) {
-    console.warn("Support form and emails won't send: set SUPPORT_EMAIL and configure RESEND_API_KEY or SMTP settings in .env");
+  if (!process.env.SUPPORT_EMAIL || !smtpConfigured) {
+    console.warn("Support form and emails won't send: set SUPPORT_EMAIL and configure SMTP settings in .env");
   }
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
     console.warn("JWT_SECRET is shorter than 32 characters. Production will refuse to start with it.");

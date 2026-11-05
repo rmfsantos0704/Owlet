@@ -32,35 +32,7 @@ function getTransport() {
   return transport;
 }
 
-async function sendWithResend(mail: Mail) {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: process.env.MAIL_FROM,
-      to: mail.to,
-      subject: mail.subject,
-      text: mail.text,
-      ...(mail.html ? { html: mail.html } : {}),
-      ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
-    }),
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Resend email request failed with HTTP ${response.status}`);
-  }
-}
-
 export async function sendMail(mail: Mail) {
-  if (process.env.RESEND_API_KEY) {
-    await sendWithResend(mail);
-    return;
-  }
-
   const t = getTransport();
   if (!t) {
     outbox.push(mail);

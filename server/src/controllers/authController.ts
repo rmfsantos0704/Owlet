@@ -105,7 +105,13 @@ export async function register(req: Request, res: Response) {
 
   if (existing && existing.emailVerified !== false) {
     // A real account already uses this email: tell its owner by email, reveal nothing to the requester.
-    if (await claimEmailSlot(existing._id)) fire(sendMail(tpl.alreadyRegisteredEmail(email)));
+    if (await claimEmailSlot(existing._id)) {
+      try {
+        await sendMail(tpl.alreadyRegisteredEmail(existing.email));
+      } catch (err) {
+        console.error("Auth email failed:", err);
+      }
+    }
   } else if (existing) {
     // Never-verified registration: the newest submission wins, so nobody can pre-claim someone else's address.
     await User.updateOne(
@@ -159,7 +165,13 @@ export async function forgotPassword(req: Request, res: Response) {
   if (!parsed.success) return res.status(400).json({ error: firstError(parsed.error) });
 
   const user = await User.findOne({ email: parsed.data.email });
-  if (user && (await claimEmailSlot(user._id))) fire(issueReset(user));
+  if (user && (await claimEmailSlot(user._id))) {
+    try {
+      await issueReset(user);
+    } catch (err) {
+      console.error("Auth email failed:", err);
+    }
+  }
   res.status(202).json({ message: "If an account exists for that email, we've sent a reset link." });
 }
 

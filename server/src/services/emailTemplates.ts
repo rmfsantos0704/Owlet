@@ -47,7 +47,7 @@ export function resetEmail(to: string, token: string): Mail {
 export function alreadyRegisteredEmail(to: string): Mail {
   const url = `${clientUrl()}/forgot-password`;
   const intro = "Someone tried to create an Owlet account with this email address, but you already have one.";
-  const note = "If this was you, use the link to reset your password. If it wasn't, you can ignore this email; nothing changed.";
+  const note = "If it was you, use the link to reset your password. If it wasn't, you can ignore this email; nothing changed.";
   return {
     to,
     subject: "You already have an Owlet account",
