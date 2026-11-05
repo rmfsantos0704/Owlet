@@ -366,12 +366,17 @@ export default function HelpSupport() {
             Quick guides for the things you'll do most, answers to common questions, and a way to reach us.
           </p>
           <div className="relative mx-auto mt-4 max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <img
+              src="/owl.png"
+              alt=""
+              aria-hidden="true"
+              className="absolute left-2.5 top-1/2 size-6 -translate-y-1/2 object-contain"
+            />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Search the help center"
-              className="h-9 w-full rounded-xl border border-white/10 bg-white pl-9 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-300/20"
+              className="h-9 w-full rounded-xl border border-white/10 bg-white pl-11 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-cyan-300/20"
               placeholder="Search the help center..."
             />
           </div>
