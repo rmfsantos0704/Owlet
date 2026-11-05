@@ -142,6 +142,22 @@ html.dark [class~="bg-slate-950/30"] {
   background-color: rgb(2 6 23 / 40%);
 }
 
+html.dark input:focus,
+html.dark textarea:focus,
+html.dark select:focus {
+  background-color: #172338;
+  color: #e2e8f0;
+}
+
+html.dark select {
+  color-scheme: dark;
+}
+
+html.dark select option {
+  background-color: #111c2f;
+  color: #e2e8f0;
+}
+
 .onboarding-highlight {
   position: relative;
   z-index: 80;

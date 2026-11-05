@@ -97,7 +97,7 @@ function FilterDropdown({ select }: { select: FilterSelect }) {
             setOpen(true);
           }
         }}
-        className="flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-blue-100"
+        className="flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-400/20"
       >
         {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
         <span className="min-w-0 flex-1 truncate">{selected?.label ?? "Choose…"}</span>
@@ -121,7 +121,7 @@ function FilterDropdown({ select }: { select: FilterSelect }) {
                   onChange={(event) => setQuery(event.target.value)}
                   aria-label={`Search ${select.label.toLowerCase()}`}
                   placeholder={`Search ${select.label.toLowerCase()}…`}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-8 pr-2 text-xs text-slate-700 outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-8 pr-2 text-xs text-slate-700 outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 dark:focus:bg-[#172338] dark:focus:ring-blue-400/20"
                 />
               </div>
             </div>
@@ -142,7 +142,7 @@ function FilterDropdown({ select }: { select: FilterSelect }) {
                       close();
                     }}
                     className={`block w-full truncate rounded-lg px-3 py-2 text-left text-xs transition ${
-                      isSelected ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600 hover:bg-slate-50"
+                      isSelected ? "bg-blue-50 font-semibold text-blue-700 dark:bg-[#172338] dark:text-blue-300" : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     {option.label}
