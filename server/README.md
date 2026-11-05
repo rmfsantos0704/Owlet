@@ -16,11 +16,12 @@
 | `JWT_SECRET` | A randomly generated secret with at least 32 characters. |
 | `CLIENT_URL` | The dashboard's exact HTTPS origin, with no path. |
 | `TRUST_PROXY` | `1` |
-| `RESEND_API_KEY` | Resend API key. Required on Vercel because email is sent over HTTPS rather than SMTP. |
-| `SMTP_HOST` | SMTP server hostname. Required with `SMTP_USER` and `SMTP_PASS` only for non-Vercel production deployments when `RESEND_API_KEY` is not set. |
-| `SMTP_USER` | SMTP username (SMTP fallback only). |
-| `SMTP_PASS` | SMTP password or provider app password (SMTP fallback only). |
-| `MAIL_FROM` | Verified sender address/name for the selected email provider. |
+| `SMTP_HOST` | SMTP server hostname, reachable from the API host. |
+| `SMTP_PORT` | SMTP port. Use `465` for implicit TLS or `587` for STARTTLS; defaults to `587`. |
+| `SMTP_SECURE` | Set to `true` for port `465`; leave unset or set to `false` for port `587`. |
+| `SMTP_USER` | SMTP username. |
+| `SMTP_PASS` | SMTP password or provider app password. |
+| `MAIL_FROM` | Verified sender address/name for the SMTP provider. |
 | `SUPPORT_EMAIL` | Address that receives support requests. |
 
 `AI_ENABLED` defaults to off. To enable the managed provider pool, set it to `true` and configure one or more providers. Requests try providers in this order:
@@ -39,7 +40,7 @@ Keep provider keys in the API server's environment settings, never in the dashbo
 
 In MongoDB Atlas, configure a database user with only the permissions the app needs. Atlas must allow connections from Vercel; Vercel's serverless functions do not have a fixed outbound IP on every plan, so review Atlas's IP access list options for your plan before deployment.
 
-For Vercel, configure `RESEND_API_KEY` and a `MAIL_FROM` address on a domain verified with Resend, then redeploy. SMTP connections can time out from Vercel functions, so production startup requires the Resend key there. Owlet sends registration, verification, password-reset, and support messages through Resend's HTTPS API when the key is present. SMTP remains available as a fallback for non-serverless deployments.
+Configure SMTP with a provider and sender address that are verified for your domain. The SMTP host and port must be reachable from the API deployment; use port `465` with `SMTP_SECURE=true` or port `587` with `SMTP_SECURE=false`. Owlet waits for SMTP delivery attempts before completing registration-notice and password-reset requests. If SMTP connections time out, check the provider's host/port settings and whether the deployment platform permits outbound SMTP connections.
 
 ## Verify and connect the clients
 
