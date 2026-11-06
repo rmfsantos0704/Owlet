@@ -7,12 +7,12 @@ import {
 import { api, download } from "../services/api";
 import CitationBox from "../components/itemdetail/CitationBox";
 import TagInput from "../components/itemdetail/TagInput";
-import HighlightList from "../components/HighlightList";
+import HighlightList from "../components/itemdetail/HighlightList";
 import ClippedText from "../components/itemdetail/ClippedText";
 import DraggableModal from "../components/shared/DraggableModal";
 import { useAuth } from "../context/AuthContext";
 import QuickSummary from "../components/itemdetail/QuickSummary";
-import CommentThread from "../components/CommentThread";
+import CommentThread from "../components/itemdetail/CommentThread";
 import SourceEditor from "../components/itemdetail/SourceEditor";
 import AiSettingsModal from "../components/itemdetail/AiSettingsModal";
 import RegenerateModal from "../components/itemdetail/RegenerateModal";
