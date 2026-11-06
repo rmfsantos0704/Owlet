@@ -301,15 +301,24 @@ function forAi(text: string) {
 // POST /research/import/token: Vercel rejects request bodies over ~4.5 MB, so the browser uploads the PDF
 // straight to Vercel Blob. This hands out a short-lived token for one PDF at a path only this user can import.
 export async function importToken(_req: Request, res: Response) {
+  // browser upload tokens must be made from the long-lived read-write token, not the short-lived OIDC credentials
+  const readWriteToken = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!readWriteToken) {
+    console.error("BLOB_READ_WRITE_TOKEN is not set on this deployment");
+    return res.status(500).json({ error: "File uploads aren't set up on the server yet." });
+  }
   const pathname = `imports/${res.locals.userId}/${randomUUID()}.pdf`;
   try {
     const clientToken = await generateClientTokenFromReadWriteToken({
+      token: readWriteToken,
       pathname,
       allowedContentTypes: ["application/pdf"],
       maximumSizeInBytes: MAX_IMPORT_BYTES,
       validUntil: Date.now() + 10 * 60 * 1000,
     });
-    res.json({ pathname, clientToken });
+    // TEMPORARY while debugging uploads: only the shape of the tokens, never their values. Remove once uploads work.
+    const shape = (t: string) => `${t.split("_").slice(0, 3).join("_")}_… (${t.split("_").length} parts)`;
+    res.json({ pathname, clientToken, debug: { readWrite: shape(readWriteToken), client: shape(clientToken) } });
   } catch (err) {
     console.error("Blob token failed:", err);
     res.status(500).json({ error: "Couldn't start the upload. Try again." });

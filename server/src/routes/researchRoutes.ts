@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-  clip, importPdf, importToken, list, lookup, getOne, getHighlights, remove,
+  clip, importPdf, list, lookup, getOne, getHighlights, remove,
   addHighlight, updateHighlight, removeHighlight,
   addComment, updateComment, removeComment,
   setTags, updateSource, regenerate, pdf, exportItems, setAiOutput,
@@ -10,7 +10,7 @@ import {
 } from "../controllers/researchController.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { requireAi } from "../middlewares/requireAi.js";
-import { fetchImportBlob } from "../middlewares/blobImport.js";
+import { fetchImportBlob, startImportUpload } from "../middlewares/blobImport.js";
 import {
   aiDailyLimiter, aiMinuteLimiter, clipDailyLimiter, importDailyLimiter, writeLimiter,
 } from "../middlewares/rateLimits.js";
@@ -22,7 +22,7 @@ router.use(requireAuth); // the per-account limiters below rely on this having r
 // per-minute IP limits for clip/import are in app.ts; these add a daily cap per account
 router.post("/clip", clipDailyLimiter, trackActivity("clip_added"), clip);
 // PDFs go browser -> Vercel Blob (the daily cap counts at the token step), then /import reads them from there
-router.post("/import/token", importDailyLimiter, importToken);
+router.post("/import/token", importDailyLimiter, startImportUpload);
 router.post("/import", fetchImportBlob, trackActivity("pdf_imported"), importPdf);
 router.post("/ask", requireAi, aiMinuteLimiter, aiDailyLimiter, ask);
 router.get("/sessions", listSessions); // stays open so old sessions can still be deleted
