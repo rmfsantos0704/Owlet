@@ -9,3 +9,5 @@ coverage/
 .DS_Store
 .loxrc.json
 *.zip
+.vercel
+.env*
