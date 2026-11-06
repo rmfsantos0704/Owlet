@@ -3,17 +3,16 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   Archive, Bot, Copy, FileDown, Highlighter, LoaderCircle, MessageSquareText, Quote, Search, Settings, Tag, Upload, X, type LucideIcon,
 } from "lucide-react";
-import { put } from "@vercel/blob/client";
 import { api, download } from "../services/api";
 import type { ResearchItem } from "../types";
-import ResearchCard from "../components/ResearchCard";
-import SelectableClips from "../components/SelectableClips";
+import ResearchCard from "../components/library/ResearchCard";
+import SelectableClips from "../components/library/SelectableClips";
 import { useCollections } from "../context/CollectionContext";
-import CollectionExportMenu from "../components/CollectionExportMenu";
-import AiAssistantCard from "../components/AiAssistantCard";
-import Toast, { type Notice } from "../components/Toast";
+import CollectionExportMenu from "../components/library/CollectionExportMenu";
+import AiAssistantCard from "../components/library/AiAssistantCard";
+import Toast, { type Notice } from "../components/shared/Toast";
 import { useAuth } from "../context/AuthContext";
-import RecentActivity from "../components/RecentActivity";
+import RecentActivity from "../components/library/RecentActivity";
 
 const MAX_FILES = 10;
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -154,20 +153,21 @@ export default function Library({ all = false }: { all?: boolean }) {
           continue;
         }
         try {
-          // Vercel rejects request bodies over ~4.5 MB, so the PDF goes straight to Blob storage,
-          // and the server only gets its address
-          const { pathname, clientToken } = await api<{ pathname: string; clientToken: string }>(
+          // Vercel rejects request bodies over ~4.5 MB, so the PDF goes straight to Blob storage
+          // through a one-time upload link, and the server only gets its path
+          const { pathname, uploadUrl } = await api<{ pathname: string; uploadUrl: string }>(
             "/research/import/token",
             { method: "POST" }
           );
-          const blob = await put(pathname, f, {
-            access: "public",
-            token: clientToken,
-            contentType: "application/pdf",
+          const up = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": "application/pdf" },
+            body: f,
           });
+          if (!up.ok) throw new Error("Couldn't upload the PDF. Try again.");
           const r = await api<{ aiFailed: boolean }>("/research/import", {
             method: "POST",
-            body: { collectionId: wid, blobUrl: blob.url, fileName: f.name },
+            body: { collectionId: wid, pathname, fileName: f.name },
           });
           ok++;
           if (r.aiFailed) problems.push(`${f.name}: saved, but the AI summary failed`);
@@ -236,12 +236,12 @@ export default function Library({ all = false }: { all?: boolean }) {
 
   const filtering = !!(q.trim() || tag || readingStatus);
   const stats = [
-    { label: "Saved clips", value: items.length, icon: Archive, accent: "bg-blue-50 text-blue-700" },
+    { label: "Saved clips", value: items.length, icon: Archive, accent: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" },
     aiEnabled
-      ? { label: "AI summaries", value: items.filter((i) => i.aiOutput.summary).length, icon: Bot, accent: "bg-violet-50 text-violet-700" }
-      : { label: "Tagged clips", value: items.filter((i) => (i.tags?.length ?? 0) > 0).length, icon: Tag, accent: "bg-violet-50 text-violet-700" },
-    { label: "Highlights", value: items.reduce((n, i) => n + (i.highlights?.length ?? 0), 0), icon: Highlighter, accent: "bg-amber-50 text-amber-700" },
-    { label: "Comments", value: items.reduce((n, i) => n + (i.comments?.length ?? 0), 0), icon: MessageSquareText, accent: "bg-emerald-50 text-emerald-700" },
+      ? { label: "AI summaries", value: items.filter((i) => i.aiOutput.summary).length, icon: Bot, accent: "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" }
+      : { label: "Tagged clips", value: items.filter((i) => (i.tags?.length ?? 0) > 0).length, icon: Tag, accent: "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
+    { label: "Highlights", value: items.reduce((n, i) => n + (i.highlights?.length ?? 0), 0), icon: Highlighter, accent: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
+    { label: "Comments", value: items.reduce((n, i) => n + (i.comments?.length ?? 0), 0), icon: MessageSquareText, accent: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
   ];
 
   if (!all && !ready) {
@@ -275,7 +275,7 @@ export default function Library({ all = false }: { all?: boolean }) {
         <>
           <span>{items.length} {items.length === 1 ? "clip" : "clips"}</span>
           {tag && (
-            <button onClick={() => setTag("")} className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
+            <button onClick={() => setTag("")} className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
               {tag} <X className="size-3" />
             </button>
           )}

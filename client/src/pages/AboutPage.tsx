@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, Highlighter, UsersRound } from "lucide-react";
-import PublicSiteFooter from "../components/PublicSiteFooter";
-import PublicSiteHeader from "../components/PublicSiteHeader";
+import PublicSiteFooter from "../components/publicsite/PublicSiteFooter";
+import PublicSiteHeader from "../components/publicsite/PublicSiteHeader";
 
 const features = [
   { icon: BookOpen, title: "Collect sources", text: "Save web pages and PDFs into Collections organized around your projects." },

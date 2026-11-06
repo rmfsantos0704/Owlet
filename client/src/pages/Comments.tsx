@@ -5,8 +5,8 @@ import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useCollectionScope } from "../hooks/useCollectionScope";
 import { useDialog } from "../context/DialogContext";
-import FilterBar, { type FilterSelect } from "../components/FilterBar";
-import Modal from "../components/Modal";
+import FilterBar, { type FilterSelect } from "../components/shared/FilterBar";
+import Modal from "../components/shared/Modal";
 import type { ResearchItem } from "../types";
 
 const FILTERS = ["All", "On highlights", "General"] as const;

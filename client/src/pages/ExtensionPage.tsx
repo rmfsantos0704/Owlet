@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, ArrowUpRight, Check, MousePointer2, Puzzle, ShieldCheck } from "lucide-react";
-import PublicSiteFooter from "../components/PublicSiteFooter";
-import PublicSiteHeader from "../components/PublicSiteHeader";
+import PublicSiteFooter from "../components/publicsite/PublicSiteFooter";
+import PublicSiteHeader from "../components/publicsite/PublicSiteHeader";
 import { chromeExtensionUrl } from "../utils/chromeExtension";
 
 const features = [

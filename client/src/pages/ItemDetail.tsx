@@ -5,19 +5,19 @@ import {
   Pencil, RefreshCw, Save, Settings, Sparkles, Trash2, X,
 } from "lucide-react";
 import { api, download } from "../services/api";
-import CitationBox from "../components/CitationBox";
-import TagInput from "../components/TagInput";
+import CitationBox from "../components/itemdetail/CitationBox";
+import TagInput from "../components/itemdetail/TagInput";
 import HighlightList from "../components/HighlightList";
-import ClippedText from "../components/ClippedText";
-import DraggableModal from "../components/DraggableModal";
+import ClippedText from "../components/itemdetail/ClippedText";
+import DraggableModal from "../components/shared/DraggableModal";
 import { useAuth } from "../context/AuthContext";
-import QuickSummary from "../components/QuickSummary";
+import QuickSummary from "../components/itemdetail/QuickSummary";
 import CommentThread from "../components/CommentThread";
-import SourceEditor from "../components/SourceEditor";
-import AiSettingsModal from "../components/AiSettingsModal";
-import RegenerateModal from "../components/RegenerateModal";
-import Modal from "../components/Modal";
-import RelatedClips from "../components/RelatedClips";
+import SourceEditor from "../components/itemdetail/SourceEditor";
+import AiSettingsModal from "../components/itemdetail/AiSettingsModal";
+import RegenerateModal from "../components/itemdetail/RegenerateModal";
+import Modal from "../components/shared/Modal";
+import RelatedClips from "../components/itemdetail/RelatedClips";
 import { DEFAULT_AI_SETTINGS } from "../types";
 import type { AiSettings, ResearchItem, Role } from "../types";
 

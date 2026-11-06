@@ -3,13 +3,13 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Highlighter, ListFilter, MessageSquareText, StickyNote, FileText, Pencil } from "lucide-react";
 import { api } from "../services/api";
 import { useCollectionScope } from "../hooks/useCollectionScope";
-import ColorPicker from "../components/ColorPicker";
-import FilterBar, { type FilterSelect } from "../components/FilterBar";
-import HighlightsAnalysis, { MAX_ANALYSIS_SOURCES } from "../components/HighlightsAnalysis";
+import ColorPicker from "../components/shared/ColorPicker";
+import FilterBar, { type FilterSelect } from "../components/shared/FilterBar";
+import HighlightsAnalysis, { MAX_ANALYSIS_SOURCES } from "../components/highlights/HighlightsAnalysis";
 import { styleFor } from "../utils/colors";
 import type { Highlight, ResearchItem } from "../types";
 import { useAuth } from "../context/AuthContext";
-import BriefModal from "../components/BriefModal";
+import BriefModal from "../components/highlights/BriefModal";
 import type { BriefHighlight } from "../utils/brief";
 
 const FILTERS = ["All highlights", "With notes"] as const;

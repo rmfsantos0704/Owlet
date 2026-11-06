@@ -56,6 +56,22 @@ html.dark {
   --color-gray-800: #e2e8f0;
   --color-gray-900: #edf2f7;
   --color-gray-950: #f8fafc;
+
+  /* Blue, red and emerald: dark-friendly shades so light tints don't glow */
+  --color-blue-50: #14213d;
+  --color-blue-100: #182a4d;
+  --color-blue-200: #1f3a6b;
+  --color-blue-300: #3b5f9e;
+  --color-blue-600: #6b9bf0;
+  --color-blue-700: #8fb4f5;
+  --color-blue-800: #a9c4f8;
+
+  --color-red-50: #2a1620;
+  --color-red-200: #5b2a35;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+
+  --color-emerald-700: #6ee7b7;
 }
 
 html.dark [class~="bg-white"] {
@@ -101,6 +117,17 @@ html.dark .btn-secondary {
 html.dark .btn-secondary:hover {
   background-color: #172338;
   border-color: #3a4b63;
+}
+
+html.dark .btn-danger {
+  background-color: #111c2f;
+  border-color: rgb(248 113 113 / 30%);
+  color: #fca5a5;
+}
+
+html.dark .btn-danger:hover {
+  background-color: rgb(239 68 68 / 12%);
+  border-color: rgb(248 113 113 / 45%);
 }
 
 .ai-usage-popover {
@@ -162,6 +189,12 @@ html.dark textarea:focus,
 html.dark select:focus {
   background-color: #172338;
   color: #e2e8f0;
+}
+
+/* Soft focus ring so fields don't glow white in dark mode */
+html.dark .field:focus {
+  --tw-ring-color: rgb(96 165 250 / 25%);
+  border-color: #3b5f9e;
 }
 
 html.dark select {

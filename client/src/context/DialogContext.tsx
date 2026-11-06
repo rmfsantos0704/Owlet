@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import Modal from "../components/Modal";
+import Modal from "../components/shared/Modal";
 
 type Base = {
   title: string;

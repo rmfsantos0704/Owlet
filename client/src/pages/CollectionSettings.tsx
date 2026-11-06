@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
 import type { JoinLink, SentInvitation, collectionDetail } from "../types";
-import CollectionTagManager from "../components/CollectionTagManager";
+import CollectionTagManager from "../components/collectionsettings/CollectionTagManager";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

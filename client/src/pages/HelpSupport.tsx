@@ -23,13 +23,25 @@ import {
   FolderOutput,
   type LucideIcon,
 } from "lucide-react";
-import Modal from "../components/Modal"; // adjust path to match where the file lives
-import SupportModal from "../components/SupportModal"; // adjust path to match where the file lives
+import Modal from "../components/shared/Modal"; // adjust path to match where the file lives
+import SupportModal from "../components/helpsupport/SupportModal"; // adjust path to match where the file lives
 import { useAuth } from "../context/AuthContext";
 import { openOnboardingAt } from "../utils/onboarding";
 
 const EXTENSION_URL =
   "https://chromewebstore.google.com/detail/ahcmkkocefbjeoopiclnnmgemdbmooao?utm_source=item-share-cb";
+
+// Icon tile colors: a light tint in light mode, a soft translucent tint in dark mode.
+const ACCENT = {
+  blue: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+  violet: "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+  amber: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  emerald: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  cyan: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300",
+  sky: "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
+  indigo: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
+  slate: "bg-slate-100 text-slate-700",
+} as const;
 
 type Guide = { topic: string; icon: LucideIcon; title: string; text: string; accent: string };
 type Faq = { topic: string; q: string; a: string };
@@ -50,28 +62,28 @@ function guides(ai: boolean): Guide[] {
       text: ai
         ? "Open an article, click the Owlet extension, pick a Collection, optionally add tags or a short note about why you saved it, and press Clip this page. Owlet saves the text and writes an AI summary."
         : "Open an article, click the Owlet extension, pick a Collection, optionally add tags or a short note about why you saved it, and press Clip this page. Owlet saves the text and builds the citations.",
-      accent: "bg-blue-50 text-blue-700",
+      accent: ACCENT.blue,
     },
     {
       topic: "getting-started",
       icon: FileUp,
       title: "Import PDFs",
       text: "In a Collection, press Import PDF or drag PDF files anywhere on the page. You can add up to 10 files at a time, 15 MB each.",
-      accent: "bg-violet-50 text-violet-700",
+      accent: ACCENT.violet,
     },
     {
       topic: "notes",
       icon: Highlighter,
       title: "Highlight and comment",
       text: "Open a clip to highlight passages, add notes and leave comments. Highlights use their saved position to avoid confusing repeated phrases, and PDF highlights show a page number when available.",
-      accent: "bg-amber-50 text-amber-700",
+      accent: ACCENT.amber,
     },
     {
       topic: "extension",
       icon: Highlighter,
       title: "Highlight while you read",
       text: "Select text on any page and right-click Save selection to Owlet, or press Alt+Shift+S. It saves to the Collection selected in the extension and clips the page first if needed.",
-      accent: "bg-amber-50 text-amber-700",
+      accent: ACCENT.amber,
     },
   ];
 
@@ -81,7 +93,7 @@ function guides(ai: boolean): Guide[] {
       icon: Sparkles,
       title: "Use the AI workspace",
       text: "Open it from the AI research assistant card on a Collection page. Pick up to 8 sources, choose a mode and run the analysis. Each run is saved under Recent sessions. AI use is limited to 10 generations per account each day.",
-      accent: "bg-emerald-50 text-emerald-700",
+      accent: ACCENT.emerald,
     });
   } else {
     list.push(
@@ -90,14 +102,14 @@ function guides(ai: boolean): Guide[] {
         icon: ListChecks,
         title: "Quick summary and tags",
         text: "Open a clip to see its Quick summary: key sentences picked from the text, plus key terms. Click a term to add it as a tag.",
-        accent: "bg-cyan-50 text-cyan-700",
+        accent: ACCENT.cyan,
       },
       {
         topic: "summaries",
         icon: FileText,
         title: "Build a brief",
         text: "On the Highlights page, press Build a brief, tick the highlights you want and group them by source or by color. Owlet compiles them with your notes and an APA reference list. Copy it as Markdown or download it as a .md file.",
-        accent: "bg-emerald-50 text-emerald-700",
+        accent: ACCENT.emerald,
       }
     );
   }
@@ -107,14 +119,14 @@ function guides(ai: boolean): Guide[] {
     icon: Share2,
     title: "Share a Collection",
     text: "Owners can create a join link from the Collection settings, or from the extension. Choose whether people join as viewers or editors, and when the link expires.",
-    accent: "bg-sky-50 text-sky-700",
+    accent: ACCENT.sky,
   });
   list.push({
     topic: "organize",
     icon: FileText,
     title: "Build a literature matrix",
     text: "Open Literature matrix from Workspaces. Add your own columns, fill in each clip's cells, and export the collection matrix as CSV.",
-    accent: "bg-cyan-50 text-cyan-700",
+    accent: ACCENT.cyan,
   });
   return list;
 }
@@ -212,21 +224,21 @@ function topics(ai: boolean): Topic[] {
       title: "Getting started",
       description: "Clip your first page, import PDFs and fix common clipping problems.",
       icon: BookOpen,
-      color: "bg-blue-50 text-blue-700",
+      color: ACCENT.blue,
     },
     {
       id: "extension",
       title: "Chrome extension",
       description: "Install the clipper and save research from any webpage.",
       icon: Link2,
-      color: "bg-violet-50 text-violet-700",
+      color: ACCENT.violet,
     },
     {
       id: "notes",
       title: "Highlights & notes",
       description: "Capture important passages, add notes and leave comments.",
       icon: Highlighter,
-      color: "bg-amber-50 text-amber-700",
+      color: ACCENT.amber,
     },
   ];
 
@@ -236,7 +248,7 @@ function topics(ai: boolean): Topic[] {
       title: "AI workspace",
       description: "Run analyses across up to 8 sources and revisit past sessions.",
       icon: Sparkles,
-      color: "bg-cyan-50 text-cyan-700",
+      color: ACCENT.cyan,
     });
   } else {
     list.push({
@@ -244,7 +256,7 @@ function topics(ai: boolean): Topic[] {
       title: "Summaries & briefs",
       description: "Quick summaries, key terms, tags and compiled briefs.",
       icon: ListChecks,
-      color: "bg-cyan-50 text-cyan-700",
+      color: ACCENT.cyan,
     });
   }
 
@@ -254,21 +266,21 @@ function topics(ai: boolean): Topic[] {
       title: "Organize & export",
       description: "Literature matrix, reference lists and exports.",
       icon: FolderOutput,
-      color: "bg-indigo-50 text-indigo-700",
+      color: ACCENT.indigo,
     },
     {
       id: "collaboration",
       title: "Team collaboration",
       description: "Share Collections, roles and join links.",
       icon: Users,
-      color: "bg-emerald-50 text-emerald-700",
+      color: ACCENT.emerald,
     },
     {
       id: "limits",
       title: "AI usage & limits",
       description: "How the daily AI allowance and provider availability work.",
       icon: Gauge,
-      color: "bg-slate-100 text-slate-700",
+      color: ACCENT.slate,
     }
   );
   return list;
@@ -458,7 +470,7 @@ export default function HelpSupport() {
                   key={t.id}
                   type="button"
                   onClick={() => setActiveTopic(t.id)}
-                  className="card group flex items-start gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg hover:shadow-slate-200/50"
+                  className="card group flex items-start gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/30"
                 >
                   <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${t.color}`}>
                     <Icon className="size-4.5" strokeWidth={1.9} />
@@ -577,14 +589,14 @@ export default function HelpSupport() {
                 setActiveTopic(null);
                 setSupportOpen(true);
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="btn-secondary"
             >
               <CircleHelp className="size-4" /> Still stuck?
             </button>
             <button
               type="button"
               onClick={() => setActiveTopic(null)}
-              className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#173b77]"
+              className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover"
             >
               Done
             </button>

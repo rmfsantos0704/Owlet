@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import PublicSiteFooter from "../PublicSiteFooter";
-import PublicSiteHeader from "../PublicSiteHeader";
+import PublicSiteFooter from "../publicsite/PublicSiteFooter";
+import PublicSiteHeader from "../publicsite/PublicSiteHeader";
 // The page frame shared by every auth screen: mascot on the left, the card on the right.
 export default function AuthShell({ children }: { children: ReactNode }) {
   return (

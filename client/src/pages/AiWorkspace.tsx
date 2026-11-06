@@ -5,9 +5,9 @@ import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
-import Modal from "../components/Modal";
-import RecentSessions, { sessionTitle } from "../components/RecentSessions";
-import Sources from "../components/Sources";
+import Modal from "../components/shared/Modal";
+import RecentSessions, { sessionTitle } from "../components/aiworkspace/RecentSessions";
+import Sources from "../components/aiworkspace/Sources";
 import type { AiSession, ResearchItem } from "../types";
 
 const MODES = ["Research brief", "Summarize", "Compare sources"] as const;

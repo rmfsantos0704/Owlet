@@ -23,11 +23,11 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
-import NotificationsBell from "./NotificationsBell";
-import CollectionMenu from "./CollectionMenu";
-import WorkspaceMenu from "./WorkspaceMenu";
-import AiUsageIndicator from "./AiUsageIndicator";
-import OnboardingModal from "./OnboardingModal";
+import NotificationsBell from "./layout/NotificationsBell";
+import CollectionMenu from "./layout/CollectionMenu";
+import WorkspaceMenu from "./layout/WorkspaceMenu";
+import AiUsageIndicator from "./layout/AiUsageIndicator";
+import OnboardingModal from "./layout/OnboardingModal";
 import { ONBOARDING_EVENT } from "../utils/onboarding";
 
 // pages where the header search filters what's shown (everywhere else it jumps to the collection page)
