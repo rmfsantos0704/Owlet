@@ -88,7 +88,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/research", researchRoutes);
 app.use("/api/collections", collectionRoutes);
-app.use("/api/support", limiter(minutes(15), 5)); // it sends email, so spam would cost you
+app.use("/api/support", limiter(minutes(15), 5), supportRoutes); // it sends email, so spam would cost you
 
 // unknown API paths answer in JSON like everything else
 app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
