@@ -22,5 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src", "src/components/shared/Modal.tsx", "src/components/shared/FilterBar.tsx", "src/components/shared/DraggableModal.tsx", "src/components/shared/ColorPicker.tsx", "src/components/shared/ActivityRow.tsx"]
 }
