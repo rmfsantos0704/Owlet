@@ -1,6 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* Make Tailwind's dark: variant follow Owlet's .dark class instead of the OS color scheme */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
   --color-brand: #102b5c;
@@ -75,6 +78,18 @@ html.dark .help-extension-card {
 
 html.dark .help-extension-title {
   color: #f8fafc;
+}
+
+/* Chrome extension card icon: dark in light mode, bright only in dark mode */
+.help-extension-icon {
+  background-color: #fff;
+  color: #4c1d95; /* violet-900 */
+}
+
+html.dark .help-extension-icon {
+  background-color: rgb(139 92 246 / 20%);
+  color: #c4b5fd; /* violet-300 */
+  box-shadow: none;
 }
 
 html.dark .btn-secondary {

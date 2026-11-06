@@ -509,7 +509,7 @@ export default function HelpSupport() {
           <div className="space-y-6 xl:self-start">
             {showExtension && (
               <div className="help-extension-card rounded-2xl border border-violet-100 bg-violet-50/60 p-5 dark:border-violet-400/20 dark:bg-violet-500/10">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-white text-violet-700 shadow-sm dark:bg-violet-500/20 dark:text-violet-300 dark:shadow-none">
+                <div className="help-extension-icon flex size-10 items-center justify-center rounded-xl shadow-sm">
                   <Link2 className="size-4.5" />
                 </div>
                 <h2 className="help-extension-title mt-4 font-semibold">Get the Chrome extension</h2>
