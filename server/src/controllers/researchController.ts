@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Request, Response } from "express";
+import { generateClientTokenFromReadWriteToken } from "@vercel/blob/client";
 import mongoose, { type UpdateQuery } from "mongoose";
 import { z } from "zod";
 import { ResearchItem } from "../models/ResearchItem.js";
@@ -17,6 +18,7 @@ import { normalizePageUrl } from "../services/pageUrl.js";
 import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../services/access.js";
 import { aiEnabled } from "../config/features.js";
 import { AiQuotaExceededError, aiAvailableForUser } from "../services/aiUsage.js";
+import { MAX_IMPORT_BYTES } from "../middlewares/blobImport.js";
 
 const MAX_TITLE = 100;
 const HIGHLIGHT_COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green"] as const;
@@ -296,6 +298,25 @@ function forAi(text: string) {
   return text.length > 12000 ? text.slice(0, 8000) + "\n[...]\n" + text.slice(-4000) : text;
 }
 
+// POST /research/import/token: Vercel rejects request bodies over ~4.5 MB, so the browser uploads the PDF
+// straight to Vercel Blob. This hands out a short-lived token for one PDF at a path only this user can import.
+export async function importToken(_req: Request, res: Response) {
+  const pathname = `imports/${res.locals.userId}/${randomUUID()}.pdf`;
+  try {
+    const clientToken = await generateClientTokenFromReadWriteToken({
+      pathname,
+      allowedContentTypes: ["application/pdf"],
+      maximumSizeInBytes: MAX_IMPORT_BYTES,
+      validUntil: Date.now() + 10 * 60 * 1000,
+    });
+    res.json({ pathname, clientToken });
+  } catch (err) {
+    console.error("Blob token failed:", err);
+    res.status(500).json({ error: "Couldn't start the upload. Try again." });
+  }
+}
+
+// Reads req.file, which the fetchImportBlob middleware fills in from the uploaded Blob.
 export async function importPdf(req: Request, res: Response) {
   const file = req.file;
   if (!file) return res.status(400).json({ error: "Attach a PDF file" });
