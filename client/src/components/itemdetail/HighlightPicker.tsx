@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
-import type { Highlight } from "../types";
-import { styleFor } from "../utils/colors";
+import type { Highlight } from "../../types";
+import { styleFor } from "../../utils/colors";
 
 type Props = {
   highlights: Highlight[];

@@ -1,48 +1,98 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, FolderKanban, Layers3, Puzzle, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, BookOpen, FolderKanban, Layers3, Puzzle, Sparkles, UserRound, X, type LucideIcon } from "lucide-react";
 import { chromeExtensionUrl } from "../../utils/chromeExtension";
+import { useAuth } from "../../context/AuthContext";
 
-const steps = [
-  {
-    target: "owlet-tour-workspaces",
-    icon: Layers3,
-    title: "Workspaces are your research tools",
-    description: "These links are different ways to work with your saved research. They don't move or copy clips between Collections.",
-    items: [
-      ["All clips", "Search and browse clips across every Collection you can access."],
-      ["Highlights & Comments", "Review passages you've marked and conversations on clips."],
-      ["Literature matrix", "Compare sources in a structured table."],
-      ["AI workspace", "Run research analysis on selected sources when AI is available."],
-    ],
-  },
-  {
-    target: "owlet-tour-collections",
-    icon: FolderKanban,
-    title: "Collections keep projects separate",
-    description: "A Collection is a place for the clips, highlights, and comments belonging to one project or topic. The selected Collection is your current workspace for saving and browsing.",
-    items: [
-      ["Personal", "Your private Collection; other people can't see its contents."],
-      ["Shared", "Invite collaborators as editors or viewers. Editors can contribute; viewers can read."],
-    ],
-  },
-  {
-    target: "owlet-tour-collection-list",
-    icon: BookOpen,
-    title: "Choose and manage Collections here",
-    description: "Select a Collection to open it. Use the + button to create one, or the three-dot menu beside a Collection to find its settings, members, and sharing options.",
-    items: [
-      ["Tip", "When clipping with the browser extension, choose the Collection where the page should be saved."],
-    ],
-  },
-];
+type Step = {
+  target: string; // id of the element the panel points at
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  items: [string, string][];
+};
+
+const COLLECTION_LIST_TARGET = "owlet-tour-collection-list";
 
 type Props = { open: boolean; onClose: () => void; initialStep?: number };
 type Position = { top: number; left: number; width: number };
 
 export default function OnboardingModal({ open, onClose, initialStep = 0 }: Props) {
-  const [stepIndex, setStepIndex] = useState(() => Math.min(Math.max(initialStep, 0), steps.length - 1));
+  const { user, aiUsage } = useAuth();
+  const hasAiUsage = !!aiUsage;
+  const email = user?.email;
+
+  // Built once per sign-in / AI availability, so the step object stays stable between renders.
+  // A step is left out when the thing it points at isn't on screen (the tour would wait forever for it).
+  const steps = useMemo<Step[]>(() => {
+    const list: Step[] = [
+      {
+        target: "owlet-tour-workspaces",
+        icon: Layers3,
+        title: "Workspaces are your research tools",
+        description: "These links are different ways to work with your saved research. They don't move or copy clips between Collections.",
+        items: [
+          ["All clips", "Search and browse clips across every Collection you can access."],
+          ["Highlights & Comments", "Review passages you've marked and conversations on clips."],
+          ["Literature matrix", "Compare sources in a structured table."],
+          ["AI workspace", "Run research analysis on selected sources when AI is available."],
+        ],
+      },
+      {
+        target: "owlet-tour-collections",
+        icon: FolderKanban,
+        title: "Collections keep projects separate",
+        description: "A Collection is a place for the clips, highlights, and comments belonging to one project or topic. The selected Collection is your current workspace for saving and browsing.",
+        items: [
+          ["Personal", "Your private Collection; other people can't see its contents."],
+          ["Shared", "Invite collaborators as editors or viewers. Editors can contribute; viewers can read."],
+        ],
+      },
+      {
+        target: COLLECTION_LIST_TARGET,
+        icon: BookOpen,
+        title: "Choose and manage Collections here",
+        description: "Select a Collection to open it. Use the + button to create one, or the three-dot menu beside a Collection to find its settings, members, and sharing options.",
+        items: [
+          ["Tip", "When clipping with the browser extension, choose the Collection where the page should be saved."],
+        ],
+      },
+    ];
+
+    if (hasAiUsage) {
+      list.push({
+        target: "owlet-tour-ai-usage",
+        icon: Sparkles,
+        title: "Your daily AI allowance",
+        description: "This meter in the top bar counts the AI features you've used today, such as summaries and the AI workspace. Hover over it, or tab to it, to see how many uses you have left.",
+        items: [
+          ["Used / limit", "The first number is what you've used today; the second is your daily limit."],
+          ["Resets", "Your allowance resets at midnight UTC."],
+          ["When it runs out", "AI features pause until the reset. Your clips, highlights, and comments keep working."],
+        ],
+      });
+    }
+
+    if (email) {
+      list.push({
+        target: "owlet-tour-account",
+        icon: UserRound,
+        title: "Your account",
+        description: "Your initials and email in the top bar show which account you're signed in to. Click them to open your account page.",
+        items: [
+          ["Signed in as", email],
+          ["Account settings", "Open your account page from here to manage your account."],
+          ["Log out", "The arrow icon beside your email signs you out."],
+        ],
+      });
+    }
+
+    return list;
+  }, [hasAiUsage, email]);
+
+  const [stepIndex, setStepIndex] = useState(() => Math.max(initialStep, 0));
   const [position, setPosition] = useState<Position | null>(null);
-  const step = steps[stepIndex] ?? steps[0];
+  const safeIndex = Math.min(stepIndex, steps.length - 1);
+  const step = steps[safeIndex];
 
   useEffect(() => {
     if (!open) return;
@@ -89,7 +139,7 @@ export default function OnboardingModal({ open, onClose, initialStep = 0 }: Prop
   if (!open) return null;
 
   const Icon = step.icon;
-  const lastStep = stepIndex === steps.length - 1;
+  const lastStep = safeIndex === steps.length - 1;
 
   return (
     <>
@@ -108,7 +158,7 @@ export default function OnboardingModal({ open, onClose, initialStep = 0 }: Prop
               <Icon className="size-4.5" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="eyebrow text-blue-600">Owlet guide · {stepIndex + 1} of {steps.length}</p>
+              <p className="eyebrow text-blue-600">Owlet guide · {safeIndex + 1} of {steps.length}</p>
               <h2 id="onboarding-title" className="mt-1 text-base font-semibold leading-5 text-ink">{step.title}</h2>
             </div>
             <button type="button" onClick={onClose} aria-label="Close guide" className="-mr-2 -mt-2 rounded-lg p-2 text-slate-400 hover:bg-slate-100">
@@ -119,16 +169,17 @@ export default function OnboardingModal({ open, onClose, initialStep = 0 }: Prop
           <ul className="mt-3 space-y-2.5">
             {step.items.map(([label, text]) => (
               <li key={label} className="text-xs leading-5 text-slate-500">
-                <span className="font-semibold text-slate-800">{label}: </span>{text}
+                <span className="font-semibold text-slate-800">{label}: </span>
+                <span className="break-all">{text}</span>
               </li>
             ))}
           </ul>
-          {stepIndex === 0 && (
+          {safeIndex === 0 && (
             <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
               Use the links under <span className="font-semibold text-slate-700">Workspaces</span> to switch tools; use <span className="font-semibold text-slate-700">Collections</span> to switch projects.
             </p>
           )}
-          {lastStep ? (
+          {step.target === COLLECTION_LIST_TARGET ? (
             <div className="mt-4 border-t border-slate-100 pt-3">
               {chromeExtensionUrl ? (
                 <a href={chromeExtensionUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
@@ -142,14 +193,14 @@ export default function OnboardingModal({ open, onClose, initialStep = 0 }: Prop
           <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
             <button type="button" onClick={onClose} className="text-xs font-medium text-slate-500 hover:text-slate-800">Skip tour</button>
             <div className="flex items-center gap-2">
-              {stepIndex > 0 ? (
-                <button type="button" onClick={() => setStepIndex((current) => current - 1)} className="btn-secondary !px-3 !py-2 text-xs">
+              {safeIndex > 0 ? (
+                <button type="button" onClick={() => setStepIndex(safeIndex - 1)} className="btn-secondary !px-3 !py-2 text-xs">
                   <ArrowLeft className="size-3.5" /> Back
                 </button>
               ) : null}
               <button
                 type="button"
-                onClick={() => (lastStep ? onClose() : setStepIndex((current) => current + 1))}
+                onClick={() => (lastStep ? onClose() : setStepIndex(safeIndex + 1))}
                 className="btn-primary !px-3 !py-2 text-xs"
               >
                 {lastStep ? "Done" : "Next"} {!lastStep && <ArrowRight className="size-3.5" />}

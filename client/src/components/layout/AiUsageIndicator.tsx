@@ -13,6 +13,7 @@ export default function AiUsageIndicator({ compact = false }: { compact?: boolea
 
   return (
     <div
+      id={compact ? "owlet-tour-ai-usage" : undefined}
       className={`ai-usage-popover ${exhausted ? "ai-usage-exhausted" : ""} ${
         compact
           ? "relative shrink-0"

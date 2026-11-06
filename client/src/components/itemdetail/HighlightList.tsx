@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
-import ColorPicker from "./ColorPicker";
-import { styleFor } from "../utils/colors";
-import type { Comment, Highlight } from "../types";
+import ColorPicker from "../shared/ColorPicker";
+import { styleFor } from "../../utils/colors";
+import type { Comment, Highlight } from "../../types";
 
 type Props = {
   highlights: Highlight[];

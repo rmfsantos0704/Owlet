@@ -448,7 +448,7 @@ export default function Layout() {
           <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
             <AiUsageIndicator compact />
             <NotificationsBell />
-            <Link to="/account" className="flex shrink-0 items-center gap-2.5 rounded-xl p-1 transition hover:bg-slate-100" title="Account settings">
+            <Link to="/account" id="owlet-tour-account" className="flex shrink-0 items-center gap-2.5 rounded-xl p-1 transition hover:bg-slate-100" title="Account settings">
               <div className="flex size-9 items-center justify-center rounded-xl bg-[#dbeafe] text-xs font-bold text-[#174ea6]">
                 {initials}
               </div>
