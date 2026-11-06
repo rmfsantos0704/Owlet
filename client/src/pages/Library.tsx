@@ -3,7 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   Archive, Bot, Copy, FileDown, Highlighter, LoaderCircle, MessageSquareText, Quote, Search, Settings, Tag, Upload, X, type LucideIcon,
 } from "lucide-react";
-import { api, download, upload } from "../services/api";
+import { put } from "@vercel/blob/client";
+import { api, download } from "../services/api";
 import type { ResearchItem } from "../types";
 import ResearchCard from "../components/ResearchCard";
 import SelectableClips from "../components/SelectableClips";
@@ -152,11 +153,22 @@ export default function Library({ all = false }: { all?: boolean }) {
           problems.push(`${f.name}: too large (15 MB max)`);
           continue;
         }
-        const form = new FormData();
-        form.append("collectionId", wid);
-        form.append("file", f);
         try {
-          const r = await upload<{ aiFailed: boolean }>("/research/import", form);
+          // Vercel rejects request bodies over ~4.5 MB, so the PDF goes straight to Blob storage,
+          // and the server only gets its address
+          const { pathname, clientToken } = await api<{ pathname: string; clientToken: string }>(
+            "/research/import/token",
+            { method: "POST" }
+          );
+          const blob = await put(pathname, f, {
+            access: "public",
+            token: clientToken,
+            contentType: "application/pdf",
+          });
+          const r = await api<{ aiFailed: boolean }>("/research/import", {
+            method: "POST",
+            body: { collectionId: wid, blobUrl: blob.url, fileName: f.name },
+          });
           ok++;
           if (r.aiFailed) problems.push(`${f.name}: saved, but the AI summary failed`);
         } catch (e) {
