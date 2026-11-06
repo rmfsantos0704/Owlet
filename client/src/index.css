@@ -173,6 +173,11 @@ html.dark select option {
   color: #e2e8f0;
 }
 
+/* Highlighted text: always dark ink on the light highlighter colors, in light and dark mode */
+.highlight-mark {
+  color: #0f172a;
+}
+
 .onboarding-highlight {
   position: relative;
   z-index: 80;

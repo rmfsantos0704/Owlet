@@ -154,7 +154,7 @@ export default function ClippedText({ text, highlights = [], readOnly, onHighlig
       >
         {segments.map((s, i) =>
           s.h ? (
-            <mark key={i} data-highlight-id={s.h._id} title={s.h.note || undefined} className={`rounded px-0.5 text-slate-900 ${styleFor(s.h.color).mark}`}>
+            <mark key={i} data-highlight-id={s.h._id} title={s.h.note || undefined} className={`highlight-mark rounded px-0.5 ${styleFor(s.h.color).mark}`}>
               {s.text}
             </mark>
           ) : (
