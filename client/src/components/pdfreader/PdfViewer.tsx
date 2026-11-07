@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import * as pdfjs from "pdfjs-dist";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import "pdfjs-dist/web/pdf_viewer.css";
-import { Minus, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Minus, Plus, Search, X } from "lucide-react";
 import ColorPicker from "../shared/ColorPicker";
 import { styleFor } from "../../utils/colors";
+import LoadingScreen from "../shared/LoadingScreen";
 import type { Highlight } from "../../types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -92,14 +93,8 @@ function mergeRects(rects: Rect[]): Rect[] {
   return out;
 }
 
-// finds a highlight's wording in a page's text layer and returns where it sits (best effort)
-function locate(root: HTMLElement, text: string, pageRect: DOMRect): Rect[] {
-  const needle = squash(text);
-  if (needle.length < 3) return [];
-  const { hay, map } = buildIndex(root);
-  const at = hay.indexOf(needle);
-  if (at < 0) return [];
-  const end = at + needle.length;
+// the on-page rectangles for characters [at, end) of a text layer's index
+function rectsFor(map: { node: Text; offset: number }[], at: number, end: number, pageRect: DOMRect): Rect[] {
   const rects: Rect[] = [];
   let i = at;
   while (i < end) {
@@ -118,6 +113,32 @@ function locate(root: HTMLElement, text: string, pageRect: DOMRect): Rect[] {
     i = j;
   }
   return mergeRects(rects);
+}
+
+// finds a highlight's wording in a page's text layer and returns where it sits (best effort)
+function locate(root: HTMLElement, text: string, pageRect: DOMRect): Rect[] {
+  const needle = squash(text);
+  if (needle.length < 3) return [];
+  const { hay, map } = buildIndex(root);
+  const at = hay.indexOf(needle);
+  if (at < 0) return [];
+  return rectsFor(map, at, at + needle.length, pageRect);
+}
+
+const MAX_MATCHES = 2000; // across the whole document
+const MAX_MATCHES_PER_PAGE = 500;
+
+// every occurrence of the (already squashed) search text in a page's text layer, one Rect[] per match
+function locateAll(root: HTMLElement, needle: string, pageRect: DOMRect): Rect[][] {
+  if (!needle) return [];
+  const { hay, map } = buildIndex(root);
+  const out: Rect[][] = [];
+  let at = hay.indexOf(needle);
+  while (at >= 0 && out.length < MAX_MATCHES_PER_PAGE) {
+    out.push(rectsFor(map, at, at + needle.length, pageRect));
+    at = hay.indexOf(needle, at + needle.length);
+  }
+  return out;
 }
 
 function selectionRects(range: Range, root: HTMLElement, pageRect: DOMRect): Rect[] {
@@ -154,7 +175,7 @@ function findOffsets(rawText: string, pageOffsets: number[], page: number, text:
 const NONE: Highlight[] = [];
 
 function PageView({
-  doc, n, scale, base, root, highlights,
+  doc, n, scale, base, root, highlights, needle, current, focusNonce,
 }: {
   doc: PDFDocumentProxy;
   n: number;
@@ -162,6 +183,12 @@ function PageView({
   base: { w: number; h: number };
   root: HTMLElement | null;
   highlights: Highlight[];
+  /** the squashed search text, or "" when not searching */
+  needle: string;
+  /** which match on this page is the current one (-1 when it's on another page) */
+  current: number;
+  /** changes whenever the viewer wants the current match brought into view */
+  focusNonce: number;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -240,6 +267,28 @@ function PageView({
     setLocated(next);
   }, [ready, highlights, scale]);
 
+  // search matches on this page, found in the text layer once it is on screen
+  const [found, setFound] = useState<Rect[][]>([]);
+  useEffect(() => {
+    if (!needle) {
+      setFound([]);
+      return;
+    }
+    if (!ready) return;
+    const box = textBox.current;
+    const page = wrap.current;
+    if (!box || !page) return;
+    setFound(locateAll(box, needle, page.getBoundingClientRect()));
+  }, [ready, needle, scale]);
+
+  // brings the current match to the middle of the screen, once per request (so zooming doesn't re-scroll)
+  const handled = useRef(0);
+  useEffect(() => {
+    if (current < 0 || !found[current]?.length || handled.current === focusNonce) return;
+    handled.current = focusNonce;
+    wrap.current?.querySelector("[data-search-current]")?.scrollIntoView({ block: "center", inline: "nearest" });
+  }, [found, current, focusNonce]);
+
   const w = size?.scale === scale ? size.w : base.w * scale;
   const h = size?.scale === scale ? size.h : base.h * scale;
 
@@ -248,8 +297,9 @@ function PageView({
       <div
         ref={wrap}
         data-pdf-page={n}
-        className="relative mx-auto bg-white shadow-md"
-        style={{ width: w, height: h, "--scale-factor": scale, "--total-scale-factor": scale } as CSSProperties}
+        className="relative mx-auto shadow-md"
+        // inline white: your dark theme turns every bg-white navy, but a PDF page is always paper-white
+        style={{ width: w, height: h, backgroundColor: "#fff", "--scale-factor": scale, "--total-scale-factor": scale } as CSSProperties}
       >
         <canvas ref={canvas} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-0">
@@ -259,6 +309,16 @@ function PageView({
                 key={`${hl._id}-${i}`}
                 title={hl.note || undefined}
                 className={`absolute rounded-sm opacity-40 mix-blend-multiply ${styleFor(hl.color).dot}`}
+                style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%` }}
+              />
+            ))
+          )}
+          {found.flatMap((rs, mi) =>
+            rs.map((r, i) => (
+              <div
+                key={`find-${mi}-${i}`}
+                data-search-current={mi === current && i === 0 ? "" : undefined}
+                className={`absolute rounded-sm ${mi === current ? "bg-orange-400/70 ring-1 ring-orange-600" : "bg-sky-400/40"}`}
                 style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%` }}
               />
             ))
@@ -290,6 +350,109 @@ export default function PdfViewer({ url, rawText, pageOffsets, highlights, canEd
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const frame = useRef(0);
+
+  // ---------- search ----------
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [texts, setTexts] = useState<string[] | null>(null); // every page's text, squashed
+  const [cur, setCur] = useState(0); // index into `matches`
+  const [focusNonce, setFocusNonce] = useState(0);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const needle = useDeferredValue(squash(query));
+
+  // read every page's text once, the first time search is opened (pages that aren't drawn have no text layer)
+  useEffect(() => {
+    if (!searchOpen || texts || !doc) return;
+    let cancelled = false;
+    (async () => {
+      const out: string[] = [];
+      for (let p = 1; p <= doc.numPages; p++) {
+        try {
+          const content = await (await doc.getPage(p)).getTextContent();
+          out.push(squash(content.items.map((it) => ("str" in it ? it.str : "")).join("")));
+        } catch {
+          out.push("");
+        }
+        if (cancelled) return;
+      }
+      setTexts(out);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchOpen, texts, doc]);
+
+  const matches = useMemo(() => {
+    const out: { page: number; index: number }[] = [];
+    if (!texts || !needle) return out;
+    for (let p = 0; p < texts.length && out.length < MAX_MATCHES; p++) {
+      let k = 0;
+      let at = texts[p].indexOf(needle);
+      while (at >= 0 && out.length < MAX_MATCHES) {
+        out.push({ page: p + 1, index: k++ });
+        at = texts[p].indexOf(needle, at + needle.length);
+      }
+    }
+    return out;
+  }, [texts, needle]);
+
+  // a new search starts at its first match
+  useEffect(() => {
+    setCur(0);
+    if (matches.length) setFocusNonce((n) => n + 1);
+  }, [matches]);
+
+  const curMatch = matches[cur];
+
+  // scrolls to the current match: straight to it if its page is drawn, otherwise to the page
+  // (the page then draws itself and centres the match)
+  useEffect(() => {
+    if (!focusNonce || !curMatch || !root) return;
+    setPageInput(String(curMatch.page));
+    const el = root.querySelector("[data-search-current]");
+    if (el) el.scrollIntoView({ block: "center", inline: "nearest" });
+    else root.querySelector(`[data-pdf-page="${curMatch.page}"]`)?.scrollIntoView({ block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNonce]);
+
+  function openSearch() {
+    setSearchOpen(true);
+    requestAnimationFrame(() => {
+      searchInput.current?.focus();
+      searchInput.current?.select();
+    });
+  }
+
+  function closeSearch() {
+    setSearchOpen(false);
+    setQuery("");
+  }
+
+  function step(dir: 1 | -1) {
+    if (!matches.length) return;
+    setCur((c) => (c + dir + matches.length) % matches.length);
+    setFocusNonce((n) => n + 1);
+  }
+
+  // Ctrl/Cmd+F opens this search instead of the browser's, which can't see pages that aren't drawn yet
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        openSearch();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const searchStatus = !needle
+    ? ""
+    : !texts
+      ? "Searching…"
+      : matches.length === 0
+        ? "No results"
+        : `${Math.min(cur + 1, matches.length)} of ${matches.length}${matches.length >= MAX_MATCHES ? "+" : ""}`;
 
   // The address is a short-lived link, so the whole file is downloaded once up front (15 MB at most)
   // and opened from memory. Nothing else is requested from storage after that, even if the link expires.
@@ -433,7 +596,7 @@ export default function PdfViewer({ url, rawText, pageOffsets, highlights, canEd
   }
 
   if (error) return <p role="alert" className="py-10 text-center text-sm text-red-600">{error}</p>;
-  if (!doc || !base) return <p className="py-10 text-center text-sm text-slate-400">Loading the PDF…</p>;
+  if (!doc || !base) return <LoadingScreen label="Loading the PDF…" fill="parent" />;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -455,7 +618,46 @@ export default function PdfViewer({ url, rawText, pageOffsets, highlights, canEd
           />
           <span>of {doc.numPages}</span>
         </form>
+        {searchOpen && (
+          <div className="flex items-center gap-1">
+            <input
+              ref={searchInput}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  step(e.shiftKey ? -1 : 1);
+                } else if (e.key === "Escape") {
+                  closeSearch();
+                }
+              }}
+              placeholder="Find in PDF"
+              aria-label="Find in PDF"
+              className="field !w-40 !px-2 !py-1 !text-xs sm:!w-56"
+            />
+            <span className="min-w-16 text-center tabular-nums" aria-live="polite">{searchStatus}</span>
+            <button type="button" onClick={() => step(-1)} disabled={!matches.length} aria-label="Previous match" className="btn-secondary !p-1.5">
+              <ChevronUp className="size-3.5" />
+            </button>
+            <button type="button" onClick={() => step(1)} disabled={!matches.length} aria-label="Next match" className="btn-secondary !p-1.5">
+              <ChevronDown className="size-3.5" />
+            </button>
+            <button type="button" onClick={closeSearch} aria-label="Close search" className="btn-secondary !p-1.5">
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => (searchOpen ? closeSearch() : openSearch())}
+            aria-label="Find in PDF"
+            aria-pressed={searchOpen}
+            className="btn-secondary !p-1.5"
+          >
+            <Search className="size-3.5" />
+          </button>
           <button type="button" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.15).toFixed(2)))} aria-label="Zoom out" className="btn-secondary !p-1.5">
             <Minus className="size-3.5" />
           </button>
@@ -514,6 +716,9 @@ export default function PdfViewer({ url, rawText, pageOffsets, highlights, canEd
             base={base}
             root={root}
             highlights={byPage.get(i + 1) ?? NONE}
+            needle={searchOpen ? needle : ""}
+            current={curMatch && curMatch.page === i + 1 ? curMatch.index : -1}
+            focusNonce={focusNonce}
           />
         ))}
       </div>

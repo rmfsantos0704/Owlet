@@ -7,6 +7,7 @@ import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
 import type { JoinLink, SentInvitation, collectionDetail } from "../types";
 import CollectionTagManager from "../components/collectionsettings/CollectionTagManager";
+import LoadingScreen from "../components/shared/LoadingScreen";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -218,7 +219,9 @@ export default function CollectionSettings() {
     });
   };
 
-  if (!ws) return <p className={error ? "text-red-600" : "text-slate-400"}>{error || "Loading…"}</p>;
+  if (!ws) {
+    return error ? <p className="text-red-600">{error}</p> : <LoadingScreen label="Loading settings…" fill="page" />;
+  }
 
   const isOwner = ws.role === "owner";
   const me = user?.email.toLowerCase();

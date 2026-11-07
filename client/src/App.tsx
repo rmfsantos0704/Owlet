@@ -1,7 +1,9 @@
 import type { ReactElement } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import Layout from "./components/Layout";
+import LoadingScreen from "./components/shared/LoadingScreen";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
@@ -25,8 +27,6 @@ import ExtensionPage from "./pages/ExtensionPage";
 import { DialogProvider } from "./context/DialogContext";
 import PdfReader from "./pages/PdfReader";
 
-// next to your other protected routes, but not inside the <Layout /> route:
-<Route path="/item/:id/pdf" element={<PdfReader />} />
 // A join link opened while logged out: remember it, send the person to log in, then bring them back.
 // Only join links are remembered, so this can't be used as an open redirect.
 const RETURN_KEY = "owlet.returnTo";
@@ -57,41 +57,50 @@ function ToLogin() {
 
 export default function App() {
   const { user, loading } = useAuth();
-  if (loading) return <p className="p-6 text-gray-500">Loading…</p>;
 
   const guest = (page: ReactElement) => (user ? <Navigate to={peekReturnTo()} replace /> : page);
-  
+
+  // ThemeProvider wraps everything (including the PDF reader, which sits outside <Layout />),
+  // so the dark class on <html> is managed in one place. Don't mount it again inside Layout or main.tsx.
   return (
-    <DialogProvider>
-    <Routes>
-      <Route path="/login" element={guest(<LoginPage />)} />
-      <Route path="/register" element={guest(<RegisterPage />)} />
-      <Route path="/forgot-password" element={guest(<ForgotPasswordPage />)} />
+    <ThemeProvider>
+      {loading ? (
+        <LoadingScreen label="Loading Owlet…" />
+      ) : (
+        <DialogProvider>
+          <Routes>
+            <Route path="/login" element={guest(<LoginPage />)} />
+            <Route path="/register" element={guest(<RegisterPage />)} />
+            <Route path="/forgot-password" element={guest(<ForgotPasswordPage />)} />
 
-      {/* emailed links and legal pages must work whether or not someone is logged in */}
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/verify-email" element={<VerifyEmailPage />} />
-      <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
-      <Route path="/terms" element={<TermsPage />} />
-      <Route path="/privacy" element={<PrivacyPage />} />
-      <Route path="/about" element={<AboutPage />} />
-      <Route path="/extension" element={<ExtensionPage />} />
+            {/* emailed links and legal pages must work whether or not someone is logged in */}
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/extension" element={<ExtensionPage />} />
 
-      <Route element={user ? <Layout /> : <ToLogin />}>
-        <Route path="/" element={<Library />} />
-        <Route path="/all" element={<Library all />} />
-        <Route path="/ai" element={<AiWorkspace />} />
-        <Route path="/highlights" element={<Highlights />} />
-        <Route path="/comments" element={<Comments />} />
-        <Route path="/matrix" element={<LiteratureMatrix />} />
-        <Route path="/help" element={<HelpSupport />} />
-        <Route path="/item/:id" element={<ItemDetail />} />
-        <Route path="/item/:id/pdf" element={<PdfReader />} />
-        <Route path="/Collection/:id/settings" element={<CollectionSettings />} />
-        <Route path="/join/:token" element={<JoinCollection />} />
-        <Route path="/account" element={<AccountPage />} />
-      </Route>
-    </Routes>
-    </DialogProvider>
+            {/* the PDF reader needs a login, but sits outside <Layout /> so it can use the whole window */}
+            <Route path="/item/:id/pdf" element={user ? <PdfReader /> : <ToLogin />} />
+
+            <Route element={user ? <Layout /> : <ToLogin />}>
+              <Route path="/" element={<Library />} />
+              <Route path="/all" element={<Library all />} />
+              <Route path="/ai" element={<AiWorkspace />} />
+              <Route path="/highlights" element={<Highlights />} />
+              <Route path="/comments" element={<Comments />} />
+              <Route path="/matrix" element={<LiteratureMatrix />} />
+              <Route path="/help" element={<HelpSupport />} />
+              <Route path="/item/:id" element={<ItemDetail />} />
+              <Route path="/Collection/:id/settings" element={<CollectionSettings />} />
+              <Route path="/join/:token" element={<JoinCollection />} />
+              <Route path="/account" element={<AccountPage />} />
+            </Route>
+          </Routes>
+        </DialogProvider>
+      )}
+    </ThemeProvider>
   );
 }

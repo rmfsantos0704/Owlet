@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ArrowUpRight, Check, MousePointer2, Puzzle, ShieldCheck } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, MousePointer2, Puzzle, ShieldCheck, Zap } from "lucide-react";
 import PublicSiteFooter from "../components/publicsite/PublicSiteFooter";
 import PublicSiteHeader from "../components/publicsite/PublicSiteHeader";
 import { chromeExtensionUrl } from "../utils/chromeExtension";
@@ -19,6 +20,34 @@ const features = [
     icon: ShieldCheck,
     title: "Stay in control",
     description: "Choose the Collection for each clip. Your saved sources are waiting in your Owlet dashboard.",
+  },
+];
+
+function Key({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-xs font-semibold text-slate-700 shadow-sm">
+      {children}
+    </kbd>
+  );
+}
+
+const steps: { title: string; body: ReactNode }[] = [
+  {
+    title: "Sign in and pick a Collection",
+    body: "Sign in to Owlet from the extension and choose the Collection for your research.",
+  },
+  {
+    title: "Save a web page",
+    body: "To save a page, open it in Chrome, click the Owlet extension, then choose “Clip this page.”",
+  },
+  {
+    title: "Save a passage",
+    body: (
+      <>
+        To save a passage, select text and use the right-click “Save selection to Owlet” action or press{" "}
+        <Key>Alt</Key> + <Key>Shift</Key> + <Key>S</Key>. If the page is not in the Collection yet, Owlet clips it first.
+      </>
+    ),
   },
 ];
 
@@ -61,6 +90,53 @@ export default function ExtensionPage() {
           </div>
         </section>
 
+        {/* the tutorial: right under the hero, so it's the first thing people read after adding the extension */}
+        <section
+          id="how-to-use"
+          className="mt-8 scroll-mt-24 overflow-hidden rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-white p-6 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100 sm:p-10"
+        >
+          <div className="max-w-2xl">
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white">
+              <Zap className="size-3.5" /> Quick start · 3 steps
+            </div>
+            <h2 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+              How to use the extension
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 sm:text-base">Save a webpage or selected text in a few clicks.</p>
+          </div>
+
+          <div className="mt-8 grid gap-8 lg:grid-cols-5 lg:gap-10">
+            <ol className="lg:col-span-3">
+              {steps.map((step, index) => (
+                <li key={step.title} className="relative flex gap-4 pb-7 last:pb-0">
+                  {index < steps.length - 1 && (
+                    <span aria-hidden="true" className="absolute left-5 top-10 -ml-px h-[calc(100%-2.5rem)] w-0.5 bg-blue-200" />
+                  )}
+                  <span className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white shadow-md shadow-blue-950/20">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 pt-1.5">
+                    <h3 className="text-base font-semibold text-ink">{step.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6 lg:col-span-2">
+              <p className="eyebrow mb-2 text-blue-600">In your dashboard</p>
+              <h3 className="text-lg font-semibold text-ink">Your clips stay connected to their source</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Open the Collection you selected to find saved pages in your library. Each clip keeps its source details and saved text; selected passages are available as highlights on the clip. From there, you can add notes, comments, and citations, or revisit the original page.
+              </p>
+              <div className="mt-5 flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">
+                <Check className="mt-1 size-4 shrink-0" />
+                <span>One Collection keeps each project’s pages, highlights, and notes together.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="py-12 sm:py-16">
           <div className="max-w-2xl">
             <p className="eyebrow mb-2 text-blue-600">What it does</p>
@@ -78,38 +154,6 @@ export default function ExtensionPage() {
                 <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
               </article>
             ))}
-          </div>
-        </section>
-
-        <section className="grid gap-8 border-t border-slate-200 py-10 sm:py-12 md:grid-cols-2 md:gap-12">
-          <div>
-            <p className="eyebrow mb-2 text-blue-600">How to use it</p>
-            <h2 className="text-xl font-semibold text-ink">Save a webpage or selected text</h2>
-            <ol className="mt-5 space-y-4">
-              {[
-                "Sign in to Owlet from the extension and choose the Collection for your research.",
-                "To save a page, open it in Chrome, click the Owlet extension, then choose “Clip this page.”",
-                "To save a passage, select text and use the right-click “Save selection to Owlet” action or press Alt+Shift+S. If the page is not in the Collection yet, Owlet clips it first.",
-              ].map((text, index) => (
-                <li key={text} className="flex gap-3 text-sm leading-6 text-slate-600">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-800">
-                    {index + 1}
-                  </span>
-                  <span>{text}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-            <p className="eyebrow mb-2 text-blue-600">In your dashboard</p>
-            <h2 className="text-xl font-semibold text-ink">Your clips stay connected to their source</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              Open the Collection you selected to find saved pages in your library. Each clip keeps its source details and saved text; selected passages are available as highlights on the clip. From there, you can add notes, comments, and citations, or revisit the original page.
-            </p>
-            <div className="mt-5 flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">
-              <Check className="mt-1 size-4 shrink-0" />
-              <span>One Collection keeps each project’s pages, highlights, and notes together.</span>
-            </div>
           </div>
         </section>
 

@@ -27,16 +27,19 @@ function readTheme(): Theme {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(readTheme);
   const { pathname } = useLocation();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark" && !!user && !AUTH_PATHS.has(pathname));
+    // While the session is still being checked (the loading screen), apply the saved theme too,
+    // so the loader isn't white for someone who uses dark mode. Login and similar pages stay light.
+    const dark = theme === "dark" && (loading || !!user) && !AUTH_PATHS.has(pathname);
+    document.documentElement.classList.toggle("dark", dark);
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {
       // The preference still applies for this session when storage is unavailable.
     }
-  }, [theme, pathname, user]);
+  }, [theme, pathname, user, loading]);
 
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }

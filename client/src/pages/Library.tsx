@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  Archive, Bot, Copy, FileDown, Highlighter, LoaderCircle, MessageSquareText, Quote, Search, Settings, Tag, Upload, X, type LucideIcon,
+  Archive, Bot, Copy, FileDown, Highlighter, MessageSquareText, Quote, Search, Settings, Tag, Upload, X, type LucideIcon,
 } from "lucide-react";
 import { api, download } from "../services/api";
 import type { ResearchItem } from "../types";
@@ -10,6 +10,7 @@ import SelectableClips from "../components/library/SelectableClips";
 import { useCollections } from "../context/CollectionContext";
 import CollectionExportMenu from "../components/library/CollectionExportMenu";
 import AiAssistantCard from "../components/library/AiAssistantCard";
+import LoadingScreen from "../components/shared/LoadingScreen";
 import Toast, { type Notice } from "../components/shared/Toast";
 import { useAuth } from "../context/AuthContext";
 import RecentActivity from "../components/library/RecentActivity";
@@ -245,12 +246,7 @@ export default function Library({ all = false }: { all?: boolean }) {
   ];
 
   if (!all && !ready) {
-    return (
-      <div role="status" className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-sm text-slate-500">
-        <LoaderCircle className="size-6 animate-spin text-blue-600" aria-hidden="true" />
-        <span>Loading your collections…</span>
-      </div>
-    );
+    return <LoadingScreen label="Loading your collections…" fill="page" />;
   }
 
   if (!all && !current) {

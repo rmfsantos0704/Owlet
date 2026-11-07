@@ -6,6 +6,7 @@ import { useDialog } from "../context/DialogContext";
 import { styleFor } from "../utils/colors";
 import type { ResearchItem, Role } from "../types";
 import type { NewPdfHighlight } from "../components/pdfreader/PdfViewer";
+import LoadingScreen from "../components/shared/LoadingScreen";
 
 // loaded only on this page, so the PDF library stays out of the main bundle
 const PdfViewer = lazy(() => import("../components/pdfreader/PdfViewer"));
@@ -78,7 +79,7 @@ export default function PdfReader() {
       </div>
     );
   }
-  if (!item || !id) return <p className="p-10 text-center text-slate-400">Loading…</p>;
+  if (!item || !id) return <LoadingScreen label="Opening your clip…" />;
 
   const canEdit = role === "owner" || role === "editor";
   const pdfUrl = item.source.kind === "pdf" ? item.source.fileUrl : undefined;
@@ -122,7 +123,7 @@ export default function PdfReader() {
 
       <div className="relative flex min-h-0 flex-1">
         <main className="min-w-0 flex-1">
-          <Suspense fallback={<p className="py-10 text-center text-sm text-slate-400">Loading the PDF…</p>}>
+          <Suspense fallback={<LoadingScreen label="Loading the PDF…" fill="parent" />}>
             <PdfViewer
               url={pdfUrl}
               rawText={item.content?.rawText ?? ""}

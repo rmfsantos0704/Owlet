@@ -17,6 +17,7 @@ import SourceEditor from "../components/itemdetail/SourceEditor";
 import AiSettingsModal from "../components/itemdetail/AiSettingsModal";
 import RegenerateModal from "../components/itemdetail/RegenerateModal";
 import Modal from "../components/shared/Modal";
+import LoadingScreen from "../components/shared/LoadingScreen";
 import RelatedClips from "../components/itemdetail/RelatedClips";
 import { DEFAULT_AI_SETTINGS } from "../types";
 import type { AiSettings, ResearchItem, Role } from "../types";
@@ -177,7 +178,7 @@ export default function ItemDetail() {
   }
 
   if (error) return <p className="text-red-600">{error}</p>;
-  if (!item || !id) return <p className="text-slate-400">Loading…</p>;
+  if (!item || !id) return <LoadingScreen label="Opening your clip…" fill="page" />;
 
   const canEdit = role === "owner" || role === "editor";
   const isPdf = item.source.kind === "pdf";
@@ -201,7 +202,7 @@ export default function ItemDetail() {
             onClick={() => setHighlightsOpen(true)}
             title={`Highlights (${item.highlights.length})`}
             aria-label={`View highlights (${item.highlights.length})`}
-            className="relative flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition hover:bg-amber-100"
+            className="relative flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
           >
             <Highlighter className="size-5" />
             {item.highlights.length > 0 && (
@@ -215,7 +216,7 @@ export default function ItemDetail() {
             onClick={() => setCommentsOpen(true)}
             title={`Comments (${item.comments.length})`}
             aria-label={`Open comments (${item.comments.length})`}
-            className="relative flex size-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
+            className="relative flex size-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
           >
             <MessageSquareText className="size-5" />
             {item.comments.length > 0 && (
@@ -442,8 +443,14 @@ export default function ItemDetail() {
 
           {pdfUrl && (
             <section className="card p-5">
-              <Link to={`/item/${id}/pdf`} className="group flex w-full items-center gap-3 text-left">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              {/* opens the reader in its own tab, like a document in Google Docs */}
+              <Link
+                to={`/item/${id}/pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex w-full items-center gap-3 text-left"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
                   <Highlighter className="size-5" />
                 </span>
                 <span className="min-w-0 flex-1">

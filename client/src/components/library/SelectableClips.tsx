@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ListChecks, ListX, Trash2 } from "lucide-react";
 import { api } from "../../services/api";
 import Modal from "../shared/Modal";
+import { Spinner } from "../shared/LoadingScreen";
 
 type Props<T> = {
   clips: T[];
@@ -150,7 +151,14 @@ export default function SelectableClips<T>({
         {error && <p className="px-5 py-3 text-sm text-red-600">{error}</p>}
 
         {loading ? (
-          <p className="px-5 py-16 text-center text-sm text-slate-400">Loading…</p>
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex flex-col items-center justify-center gap-3 px-5 py-16 text-sm text-slate-400"
+          >
+            <Spinner className="size-8" />
+            <span>Loading clips…</span>
+          </div>
         ) : clips.length === 0 ? (
           empty
         ) : (
