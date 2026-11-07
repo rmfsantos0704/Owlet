@@ -98,7 +98,8 @@ export default function PdfReader() {
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-canvas text-slate-900">
+    // pinned to the viewport, so no navbar or max-width container from the app shell can constrain it
+    <div className="fixed inset-0 z-40 flex flex-col bg-slate-100 text-slate-900">
       <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-5">
         <Link
           to={clipPath}
@@ -120,7 +121,7 @@ export default function PdfReader() {
       {actionError && <p role="alert" className="shrink-0 bg-red-50 px-4 py-2 text-xs text-red-700">{actionError}</p>}
 
       <div className="relative flex min-h-0 flex-1">
-        <main className="min-w-0 flex-1 p-3">
+        <main className="min-w-0 flex-1">
           <Suspense fallback={<p className="py-10 text-center text-sm text-slate-400">Loading the PDF…</p>}>
             <PdfViewer
               url={pdfUrl}

@@ -327,10 +327,11 @@ export default function PdfViewer({ url, rawText, pageOffsets, highlights, canEd
     };
   }, [url]);
 
-  // "fit to width" zoom, kept up to date as the window changes
+  // "fit to width" zoom, kept up to date as the window changes.
+  // 48px matches the scroll area's side padding on sm+; the cap keeps pages from getting huge on wide monitors.
   useEffect(() => {
     if (!root || !base) return;
-    const update = () => setFit(Math.max(0.4, (root.clientWidth - 32) / base.w));
+    const update = () => setFit(Math.max(0.4, Math.min(1.6, (root.clientWidth - 48) / base.w)));
     update();
     const ro = new ResizeObserver(update);
     ro.observe(root);
@@ -435,8 +436,8 @@ export default function PdfViewer({ url, rawText, pageOffsets, highlights, canEd
   if (!doc || !base) return <p className="py-10 text-center text-sm text-slate-400">Loading the PDF…</p>;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-500">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -468,7 +469,7 @@ export default function PdfViewer({ url, rawText, pageOffsets, highlights, canEd
       </div>
 
       {canEdit && (
-        <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
           {pending ? (
             <div className="space-y-2.5">
               <p className="break-words text-xs italic leading-5 text-slate-600">
@@ -502,7 +503,7 @@ export default function PdfViewer({ url, rawText, pageOffsets, highlights, canEd
         onMouseUp={capture}
         onTouchEnd={capture}
         onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-auto rounded-xl bg-slate-100 p-4"
+        className="min-h-0 flex-1 overflow-auto bg-slate-100 px-2 py-4 sm:px-6"
       >
         {Array.from({ length: doc.numPages }, (_, i) => (
           <PageView
@@ -518,7 +519,7 @@ export default function PdfViewer({ url, rawText, pageOffsets, highlights, canEd
       </div>
 
       {unplaced > 0 && (
-        <p className="shrink-0 text-[11px] text-slate-400">
+        <p className="shrink-0 border-t border-slate-200 bg-white px-4 py-1 text-[11px] text-slate-400">
           {unplaced} highlight{unplaced === 1 ? "" : "s"} can't be placed on a page. They stay in the highlight list.
         </p>
       )}
