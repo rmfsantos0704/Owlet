@@ -18,7 +18,7 @@ import { normalizePageUrl } from "../services/pageUrl.js";
 import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../services/access.js";
 import { aiEnabled } from "../config/features.js";
 import { AiQuotaExceededError, aiAvailableForUser } from "../services/aiUsage.js";
-import { MAX_IMPORT_BYTES } from "../middlewares/blobImport.js";
+import { MAX_IMPORT_BYTES, deleteBlob, signedFileUrl } from "../middlewares/blobImport.js";
 
 const MAX_TITLE = 100;
 const HIGHLIGHT_COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green"] as const;
@@ -92,8 +92,18 @@ const clipSchema = z.object({
   tags: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(20).optional(),
   personalNote: z.string().trim().max(280).transform((note) => note.replace(/\s+/g, " ")).optional(),
 });
+const rectSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  w: z.number().gt(0).max(1),
+  h: z.number().gt(0).max(1),
+});
+
 const highlightSchema = z.object({
   text: z.string().trim().min(1).max(2000),
+  // set by the PDF viewer: the page and where on it the highlight sits
+  page: z.number().int().min(1).max(500).optional(),
+  rects: z.array(rectSchema).min(1).max(200).optional(),
   startOffset: z.number().int().min(0).optional(),
   endOffset: z.number().int().min(1).optional(),
   color: z.enum(HIGHLIGHT_COLORS).default("yellow"),
@@ -369,6 +379,8 @@ export async function importPdf(req: Request, res: Response) {
         kind: "pdf",
         dedupeKey,
         fileName: file.originalname.slice(0, 200),
+        // keep the uploaded PDF so it can be opened in the viewer (blobImport.ts deletes it only if the import fails)
+        filePathname: res.locals.importPathname,
         title,
         author,
       },
@@ -518,15 +530,22 @@ export async function getOne(req: Request, res: Response) {
   const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } });
   if (!item) return res.status(404).json({ error: "Not found" });
   const ws = await collection.findById(item.collectionId).select("ownerId members");
-  res.json({ item, role: ws ? roleIn(ws, res.locals.userId) : null });
+  // the PDF viewer gets a fresh short-lived link every time the clip is opened (the file itself stays private)
+  const body: any = item.toObject();
+  if (body.source?.filePathname) body.source.fileUrl = await signedFileUrl(body.source.filePathname);
+  else if (body.source) delete body.source.fileUrl;
+  res.json({ item: body, role: ws ? roleIn(ws, res.locals.userId) : null });
 }
 
 export async function remove(req: Request, res: Response) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
   const ids = await collectionIds(res.locals.userId, "editor");
-  const result = await ResearchItem.deleteOne({ _id: id, collectionId: { $in: ids } });
-  if (!result.deletedCount) return res.status(404).json({ error: "Not found" });
+  const removed = await ResearchItem.findOneAndDelete({ _id: id, collectionId: { $in: ids } }).select("source.filePathname");
+  if (!removed) return res.status(404).json({ error: "Not found" });
+  // the clip's stored PDF goes with it (best effort)
+  const stored = removed.source?.filePathname;
+  if (stored) void deleteBlob(stored);
   res.json({ ok: true });
 }
 
@@ -552,7 +571,10 @@ export async function addHighlight(req: Request, res: Response) {
   const clip = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("content.rawText content.pageOffsets");
   if (!clip) return res.status(404).json({ error: "Not found" });
 
+  // a highlight made on the PDF page keeps the page it was made on; otherwise the page is worked out from the offsets
+  const placedOnPage = Boolean(p.data.rects?.length && p.data.page);
   const highlight: typeof p.data & { page?: number } = { ...p.data };
+  if (!placedOnPage) highlight.page = undefined;
   if (p.data.startOffset !== undefined || p.data.endOffset !== undefined) {
     const rawText = clip.content?.rawText ?? "";
     if (
@@ -564,11 +586,12 @@ export async function addHighlight(req: Request, res: Response) {
     ) {
       return res.status(400).json({ error: "The selected text position doesn't match this clip" });
     }
-    highlight.page = undefined;
-    const offsets = clip.content?.pageOffsets ?? [];
-    for (let index = 0; index < offsets.length; index += 1) {
-      if (offsets[index] > p.data.startOffset) break;
-      highlight.page = index + 1;
+    if (!placedOnPage) {
+      const offsets = clip.content?.pageOffsets ?? [];
+      for (let index = 0; index < offsets.length; index += 1) {
+        if (offsets[index] > p.data.startOffset) break;
+        highlight.page = index + 1;
+      }
     }
   }
   return mutate(req, res, { $push: { highlights: highlight } }, 201);

@@ -20,6 +20,8 @@ const researchItemSchema = new Schema(
       issue: String,
       pages: String,
       doi: String,
+      filePathname: String, // where the original PDF is kept (Vercel Blob); set on PDF imports
+      fileUrl: String, // public, unguessable address the PDF viewer opens
     },
     content: {
       rawText: String,
@@ -46,6 +48,8 @@ const researchItemSchema = new Schema(
         startOffset: Number,
         endOffset: Number,
         page: Number,
+        // where the highlight sits on the PDF page, as fractions (0-1) of the page's width and height
+        rects: [{ _id: false, x: Number, y: Number, w: Number, h: Number }],
         color: { type: String, default: "yellow" },
         note: String,
         createdAt: { type: Date, default: Date.now },
