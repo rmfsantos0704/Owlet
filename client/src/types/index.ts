@@ -6,6 +6,7 @@ export type Highlight = {
   startOffset?: number;
   endOffset?: number;
   page?: number;
+  rects?: { x: number; y: number; w: number; h: number }[]; // PDF highlights: position on the page, as fractions
   createdAt: string;
 };
 export type Comment = {
@@ -74,8 +75,9 @@ export type ResearchItem = {
     issue?: string;
     pages?: string;
     doi?: string;
+    fileUrl?: string; // PDF imports: where the original file can be opened
   };
-  content?: { rawText?: string; wordCount?: number };
+  content?: { rawText?: string; wordCount?: number; pageOffsets?: number[] };
   matrixValues?: Record<string, string>;
   aiOutput: { summary?: string; paraphrase?: string };
   aiQuotaExceeded?: boolean;

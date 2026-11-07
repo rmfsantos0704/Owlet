@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Check, ChevronLeft, ChevronRight, FileDown, FileText, Highlighter, Loader2, MessageSquareText,
   Pencil, RefreshCw, Save, Settings, Sparkles, Trash2, X,
@@ -181,6 +181,7 @@ export default function ItemDetail() {
 
   const canEdit = role === "owner" || role === "editor";
   const isPdf = item.source.kind === "pdf";
+  const pdfUrl = isPdf ? item.source.fileUrl : undefined;
   const aiSettings = item.aiSettings ?? DEFAULT_AI_SETTINGS;
   const textLabel = isPdf ? "Extracted text" : "Clipped text";
   const wordCount = item.content?.wordCount ?? 0;
@@ -438,6 +439,23 @@ export default function ItemDetail() {
               {canEdit ? ", and use Edit details to correct them." : "."}
             </p>
           </section>
+
+          {pdfUrl && (
+            <section className="card p-5">
+              <Link to={`/item/${id}/pdf`} className="group flex w-full items-center gap-3 text-left">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <Highlighter className="size-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-ink">Original PDF</span>
+                  <span className="block text-xs text-slate-500">
+                    {canEdit ? "Read and highlight on the page" : "Read on the page"}
+                  </span>
+                </span>
+                <ChevronRight className="size-4 text-slate-300 transition group-hover:text-blue-500" />
+              </Link>
+            </section>
+          )}
 
           <section className="card p-5">
             <button

@@ -23,7 +23,10 @@ import HelpSupport from "./pages/HelpSupport";
 import AboutPage from "./pages/AboutPage";
 import ExtensionPage from "./pages/ExtensionPage";
 import { DialogProvider } from "./context/DialogContext";
+import PdfReader from "./pages/PdfReader";
 
+// next to your other protected routes, but not inside the <Layout /> route:
+<Route path="/item/:id/pdf" element={<PdfReader />} />
 // A join link opened while logged out: remember it, send the person to log in, then bring them back.
 // Only join links are remembered, so this can't be used as an open redirect.
 const RETURN_KEY = "owlet.returnTo";
@@ -83,6 +86,7 @@ export default function App() {
         <Route path="/matrix" element={<LiteratureMatrix />} />
         <Route path="/help" element={<HelpSupport />} />
         <Route path="/item/:id" element={<ItemDetail />} />
+        <Route path="/item/:id/pdf" element={<PdfReader />} />
         <Route path="/Collection/:id/settings" element={<CollectionSettings />} />
         <Route path="/join/:token" element={<JoinCollection />} />
         <Route path="/account" element={<AccountPage />} />
