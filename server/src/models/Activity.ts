@@ -3,6 +3,8 @@ import { Schema, model } from "mongoose";
 export const ACTIVITY_TYPES = [
   "clip_added", "pdf_imported", "highlight_added", "comment_added",
   "member_joined", "member_left", "member_removed",
+  "evidence_added", "evidence_moved", "evidence_removed",
+  "question_added", "question_changed", "question_removed",
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 

@@ -5,6 +5,7 @@ import { collection } from "../models/Collection.js";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { ResearchQuestion } from "../models/ResearchQuestion.js";
 import { EvidenceLink, STANCES } from "../models/EvidenceLink.js";
+import { Activity, type ActivityType } from "../models/Activity.js";
 import { atLeast, roleIn, type Role } from "../services/access.js";
 
 const MAX_SUPPORTING = 19; // plus the main question = 20
@@ -29,6 +30,16 @@ async function allow(res: Response, collectionId: string, min: Role): Promise<bo
     return false;
   }
   return true;
+}
+
+// Adds a line to the collection's Recent activity. The feed is a nice-to-have, so a failure here never fails the request.
+type Id = string | mongoose.Types.ObjectId;
+async function logActivity(collectionId: Id, actorId: Id, type: ActivityType, count = 1) {
+  try {
+    await Activity.create({ collectionId, actorId, type, count });
+  } catch {
+    /* ignore */
+  }
 }
 
 // ---------- coverage ----------
@@ -135,6 +146,7 @@ export async function setMainQuestion(req: Request, res: Response) {
     { $set: { text: p.data.text }, $setOnInsert: { createdBy: res.locals.userId } },
     { upsert: true, returnDocument: "after" }
   );
+  await logActivity(cid, res.locals.userId, "question_changed");
   res.json({ id: String(q?._id) });
 }
 
@@ -152,6 +164,7 @@ export async function addQuestion(req: Request, res: Response) {
     text: p.data.text,
     createdBy: res.locals.userId,
   });
+  await logActivity(cid, res.locals.userId, "question_added");
   res.status(201).json({ id: String(q._id) });
 }
 
@@ -167,6 +180,7 @@ export async function updateQuestion(req: Request, res: Response) {
   if (!p.success) return res.status(400).json({ error: "Write the question in 3 to 300 characters." });
   q.text = p.data.text;
   await q.save();
+  await logActivity(q.collectionId, res.locals.userId, "question_changed");
   res.json({ ok: true });
 }
 
@@ -181,6 +195,7 @@ export async function removeQuestion(req: Request, res: Response) {
   // evidence filed under this question goes with it; the highlights and clips themselves are untouched
   await EvidenceLink.deleteMany({ questionId: q._id });
   await q.deleteOne();
+  await logActivity(q.collectionId, res.locals.userId, "question_removed");
   res.json({ ok: true });
 }
 
@@ -229,16 +244,17 @@ export async function addLinks(req: Request, res: Response) {
       return res.status(400).json({ error: "One of those items isn't in this collection." });
     }
   }
-const next = new Map<string, number>(); // the next free position in each column
-const nextOrder = async (stance: (typeof STANCES)[number]) => {
-  if (!next.has(stance)) {
-    const last = await EvidenceLink.findOne({ collectionId: cid, stance }).sort({ order: -1 }).select("order").lean();
-    next.set(stance, (last?.order ?? -1) + 1);
-  }
-  const n = next.get(stance)!;
-  next.set(stance, n + 1);
-  return n;
-};
+
+  const next = new Map<string, number>(); // the next free position in each column
+  const nextOrder = async (stance: (typeof STANCES)[number]) => {
+    if (!next.has(stance)) {
+      const last = await EvidenceLink.findOne({ collectionId: cid, stance }).sort({ order: -1 }).select("order").lean();
+      next.set(stance, (last?.order ?? -1) + 1);
+    }
+    const n = next.get(stance)!;
+    next.set(stance, n + 1);
+    return n;
+  };
 
   let created = 0;
   let skipped = 0;
@@ -261,6 +277,7 @@ const nextOrder = async (stance: (typeof STANCES)[number]) => {
       else throw err;
     }
   }
+  if (created > 0) await logActivity(cid, res.locals.userId, "evidence_added", created);
   res.status(201).json({ created, skipped });
 }
 
@@ -296,6 +313,7 @@ export async function updateLink(req: Request, res: Response) {
   }
   if (p.data.stance) set.stance = p.data.stance;
 
+  const movedColumn = !!p.data.stance && p.data.stance !== link.stance;
   const stance = p.data.stance ?? link.stance;
   const reorder = p.data.stance !== undefined || p.data.beforeId !== undefined;
   try {
@@ -324,6 +342,8 @@ export async function updateLink(req: Request, res: Response) {
     }
     throw err;
   }
+  // only a move to another column is news; reordering inside a column or re-filing under a question isn't logged
+  if (movedColumn) await logActivity(link.collectionId, res.locals.userId, "evidence_moved");
   res.json({ ok: true });
 }
 
@@ -334,5 +354,6 @@ export async function removeLink(req: Request, res: Response) {
   if (!link) return res.status(404).json({ error: "Not found" });
   if (!(await allow(res, String(link.collectionId), "editor"))) return;
   await link.deleteOne();
+  await logActivity(link.collectionId, res.locals.userId, "evidence_removed");
   res.json({ ok: true });
 }
