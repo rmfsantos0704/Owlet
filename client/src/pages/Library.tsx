@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  Archive, Bot, Copy, FileDown, Highlighter, MessageSquareText, Quote, Search, Settings, Tag, Upload, X, type LucideIcon,
+  Archive, Bot, Copy, FileDown, Highlighter, MessageSquareText, Quote, Search, Settings, Tag, Tags, Upload, X, type LucideIcon,
 } from "lucide-react";
 import { api, download } from "../services/api";
 import type { ResearchItem } from "../types";
@@ -381,7 +381,11 @@ export default function Library({ all = false }: { all?: boolean }) {
                 <CollectionExportMenu collectionId={current.id} collectionName={current.name} />
               </>
             )}
-
+            
+            <Link to={`/Collection/${current.id}/board`} className="btn-secondary">
+              <Tags className="size-4" /> Evidence board
+            </Link>
+            
             <RecentActivity collectionId={current.id} reloadKey={reloadKey} />
 
             <Link to={`/Collection/${current.id}/settings`} className="btn-secondary">

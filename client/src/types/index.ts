@@ -139,3 +139,31 @@ export type AiSession = {
   sources: { id: string; title: string }[];
   createdAt: string;
 };
+
+// ---- evidence board and research questions ----
+export type Stance = "supports" | "challenges" | "background" | "methodology" | "open";
+export type ResearchQuestion = { id: string; kind: "main" | "supporting"; text: string };
+export type EvidenceLink = {
+  id: string;
+  questionId: string | null; // null = not tied to a specific question
+  stance: Stance;
+  kind: "highlight" | "clip" | "note";
+  note: string; // the text of a note card
+  order: number;
+  itemId?: string;
+  highlightId?: string;
+  evidence?: { title: string; origin?: string; quote?: string; color?: string; page?: number; note?: string };
+};
+export type Strength = "none" | "thin" | "moderate" | "strong";
+export type QuestionSummary = {
+  questionId: string;
+  supports: number;
+  challenges: number;
+  background: number;
+  methodology: number;
+  open: number;
+  sources: number; // different sources that support or challenge it
+  strength: Strength;
+  conflict: boolean; // has both supporting and challenging evidence
+};
+export type BoardResponse = { questions: ResearchQuestion[]; links: EvidenceLink[]; summaries: QuestionSummary[] };

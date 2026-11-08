@@ -21,11 +21,13 @@ import AiWorkspace from "./pages/AiWorkspace";
 import Highlights from "./pages/Highlights";
 import Comments from "./pages/Comments";
 import LiteratureMatrix from "./pages/LiteratureMatrix";
+import EvidenceBoard from "./pages/EvidenceBoard";
 import HelpSupport from "./pages/HelpSupport";
 import AboutPage from "./pages/AboutPage";
 import ExtensionPage from "./pages/ExtensionPage";
 import { DialogProvider } from "./context/DialogContext";
 import PdfReader from "./pages/PdfReader";
+import FeaturesPage from "./pages/FeaturesPage";
 
 // A join link opened while logged out: remember it, send the person to log in, then bring them back.
 // Only join links are remembered, so this can't be used as an open redirect.
@@ -81,7 +83,7 @@ export default function App() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/extension" element={<ExtensionPage />} />
-
+            <Route path="/features" element={<FeaturesPage />} />
             {/* the PDF reader needs a login, but sits outside <Layout /> so it can use the whole window */}
             <Route path="/item/:id/pdf" element={user ? <PdfReader /> : <ToLogin />} />
 
@@ -92,9 +94,11 @@ export default function App() {
               <Route path="/highlights" element={<Highlights />} />
               <Route path="/comments" element={<Comments />} />
               <Route path="/matrix" element={<LiteratureMatrix />} />
+<Route path="/board" element={<Navigate to="/" replace />} />
               <Route path="/help" element={<HelpSupport />} />
               <Route path="/item/:id" element={<ItemDetail />} />
               <Route path="/Collection/:id/settings" element={<CollectionSettings />} />
+              <Route path="/Collection/:id/board" element={<EvidenceBoard />} />
               <Route path="/join/:token" element={<JoinCollection />} />
               <Route path="/account" element={<AccountPage />} />
             </Route>
