@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import { ResearchItem } from "../models/ResearchItem.js";
 import { collection } from "../models/Collection.js";
 import { AiUsage } from "../models/AiUsage.js";
+import { ResearchQuestion } from "../models/ResearchQuestion.js";
+import { EvidenceLink } from "../models/EvidenceLink.js";
 
 // Development workaround: some home networks fail the DNS lookup behind mongodb+srv:// addresses.
 // Never in production, where it would bypass the host's own DNS.
@@ -17,5 +19,11 @@ export async function connectDB() {
     maxPoolSize: 10,
   });
   console.log("MongoDB connected");
-  await Promise.all([ResearchItem.syncIndexes(), collection.syncIndexes(), AiUsage.syncIndexes()]);
+  await Promise.all([
+    ResearchItem.syncIndexes(),
+    collection.syncIndexes(),
+    AiUsage.syncIndexes(),
+    ResearchQuestion.syncIndexes(),
+    EvidenceLink.syncIndexes(),
+  ]);
 }

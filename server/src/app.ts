@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import authRoutes from "./routes/authRoutes.js";
 import accountRoutes from "./routes/accountRoutes.js";
 import researchRoutes from "./routes/researchRoutes.js";
+import boardRoutes from "./routes/boardRoutes.js";
 import collectionRoutes from "./routes/collectionRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js";
 import { initializeApplication } from "./config/startup.js";
@@ -87,6 +88,7 @@ app.use("/api/research/import", limiter(minutes(1), 6));
 app.use("/api/auth", authRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/research", researchRoutes);
+app.use("/api/board", boardRoutes);
 app.use("/api/collections", collectionRoutes);
 app.use("/api/support", limiter(minutes(15), 5), supportRoutes); // it sends email, so spam would cost you
 
