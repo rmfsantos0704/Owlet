@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Archive, ChevronRight, CircleHelp, Highlighter, MessageSquareText, Sparkles, Table } from "lucide-react";
 import { openOnboardingAt } from "../../utils/onboarding";
 
+// The evidence board is no longer listed here: it lives inside each collection (/Collection/:id/board).
 const WORKSPACE_LINKS = [
   { to: "/all", label: "All clips", icon: Archive },
   { to: "/highlights", label: "Highlights", icon: Highlighter },
