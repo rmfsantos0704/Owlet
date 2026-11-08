@@ -3,8 +3,8 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Archive, ChevronRight, CircleHelp, Highlighter, MessageSquareText, Sparkles } from "lucide-react";
 import { openOnboardingAt } from "../../utils/onboarding";
 
-// The evidence board and the literature matrix are not listed here: each lives inside its collection
-// (/Collection/:id/board and /Collection/:id/matrix).
+// The evidence board, the literature matrix and the research briefs are not listed here: each lives inside its
+// collection (/Collection/:id/board, /Collection/:id/matrix and /Collection/:id/briefs).
 const WORKSPACE_LINKS = [
   { to: "/all", label: "All clips", icon: Archive },
   { to: "/highlights", label: "Highlights", icon: Highlighter },
