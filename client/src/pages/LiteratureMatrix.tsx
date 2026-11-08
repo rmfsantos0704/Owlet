@@ -1,15 +1,19 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Download, Plus, Save, Trash2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, Download, Plus, Save, Trash2 } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 import { api, download } from "../services/api";
 import { useCollections } from "../context/CollectionContext";
+import LoadingScreen from "../components/shared/LoadingScreen";
 
 type Column = { id: string; name: string };
 type ClipRow = { id: string; title: string; values: Record<string, string> };
 type MatrixResponse = { columns: Column[]; clips: ClipRow[]; total: number; page: number; pageSize: number };
 
 export default function LiteratureMatrix() {
-  const { current } = useCollections();
+  // the matrix belongs to the collection in the URL: /Collection/:id/matrix
+  const { id: routeId } = useParams();
+  const { collections, ready } = useCollections();
+  const current = (collections ?? []).find((c) => c.id === routeId);
   const collectionId = current?.id;
   const [columns, setColumns] = useState<Column[]>([]);
   const [columnsDirty, setColumnsDirty] = useState(false);
@@ -24,6 +28,11 @@ export default function LiteratureMatrix() {
   const [notice, setNotice] = useState("");
   const requestKey = collectionId ? `${collectionId}:${page}` : "";
   const loading = !!requestKey && loadedKey !== requestKey;
+
+  // a different collection starts on its first page
+  useEffect(() => {
+    setPage(1);
+  }, [collectionId]);
 
   useEffect(() => {
     if (!collectionId) return;
@@ -46,7 +55,15 @@ export default function LiteratureMatrix() {
     return () => { cancelled = true; };
   }, [collectionId, page, requestKey]);
 
-  if (!current) return <p className="text-sm text-slate-500">Choose a collection to view its literature matrix.</p>;
+  if (!ready) return <LoadingScreen label="Loading your collections…" fill="page" />;
+  if (!current) {
+    return (
+      <p className="text-sm text-slate-500">
+        This collection doesn't exist or you don't have access to it.{" "}
+        <Link to="/" className="font-semibold text-blue-700 hover:underline">Back to your library</Link>
+      </p>
+    );
+  }
   const activeCollection = current;
   const canEdit = activeCollection.role !== "viewer";
   const pageCount = Math.max(1, Math.ceil(total / 100));
@@ -105,6 +122,10 @@ export default function LiteratureMatrix() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
+          <Link to="/" className="btn-secondary mb-4 inline-flex items-center gap-2">
+            <ArrowLeft className="size-4" />
+            Back to {activeCollection.name}
+          </Link>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Literature matrix</h1>
           <p className="mt-1 text-sm text-slate-500">Organize clips from {activeCollection.name} by research question, method, sample, findings, or your own columns.</p>
         </div>
@@ -190,7 +211,7 @@ export default function LiteratureMatrix() {
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <section className="card overflow-hidden">
         {loading ? (
-          <p className="p-12 text-center text-sm text-slate-400">Loading matrix…</p>
+          <LoadingScreen label="Loading the literature matrix…" fill="parent" />
         ) : clips.length === 0 ? (
           <p className="p-12 text-center text-sm text-slate-500">No clips in this collection yet.</p>
         ) : (

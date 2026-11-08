@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
   Check, ChevronLeft, ChevronRight, FileDown, FileText, Highlighter, Loader2, MessageSquareText,
   Pencil, RefreshCw, Save, Settings, Sparkles, Trash2, X,
@@ -19,6 +20,7 @@ import RegenerateModal from "../components/itemdetail/RegenerateModal";
 import Modal from "../components/shared/Modal";
 import LoadingScreen from "../components/shared/LoadingScreen";
 import RelatedClips from "../components/itemdetail/RelatedClips";
+import type { LayoutContext } from "../components/Layout";
 import { DEFAULT_AI_SETTINGS } from "../types";
 import type { AiSettings, ResearchItem, Role } from "../types";
 
@@ -26,6 +28,8 @@ export default function ItemDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { aiEnabled } = useAuth();
+  const layout = useOutletContext<LayoutContext | undefined>();
+  const headerActions = layout?.headerActions ?? null; // the spot in the top bar for this page's buttons
   const [item, setItem] = useState<ResearchItem | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [error, setError] = useState("");
@@ -195,69 +199,85 @@ export default function ItemDetail() {
         <button onClick={goBack} className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand">
           <ChevronLeft className="size-4" /> Back
         </button>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setHighlightsOpen(true)}
-            title={`Highlights (${item.highlights.length})`}
-            aria-label={`View highlights (${item.highlights.length})`}
-            className="relative flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
-          >
-            <Highlighter className="size-5" />
-            {item.highlights.length > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-amber-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
-                {item.highlights.length}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setCommentsOpen(true)}
-            title={`Comments (${item.comments.length})`}
-            aria-label={`Open comments (${item.comments.length})`}
-            className="relative flex size-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
-          >
-            <MessageSquareText className="size-5" />
-            {item.comments.length > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-emerald-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
-                {item.comments.length}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-              onClick={() => setReadingNotesOpen(true)}
-              title="Reading notes"
-              aria-label="Open reading notes"
-              className="btn-secondary"
+      {/* this clip's actions, shown in the top bar (labels appear on wide screens) */}
+      {headerActions &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              onClick={() => setHighlightsOpen(true)}
+              title={`Highlights (${item.highlights.length})`}
+              aria-label={`View highlights (${item.highlights.length})`}
+              className="relative flex size-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
             >
-              <FileText className="size-4" />
-              <span className="hidden sm:inline">Reading notes</span>
+              <Highlighter className="size-4.5" />
+              {item.highlights.length > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-amber-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                  {item.highlights.length}
+                </span>
+              )}
             </button>
             <button
               type="button"
-            onClick={downloadPdf}
-            disabled={pdfState === "loading"}
-            aria-live="polite"
-            className="btn-secondary disabled:cursor-wait disabled:opacity-80"
-          >
-            {pdfState === "loading" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : pdfState === "done" ? (
-              <Check className="size-4 text-emerald-600" />
-            ) : (
-              <FileDown className="size-4" />
-            )}
-            {pdfState === "loading" ? "Downloading…" : pdfState === "done" ? "Downloaded" : "Download PDF"}
-          </button>
-          {canEdit && (
-            <button type="button" onClick={remove} className="btn-danger" title="Delete clip">
-              <Trash2 className="size-4" /> Delete
+              onClick={() => setCommentsOpen(true)}
+              title={`Comments (${item.comments.length})`}
+              aria-label={`Open comments (${item.comments.length})`}
+              className="relative flex size-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
+            >
+              <MessageSquareText className="size-4.5" />
+              {item.comments.length > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-emerald-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                  {item.comments.length}
+                </span>
+              )}
             </button>
-          )}
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={() => setReadingNotesOpen(true)}
+              title="Reading notes"
+              aria-label="Open reading notes"
+              className="btn-secondary !px-3 !py-2"
+            >
+              <FileText className="size-4" />
+              <span className="hidden 2xl:inline">Reading notes</span>
+            </button>
+            <button
+              type="button"
+              onClick={downloadPdf}
+              disabled={pdfState === "loading"}
+              aria-live="polite"
+              title="Download PDF"
+              aria-label="Download PDF"
+              className="btn-secondary !px-3 !py-2 disabled:cursor-wait disabled:opacity-80"
+            >
+              {pdfState === "loading" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : pdfState === "done" ? (
+                <Check className="size-4 text-emerald-600" />
+              ) : (
+                <FileDown className="size-4" />
+              )}
+              <span className={pdfState === "idle" ? "hidden 2xl:inline" : ""}>
+                {pdfState === "loading" ? "Downloading…" : pdfState === "done" ? "Downloaded" : "Download PDF"}
+              </span>
+            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={remove}
+                className="btn-danger !px-3 !py-2"
+                title="Delete clip"
+                aria-label="Delete clip"
+              >
+                <Trash2 className="size-4" />
+                <span className="hidden 2xl:inline">Delete</span>
+              </button>
+            )}
+          </>,
+          headerActions
+        )}
 
       {actionError && <p className="text-sm text-red-600">{actionError}</p>}
 

@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Archive, ChevronRight, CircleHelp, Highlighter, MessageSquareText, Sparkles, Table } from "lucide-react";
+import { Archive, ChevronRight, CircleHelp, Highlighter, MessageSquareText, Sparkles } from "lucide-react";
 import { openOnboardingAt } from "../../utils/onboarding";
 
-// The evidence board is no longer listed here: it lives inside each collection (/Collection/:id/board).
+// The evidence board and the literature matrix are not listed here: each lives inside its collection
+// (/Collection/:id/board and /Collection/:id/matrix).
 const WORKSPACE_LINKS = [
   { to: "/all", label: "All clips", icon: Archive },
   { to: "/highlights", label: "Highlights", icon: Highlighter },
   { to: "/comments", label: "Comments", icon: MessageSquareText },
-  { to: "/matrix", label: "Literature matrix", icon: Table },
   { to: "/ai", label: "AI workspace", icon: Sparkles },
 ];
 

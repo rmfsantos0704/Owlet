@@ -93,12 +93,14 @@ export default function App() {
               <Route path="/ai" element={<AiWorkspace />} />
               <Route path="/highlights" element={<Highlights />} />
               <Route path="/comments" element={<Comments />} />
-              <Route path="/matrix" element={<LiteratureMatrix />} />
-<Route path="/board" element={<Navigate to="/" replace />} />
+              {/* the matrix and the evidence board belong to one collection, so they live under it */}
+              <Route path="/matrix" element={<Navigate to="/" replace />} />
+              <Route path="/board" element={<Navigate to="/" replace />} />
               <Route path="/help" element={<HelpSupport />} />
               <Route path="/item/:id" element={<ItemDetail />} />
               <Route path="/Collection/:id/settings" element={<CollectionSettings />} />
               <Route path="/Collection/:id/board" element={<EvidenceBoard />} />
+              <Route path="/Collection/:id/matrix" element={<LiteratureMatrix />} />
               <Route path="/join/:token" element={<JoinCollection />} />
               <Route path="/account" element={<AccountPage />} />
             </Route>

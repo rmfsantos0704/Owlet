@@ -30,6 +30,10 @@ import AiUsageIndicator from "./layout/AiUsageIndicator";
 import OnboardingModal from "./layout/OnboardingModal";
 import { ONBOARDING_EVENT } from "../utils/onboarding";
 
+// What the layout hands to the page it shows: the spot in the top bar where a page can put its own buttons
+// (a page renders into it with a portal).
+export type LayoutContext = { headerActions: HTMLElement | null };
+
 // pages where the header search filters what's shown (everywhere else it jumps to the collection page)
 const SEARCHABLE = ["/all", "/highlights", "/comments"];
 
@@ -68,6 +72,7 @@ export default function Layout() {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [headerActions, setHeaderActions] = useState<HTMLElement | null>(null);
   const onboardingUser = user ? user.id ?? user.email.toLowerCase() : null;
   const onboardingKey = onboardingUser ? `owlet.onboarding.dismissed:${encodeURIComponent(onboardingUser)}` : null;
   const [onboardingOpen, setOnboardingOpen] = useState(
@@ -377,6 +382,34 @@ export default function Layout() {
         </nav>
 
         <div className="mt-3 shrink-0 space-y-0.5 border-t border-slate-200 pt-3">
+          {/* Account, with Log out beside it */}
+          <div className="flex items-center gap-1">
+            <NavLink
+              to="/account"
+              id="owlet-tour-account"
+              title={user?.email ?? "Account"}
+              onClick={() => setOpen(false)}
+              className={({ isActive }) =>
+                `flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  isActive ? "bg-brand text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-brand"
+                }`
+              }
+            >
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-[#dbeafe] text-[10px] font-bold text-[#174ea6]">
+                {initials}
+              </span>
+              <span className="truncate">Account</span>
+            </NavLink>
+            <button
+              type="button"
+              onClick={logout}
+              title="Log out"
+              aria-label="Log out"
+              className="shrink-0 rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-brand"
+            >
+              <LogOut className="size-4.5" strokeWidth={1.8} />
+            </button>
+          </div>
           <NavLink
             to="/help"
             onClick={() => setOpen(false)}
@@ -446,27 +479,15 @@ export default function Layout() {
             />
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+            {/* the open page can put its own buttons here (Import PDF, Literature matrix, ...), right beside the AI usage */}
+            <div ref={setHeaderActions} className="flex shrink-0 items-center gap-1.5 empty:hidden" />
             <AiUsageIndicator compact />
             <NotificationsBell />
-            <Link to="/account" id="owlet-tour-account" className="flex shrink-0 items-center gap-2.5 rounded-xl p-1 transition hover:bg-slate-100" title="Account settings">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-[#dbeafe] text-xs font-bold text-[#174ea6]">
-                {initials}
-              </div>
-              <span className="hidden max-w-48 truncate text-xs font-semibold text-slate-700 sm:block">{user?.email}</span>
-            </Link>
-            <button
-              onClick={logout}
-              title="Log out"
-              aria-label="Log out"
-              className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-brand"
-            >
-              <LogOut className="size-5" strokeWidth={1.8} />
-            </button>
           </div>
         </header>
 
         <div className="app-content mx-auto max-w-5xl px-4 py-6 sm:px-10 sm:py-8 lg:py-10">
-          <Outlet />
+          <Outlet context={{ headerActions } satisfies LayoutContext} />
         </div>
       </main>
       <OnboardingModal key={onboardingStep} open={onboardingOpen} onClose={closeOnboarding} initialStep={onboardingStep} />

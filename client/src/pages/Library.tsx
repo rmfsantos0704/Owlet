@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { Link, useOutletContext, useSearchParams } from "react-router-dom";
 import {
-  Archive, Bot, Copy, FileDown, Highlighter, MessageSquareText, Quote, Search, Settings, Tag, Tags, Upload, X, type LucideIcon,
+  Archive, Bot, Copy, FileDown, Highlighter, LayoutGrid, MessageSquareText, Quote, Search, Settings, Table, Tag, Upload, X, type LucideIcon,
 } from "lucide-react";
 import { api, download } from "../services/api";
 import type { ResearchItem } from "../types";
@@ -14,6 +15,7 @@ import LoadingScreen from "../components/shared/LoadingScreen";
 import Toast, { type Notice } from "../components/shared/Toast";
 import { useAuth } from "../context/AuthContext";
 import RecentActivity from "../components/library/RecentActivity";
+import type { LayoutContext } from "../components/Layout";
 
 const MAX_FILES = 10;
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -35,6 +37,8 @@ function StatCard({ label, value, icon: Icon, accent }: { label: string; value: 
 
 export default function Library({ all = false }: { all?: boolean }) {
   const { aiEnabled } = useAuth();
+  const layout = useOutletContext<LayoutContext | undefined>();
+  const headerActions = layout?.headerActions ?? null; // the spot in the top bar for this page's buttons
   const { current, ready, collections } = useCollections();
   const wid = all ? undefined : current?.id;
   const wsName = (id: string) => collections.find((w) => w.id === id)?.name;
@@ -363,37 +367,68 @@ export default function Library({ all = false }: { all?: boolean }) {
             {all ? "Clips from every Collection you belong to." : current?.description || "Articles, papers, and PDFs you've clipped."}
           </p>
         </div>
-        {!all && current && (
-          <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
-            {canImport && (
-              <>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => importFiles(Array.from(e.target.files ?? []))}
-                />
-                <button onClick={() => fileRef.current?.click()} disabled={!!importing} className="btn-primary">
-                  <Upload className="size-4" /> {importing || "Import PDF"}
-                </button>
-                <CollectionExportMenu collectionId={current.id} collectionName={current.name} />
-              </>
-            )}
-            
-            <Link to={`/Collection/${current.id}/board`} className="btn-secondary">
-              <Tags className="size-4" /> Evidence board
-            </Link>
-            
-            <RecentActivity collectionId={current.id} reloadKey={reloadKey} />
+      </section>
 
-            <Link to={`/Collection/${current.id}/settings`} className="btn-secondary">
+      {/* the file picker stays on the page; its button lives in the top bar */}
+      {canImport && (
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          multiple
+          className="hidden"
+          onChange={(e) => importFiles(Array.from(e.target.files ?? []))}
+        />
+      )}
+
+      {/* this collection's actions, shown in the top bar (labels appear on wide screens) */}
+      {!all && current && headerActions &&
+        createPortal(
+          <>
+            {canImport && (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={!!importing}
+                title="Import PDF"
+                aria-label="Import PDF"
+                className="btn-primary !px-3 !py-2"
+              >
+                <Upload className="size-4" />
+                <span className={importing ? "" : "hidden 2xl:inline"}>{importing || "Import PDF"}</span>
+              </button>
+            )}
+            <Link
+              to={`/Collection/${current.id}/matrix`}
+              title="Literature matrix"
+              aria-label="Literature matrix"
+              className="btn-secondary !px-3 !py-2"
+            >
+              <Table className="size-4" />
+              <span className="hidden 2xl:inline">Literature matrix</span>
+            </Link>
+            <Link
+              to={`/Collection/${current.id}/board`}
+              title="Evidence board"
+              aria-label="Evidence board"
+              className="btn-secondary !px-3 !py-2"
+            >
+              <LayoutGrid className="size-4" />
+              <span className="hidden 2xl:inline">Evidence board</span>
+            </Link>
+            <RecentActivity collectionId={current.id} reloadKey={reloadKey} />
+            {canImport && <CollectionExportMenu collectionId={current.id} collectionName={current.name} />}
+            <Link
+              to={`/Collection/${current.id}/settings`}
+              title="Collection settings"
+              aria-label="Collection settings"
+              className="btn-secondary !px-3 !py-2"
+            >
               <Settings className="size-4" />
             </Link>
-          </div>
+          </>,
+          headerActions
         )}
-      </section>
 
       {!filtering && items.length > 0 && (
         <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">

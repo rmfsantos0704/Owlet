@@ -1,4 +1,7 @@
-import { Bookmark, FileText, Highlighter, LogOut, MessageSquareText, UserMinus, UserPlus, type LucideIcon } from "lucide-react";
+import {
+  Bookmark, CircleHelp, FileText, Highlighter, LayoutGrid, LogOut, MessageSquareText, MoveRight, Pencil, Trash2,
+  UserMinus, UserPlus, type LucideIcon,
+} from "lucide-react";
 import type { ActivityEntry, ActivityPerson, ActivityType } from "../../types";
 
 const ICONS: Record<ActivityType, { icon: LucideIcon; tone: string }> = {
@@ -9,6 +12,12 @@ const ICONS: Record<ActivityType, { icon: LucideIcon; tone: string }> = {
   member_joined: { icon: UserPlus, tone: "bg-cyan-50 text-cyan-600" },
   member_left: { icon: LogOut, tone: "bg-slate-100 text-slate-500" },
   member_removed: { icon: UserMinus, tone: "bg-slate-100 text-slate-500" },
+  evidence_added: { icon: LayoutGrid, tone: "bg-violet-50 text-violet-600" },
+  evidence_moved: { icon: MoveRight, tone: "bg-violet-50 text-violet-600" },
+  evidence_removed: { icon: Trash2, tone: "bg-slate-100 text-slate-500" },
+  question_added: { icon: CircleHelp, tone: "bg-blue-50 text-blue-600" },
+  question_changed: { icon: Pencil, tone: "bg-blue-50 text-blue-600" },
+  question_removed: { icon: Trash2, tone: "bg-slate-100 text-slate-500" },
 };
 
 export function timeAgo(iso: string) {
@@ -36,6 +45,12 @@ function sentence(a: ActivityEntry): { text: string; withTitle: boolean } {
     case "member_joined": return { text: "joined the Collection", withTitle: false };
     case "member_left": return { text: "left the Collection", withTitle: false };
     case "member_removed": return { text: `removed ${a.target?.isYou ? "you" : name(a.target)} from the Collection`, withTitle: false };
+    case "evidence_added": return { text: n > 1 ? `added ${n} cards to the evidence board` : "added a card to the evidence board", withTitle: false };
+    case "evidence_moved": return { text: "moved a card on the evidence board", withTitle: false };
+    case "evidence_removed": return { text: "removed a card from the evidence board", withTitle: false };
+    case "question_added": return { text: "added a research question", withTitle: false };
+    case "question_changed": return { text: "updated a research question", withTitle: false };
+    case "question_removed": return { text: "removed a research question", withTitle: false };
   }
 }
 
@@ -51,10 +66,10 @@ export default function ActivityRow({ a, showCollection = false }: { a: Activity
       <div className="min-w-0 flex-1 text-sm leading-snug text-slate-600">
         <span className="break-all font-medium text-ink">{name(a.actor)}</span> {s.text}
         {s.withTitle && a.item && <span className="break-words font-medium text-ink"> “{a.item.title}”</span>}
-<div className="mt-0.5 text-xs text-slate-400">
-  {showCollection && a.collection?.name ? `${a.collection.name} · ` : ""}
-  {timeAgo(a.createdAt)}
-</div>
+        <div className="mt-0.5 text-xs text-slate-400">
+          {showCollection && a.collection?.name ? `${a.collection.name} · ` : ""}
+          {timeAgo(a.createdAt)}
+        </div>
       </div>
     </div>
   );

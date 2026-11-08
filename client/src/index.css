@@ -211,6 +211,10 @@ html.dark select option {
   color: #0f172a;
 }
 
+html.dark .highlight-mark {
+  color: #f1f5f9;
+}
+
 .onboarding-highlight {
   position: relative;
   z-index: 80;

@@ -86,8 +86,9 @@ export default function RecentActivity({ collectionId, reloadKey = 0 }: { collec
       <button
         type="button"
         onClick={() => setOpen(true)}
+        title="Recent activity"
         aria-label={unread > 0 ? `Recent activity, ${badge} new` : "Recent activity"}
-        className="btn-secondary relative"
+        className="btn-secondary relative !px-3 !py-2"
       >
         <History className="size-4 text-blue-600" strokeWidth={1.9} />
         {unread > 0 && (

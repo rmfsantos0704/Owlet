@@ -111,7 +111,8 @@ export type JoinPreview = {
 
 export type ActivityType =
   | "clip_added" | "pdf_imported" | "highlight_added" | "comment_added"
-  | "member_joined" | "member_left" | "member_removed";
+  | "member_joined" | "member_left" | "member_removed" 
+  | "evidence_added" | "evidence_moved" | "evidence_removed" | "question_added" | "question_changed" | "question_removed";
 export type ActivityPerson = { email: string | null; isYou: boolean };
 export type ActivityEntry = {
   id: string;
