@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Owlet",
-  "version": "0.2.7",
+  "name": "Owlet: Web Clipper, Research Highlighter & Citation Generator",
+  "version": "0.2.8",
   "minimum_chrome_version": "111",
-  "description": "Clip web pages into your Owlet research library, then highlight, cite, and share your research.",
+  "description": "Clip web pages, highlight, and cite sources in APA, MLA & Chicago. Organize research, add notes, and share PDF briefs.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -20,8 +20,10 @@
   },
   "permissions": ["activeTab", "contextMenus", "scripting", "storage"],
   "host_permissions": [
+    "https://owlet-nine.vercel.app/*",
     "https://owlet-yqfj.vercel.app/*",
-    "http://localhost:4000/*"
+    "http://localhost:4000/*",
+    "http://localhost:5173/*"
   ],
   "background": {
     "service_worker": "background.js"
