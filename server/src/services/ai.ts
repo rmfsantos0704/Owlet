@@ -289,3 +289,76 @@ export async function askSources(userId: string, mode: string, question: string,
 
   return { summary: String(parsed.summary ?? ""), findings };
 }
+
+// ---------- research briefs ----------
+
+export type BriefSource = { title: string; passages: { n: number; text: string }[] };
+export type BriefEvidence = { source: number; passage: number; quote: string; verified: boolean };
+export type BriefDraft = { sections: { title: string; blocks: { text: string; evidence: BriefEvidence[] }[] }[] };
+export type BriefSpec = {
+  label: string;
+  instruction: string;
+  sections: string[] | null; // null = one section per source
+  question: string;
+  context: string; // how the researcher organized the evidence, if they chose to share the board
+};
+
+// Writes a structured brief from numbered passages. Every block must carry quotes from the passages,
+// and each quote is checked word for word against the passage it names.
+export async function composeBrief(userId: string, spec: BriefSpec, sources: BriefSource[]): Promise<BriefDraft> {
+  const layout = spec.sections
+    ? `Write exactly these sections, in this order: ${spec.sections.map((t) => `"${t}"`).join(", ")}.`
+    : `Write one section per source, in source order (${sources.length} sections). Use the source's title as the section title.`;
+  const system =
+    `You are a research writing assistant. Respond ONLY with JSON: {"sections": [{"title": string, "blocks": [{"text": string, "evidence": [{"source": number, "passage": number, "quote": string}]}]}]}.\n` +
+    `- ${spec.instruction}\n` +
+    `- ${layout}\n` +
+    `- Each block is one short paragraph (2-4 sentences). Use 1-4 blocks per section.\n` +
+    `- The sources are given as numbered passages. A label like (2:5) means source 2, passage 5.\n` +
+    `- Every block MUST have 1-3 "evidence" items that support what the block says. "source" and "passage" are the numbers from the passage label. "quote" must be copied exactly, word for word, from that passage (at most 40 words). Never alter, shorten with "..." or join quotes.\n` +
+    `- Use only information found in the passages. Never invent facts. If the passages do not cover a section, write one block that says so and give it an empty "evidence" list.\n` +
+    `- You only see selected passages of each source, not its whole text. Do not claim a source says nothing about a topic just because it is absent from these passages.\n` +
+    `- Passages numbered 1000-1999 are the researcher's own highlights: they show what the researcher found important, so give them extra weight. Passages numbered 2000 and above are cells from the researcher's literature matrix (a column name and the value they recorded).` +
+    (spec.question ? `\nThe research question this brief serves:\n"""${spec.question}"""` : "") +
+    (spec.context ? `\nHow the researcher organized their evidence (use it to decide what supports, challenges, or only gives background; never cite it, only cite passages):\n"""${spec.context}"""` : "");
+
+  const body = sources
+    .map((source, i) => `[${i + 1}] ${source.title}\n` + source.passages.map((p) => `(${i + 1}:${p.n}) ${p.text}`).join("\n\n"))
+    .join("\n\n=====\n\n");
+
+  const parsed = await completeJson(
+    userId,
+    [
+      { role: "system", content: system },
+      { role: "user", content: body },
+    ],
+    8192,
+    0.2
+  );
+
+  const maxSections = spec.sections ? spec.sections.length : sources.length;
+  const sections = (Array.isArray(parsed.sections) ? parsed.sections : [])
+    .slice(0, maxSections)
+    .map((value: unknown) => {
+      const section = isRecord(value) ? value : {};
+      const blocks = (Array.isArray(section.blocks) ? section.blocks : []).slice(0, 6).map((raw: unknown) => {
+        const block = isRecord(raw) ? raw : {};
+        const evidence: BriefEvidence[] = [];
+        for (const entry of (Array.isArray(block.evidence) ? block.evidence : []).slice(0, 3)) {
+          const item = isRecord(entry) ? entry : {};
+          const sourceNo = Number(item.source);
+          if (!Number.isInteger(sourceNo) || sourceNo < 1 || sourceNo > sources.length) continue;
+          const passage = sources[sourceNo - 1].passages.find((p) => p.n === Number(item.passage));
+          if (!passage) continue;
+          const quote = String(item.quote ?? "").trim();
+          const verified = quote.length >= 15 && norm(passage.text).includes(norm(quote));
+          evidence.push({ source: sourceNo, passage: passage.n, quote: verified ? quote : excerpt(passage.text), verified });
+        }
+        return { text: String(block.text ?? "").trim().slice(0, 1500), evidence };
+      }).filter((b: { text: string }) => b.text);
+      return { title: String(section.title ?? "").trim().slice(0, 200), blocks };
+    })
+    .filter((s: { blocks: unknown[] }) => s.blocks.length > 0);
+
+  return { sections };
+}
