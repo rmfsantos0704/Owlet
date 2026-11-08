@@ -111,8 +111,9 @@ export type JoinPreview = {
 
 export type ActivityType =
   | "clip_added" | "pdf_imported" | "highlight_added" | "comment_added"
-  | "member_joined" | "member_left" | "member_removed" 
-  | "evidence_added" | "evidence_moved" | "evidence_removed" | "question_added" | "question_changed" | "question_removed";
+  | "member_joined" | "member_left" | "member_removed"
+  | "evidence_added" | "evidence_moved" | "evidence_removed"
+  | "question_added" | "question_changed" | "question_removed";
 export type ActivityPerson = { email: string | null; isYou: boolean };
 export type ActivityEntry = {
   id: string;
@@ -168,3 +169,45 @@ export type QuestionSummary = {
   conflict: boolean; // has both supporting and challenging evidence
 };
 export type BoardResponse = { questions: ResearchQuestion[]; links: EvidenceLink[]; summaries: QuestionSummary[] };
+
+// ---- research briefs ----
+export type BriefTemplateId =
+  | "literature_review"
+  | "study_guide"
+  | "argument_outline"
+  | "research_summary"
+  | "meeting_brief"
+  | "annotated_bibliography";
+export type BriefCitation = {
+  source: number; // 1-based position in the brief's source list
+  itemId?: string;
+  highlightId?: string;
+  kind: "text" | "highlight" | "matrix";
+  quote: string;
+  verified: boolean; // the quote was found word for word in the source
+};
+export type BriefBlock = { id: string; text: string; edited: boolean; citations: BriefCitation[] };
+export type BriefSection = { id: string; title: string; blocks: BriefBlock[] };
+export type Brief = {
+  id: string;
+  collectionId: string;
+  title: string;
+  template: BriefTemplateId;
+  question: string;
+  status: "draft" | "ready";
+  wordCount: number;
+  sources: { itemId: string; title: string; reference: string }[];
+  sections: BriefSection[];
+  createdAt: string;
+  updatedAt: string;
+};
+export type BriefSummary = {
+  id: string;
+  title: string;
+  template: BriefTemplateId;
+  question: string;
+  status: "draft" | "ready";
+  sourceCount: number;
+  wordCount: number;
+  updatedAt: string;
+};

@@ -8,6 +8,8 @@ import SessionsCard from "../../components/account/SessionsCard";
 import DataCard from "../../components/account/DataCard";
 import DeleteAccountCard from "../../components/account/DeleteAccountCard";
 import AppearanceCard from "../../components/account/AppearanceCard";
+import LoadingScreen from "../../components/shared/LoadingScreen";
+// Adjust the import path as needed
 
 export default function AccountPage() {
   const [data, setData] = useState<AccountData | null>(null);
@@ -26,7 +28,8 @@ export default function AccountPage() {
   }, [load]);
 
   if (error) return <p className="text-red-600">{error}</p>;
-  if (!data) return <p className="text-slate-400">Loading…</p>;
+  if (!data) return <LoadingScreen fill="page" label="Loading account..." />;
+  
   const { account, ownedcollections } = data;
 
   return (
