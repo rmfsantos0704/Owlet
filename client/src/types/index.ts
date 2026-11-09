@@ -194,6 +194,7 @@ export type Brief = {
   template: BriefTemplateId;
   question: string;
   status: "draft" | "ready";
+  generator?: "ai" | "outline"; // "outline" = built without AI from the researcher's own material; missing on older briefs
   wordCount: number;
   sources: { itemId: string; title: string; reference: string }[];
   sections: BriefSection[];
@@ -206,6 +207,7 @@ export type BriefSummary = {
   template: BriefTemplateId;
   question: string;
   status: "draft" | "ready";
+  generator?: "ai" | "outline";
   sourceCount: number;
   wordCount: number;
   updatedAt: string;

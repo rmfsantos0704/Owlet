@@ -137,6 +137,7 @@ export default function BriefView() {
 
   const role = collections?.find((c) => c.id === brief.collectionId)?.role;
   const canEdit = !!role && role !== "viewer";
+  const isOutline = brief.generator === "outline";
 
   const supportNote = (block: BriefBlock) => {
     if (block.citations.length === 0) return "No source is cited for this paragraph. Check it before using it.";
@@ -205,6 +206,7 @@ export default function BriefView() {
           <section className="card p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
               <span className="eyebrow text-blue-600">{templateLabel(brief.template)}</span>
+              {isOutline && <span className="rounded-full bg-slate-100 px-2 py-0.5 font-bold text-slate-600">Outline</span>}
               <span
                 className={`rounded-full px-2 py-0.5 font-bold ${brief.status === "ready" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
               >
@@ -246,7 +248,9 @@ export default function BriefView() {
               </p>
             )}
             <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
-              Written by AI from your sources. A green “Verified” quote was found word for word in the source. Check every claim against its evidence before you rely on it.
+              {isOutline
+                ? "An outline built without AI from your highlights, notes, literature matrix and evidence board. Quotes are copied exactly from your sources. Write your own text in the empty paragraphs to connect them."
+                : "Written by AI from your sources. A green “Verified” quote was found word for word in the source. Check every claim against its evidence before you rely on it."}
             </p>
           </section>
 
@@ -254,7 +258,8 @@ export default function BriefView() {
             <section key={section.id} className="card space-y-5 p-5 sm:p-6">
               <h2 className="text-lg font-semibold tracking-tight text-ink">{section.title}</h2>
               {section.blocks.map((block) => {
-                const note = supportNote(block);
+                // outline paragraphs with no citation are just the "nothing to quote" placeholder, not an unsupported claim
+                const note = isOutline && block.citations.length === 0 ? "" : supportNote(block);
                 const sourcesCited = [...new Set(block.citations.map((c) => c.source))].sort((a, b) => a - b);
                 const editing = editingBlock === block.id;
                 return (
@@ -277,12 +282,20 @@ export default function BriefView() {
                           </button>
                         </div>
                       </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">
+                    ) : block.text ? (
+                      <p
+                        className={`whitespace-pre-wrap break-words text-sm leading-7 ${
+                          isOutline && block.citations.length > 0 ? "border-l-2 border-slate-200 pl-3 text-slate-600" : "text-slate-700"
+                        }`}
+                      >
                         {block.text}
                         {sourcesCited.map((n) => (
                           <sup key={n} className="ml-0.5 font-semibold text-blue-700">[{n}]</sup>
                         ))}
+                      </p>
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm italic text-slate-400">
+                        Write your connecting text here.
                       </p>
                     )}
 
@@ -330,7 +343,7 @@ export default function BriefView() {
                           }}
                           className="inline-flex items-center gap-1 font-medium text-slate-400 hover:text-blue-600"
                         >
-                          <Pencil className="size-3.5" /> Edit
+                          <Pencil className="size-3.5" /> {block.text ? "Edit" : "Write"}
                         </button>
                         <button type="button" onClick={() => removeBlock(block)} className="inline-flex items-center gap-1 font-medium text-slate-400 hover:text-red-600">
                           <Trash2 className="size-3.5" /> Remove

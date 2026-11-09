@@ -5,7 +5,7 @@ import {
   Check, ChevronLeft, ChevronRight, FileDown, FileText, Highlighter, Loader2, MessageSquareText,
   Pencil, RefreshCw, Save, Settings, Sparkles, Trash2, X,
 } from "lucide-react";
-import { api, download } from "../services/api";
+import { api, download, AI_USAGE_UPDATED_EVENT } from "../services/api";
 import CitationBox from "../components/itemdetail/CitationBox";
 import TagInput from "../components/itemdetail/TagInput";
 import HighlightList from "../components/itemdetail/HighlightList";
@@ -23,6 +23,18 @@ import RelatedClips from "../components/itemdetail/RelatedClips";
 import type { LayoutContext } from "../components/Layout";
 import { DEFAULT_AI_SETTINGS } from "../types";
 import type { AiSettings, ResearchItem, Role } from "../types";
+
+// the citation details that "Find missing details" can propose
+const DETAIL_LABEL: Record<string, string> = {
+  author: "Author",
+  publishedDate: "Date",
+  journal: "Journal",
+  volume: "Volume",
+  issue: "Issue",
+  pages: "Pages",
+  doi: "DOI",
+};
+type DetailSuggestions = { suggestions: Record<string, string>; ai: "used" | "off" | "quota" | "failed" | "skipped" };
 
 export default function ItemDetail() {
   const { id } = useParams();
@@ -49,6 +61,10 @@ export default function ItemDetail() {
   const [readingStatus, setReadingStatus] = useState<"to_read" | "reading" | "done">("to_read");
   const [userSummary, setUserSummary] = useState("");
   const [workflowSaving, setWorkflowSaving] = useState(false);
+  const [finding, setFinding] = useState(false); // "Find missing details" is running
+  const [found, setFound] = useState<DetailSuggestions | null>(null);
+  const [foundPicked, setFoundPicked] = useState<string[]>([]);
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     api<{ item: ResearchItem; role: Role | null }>(`/research/${id}`)
@@ -105,6 +121,43 @@ export default function ItemDetail() {
     await act("/highlights", "POST", { text, color, note, ...offsets });
   }
 
+  // Proposes author, date, DOI and so on from the clip's own text. Nothing is saved until the person applies it,
+  // and applying goes through the normal source save, so the APA, MLA and Chicago citations are rebuilt from it.
+  async function findDetails() {
+    setFinding(true);
+    setActionError("");
+    try {
+      const r = await api<DetailSuggestions>(`/research/${id}/source/suggest`, { method: "POST" });
+      setFound(r);
+      setFoundPicked(Object.keys(r.suggestions));
+      if (r.ai === "used") window.dispatchEvent(new Event(AI_USAGE_UPDATED_EVENT));
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Couldn't look for details");
+    } finally {
+      setFinding(false);
+    }
+  }
+
+  async function applyFound() {
+    if (!found || !item) return;
+    const chosen = Object.fromEntries(Object.entries(found.suggestions).filter(([field]) => foundPicked.includes(field)));
+    if (!Object.keys(chosen).length) return setFound(null);
+    const s = item.source;
+    setApplying(true);
+    try {
+      await act("/source", "PATCH", {
+        title: s.title, author: s.author, publishedDate: s.publishedDate, journal: s.journal,
+        volume: s.volume, issue: s.issue, pages: s.pages, doi: s.doi,
+        ...chosen,
+      });
+      setFound(null);
+    } catch {
+      // act() reports the failure in the page-level action error.
+    } finally {
+      setApplying(false);
+    }
+  }
+
   // for handlers that don't need to react to failure (the error is already shown)
   const run = (path: string, method: string, body?: unknown) => act(path, method, body).catch(() => {});
 
@@ -149,11 +202,11 @@ export default function ItemDetail() {
     }
   }
 
-  // navigate(-1) does nothing when this page was opened in a fresh tab (e.g. from the extension),
-  // because there is no earlier history entry. React Router stores the entry index in history.state.idx.
+  // Back always goes to the library at "/", where the collections are. navigate(-1) can't be trusted here: after a
+  // visit to the PDF reader the previous history entry is the reader itself, so Back and Back again ping-pong.
+  // (Collections don't have their own URL, so there is no per-collection path to go to.)
   function goBack() {
-    if (window.history.state?.idx > 0) navigate(-1);
-    else navigate("/"); // change to your collection route, e.g. `/collections/${item?.collectionId}`
+    navigate("/");
   }
 
   async function remove() {
@@ -299,14 +352,71 @@ export default function ItemDetail() {
               </span>
             )}
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink">{item.source.title}</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              {[item.source.author, item.source.publishedDate].filter(Boolean).join(" · ") || "No author or date yet"}
+            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
+              <span>{[item.source.author, item.source.publishedDate].filter(Boolean).join(" · ") || "No author or date yet"}</span>
+              {canEdit && !found && (!item.source.author || !item.source.publishedDate) && (
+                <button
+                  type="button"
+                  onClick={findDetails}
+                  disabled={finding}
+                  title="Look for the author, date and DOI in this clip's text"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline disabled:opacity-60"
+                >
+                  {finding ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                  {finding ? "Looking…" : "Find missing details"}
+                </button>
+              )}
             </p>
             {(item.source.journal || item.source.doi) && (
               <p className="mt-1 text-xs text-slate-400">
                 {[item.source.journal, item.source.volume && `Vol. ${item.source.volume}`, item.source.issue && `No. ${item.source.issue}`, item.source.pages && `pp. ${item.source.pages}`, item.source.doi && `DOI: ${item.source.doi}`]
                   .filter(Boolean).join(" · ")}
               </p>
+            )}
+            {found && (
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+                {Object.keys(found.suggestions).length === 0 ? (
+                  <p className="text-slate-600">
+                    {found.ai === "used"
+                      ? "The text doesn't clearly state the missing details. Use Edit details to add them."
+                      : "Nothing found. AI is off or unavailable, so only a DOI can be read from the text. Use Edit details to add the rest."}
+                  </p>
+                ) : (
+                  <>
+                    <p className="font-semibold text-slate-700">Found in the text. Check each one before you apply it.</p>
+                    <ul className="mt-2 space-y-1.5">
+                      {Object.entries(found.suggestions).map(([field, value]) => (
+                        <li key={field}>
+                          <label className="flex cursor-pointer items-start gap-2">
+                            <input
+                              type="checkbox"
+                              checked={foundPicked.includes(field)}
+                              onChange={() =>
+                                setFoundPicked((prev) => (prev.includes(field) ? prev.filter((x) => x !== field) : [...prev, field]))
+                              }
+                              className="mt-0.5 size-4 shrink-0 accent-[#102b5c]"
+                            />
+                            <span className="min-w-0 break-words text-slate-600">
+                              <span className="font-medium text-slate-700">{DETAIL_LABEL[field] ?? field}: </span>
+                              {value}
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                <div className="mt-3 flex gap-2">
+                  {Object.keys(found.suggestions).length > 0 && (
+                    <button type="button" onClick={applyFound} disabled={applying || foundPicked.length === 0} className="btn-primary !px-3 !py-1.5 !text-xs">
+                      {applying ? "Applying…" : "Apply selected"}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setFound(null)} disabled={applying} className="btn-secondary !px-3 !py-1.5 !text-xs">
+                    {Object.keys(found.suggestions).length > 0 ? "Dismiss" : "Close"}
+                  </button>
+                </div>
+              </div>
             )}
             {canEdit && <SourceEditor source={item.source} onSave={(v) => act("/source", "PATCH", v)} />}
             <div className="mt-4">

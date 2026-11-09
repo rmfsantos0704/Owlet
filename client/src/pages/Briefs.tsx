@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BookOpen, Clock3, FileText, Plus, Trash2 } from "lucide-react";
 import { api } from "../services/api";
-import { useAuth } from "../context/AuthContext";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
 import NewBriefModal from "../components/briefs/NewBriefModal";
@@ -14,12 +13,11 @@ import type { BriefSummary } from "../types";
 const FILTERS = ["All briefs", "Drafts", "Ready"] as const;
 
 // Every brief in one collection (/Collection/:id/briefs). Briefs are written from the collection's sources,
-// and each claim links back to them.
+// and each claim links back to them. When AI is unavailable, a brief is built as an outline without AI.
 export default function Briefs() {
   const { id: routeId } = useParams();
   const { collections, ready } = useCollections();
   const current = (collections ?? []).find((c) => c.id === routeId);
-  const { aiEnabled, aiOffByUser } = useAuth();
   const dialog = useDialog();
   const navigate = useNavigate();
   const collectionId = current?.id;
@@ -99,13 +97,7 @@ export default function Briefs() {
           </p>
         </div>
         {canEdit && (
-          <button
-            type="button"
-            onClick={() => setNewOpen(true)}
-            disabled={!aiEnabled}
-            title={aiEnabled ? undefined : aiOffByUser ? "You turned AI off in your account" : "AI isn't available right now"}
-            className="btn-primary"
-          >
+          <button type="button" onClick={() => setNewOpen(true)} className="btn-primary">
             <Plus className="size-4" /> New brief
           </button>
         )}
@@ -165,12 +157,17 @@ export default function Briefs() {
                     <Link to={`${base}/${brief.id}`} className="min-w-0 text-sm font-semibold text-slate-800 hover:text-blue-700">
                       {brief.title}
                     </Link>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                        brief.status === "ready" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {brief.status === "ready" ? "Ready" : "Draft"}
+                    <span className="flex items-center gap-1.5">
+                      {brief.generator === "outline" && (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">Outline</span>
+                      )}
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                          brief.status === "ready" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {brief.status === "ready" ? "Ready" : "Draft"}
+                      </span>
                     </span>
                   </div>
                   <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{brief.question || templateLabel(brief.template)}</p>
