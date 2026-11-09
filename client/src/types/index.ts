@@ -111,9 +111,8 @@ export type JoinPreview = {
 
 export type ActivityType =
   | "clip_added" | "pdf_imported" | "highlight_added" | "comment_added"
-  | "member_joined" | "member_left" | "member_removed"
-  | "evidence_added" | "evidence_moved" | "evidence_removed"
-  | "question_added" | "question_changed" | "question_removed";
+  | "member_joined" | "member_left" | "member_removed" | "evidence_added" | "evidence_moved" | "evidence_removed"
+  | "question_added" | "question_changed" | "question_removed" ;
 export type ActivityPerson = { email: string | null; isYou: boolean };
 export type ActivityEntry = {
   id: string;
@@ -211,3 +210,20 @@ export type BriefSummary = {
   wordCount: number;
   updatedAt: string;
 };
+
+// ---- concept search ----
+export type SearchResult = {
+  id: string;
+  kind: "clip" | "highlight" | "comment" | "matrix";
+  itemId: string;
+  collectionId: string;
+  collectionName?: string; // only when searching across collections
+  title: string;
+  origin?: string;
+  snippet: string;
+  match: "strong" | "good" | "related"; // relative to the best match for this search
+  page?: number;
+  color?: string;
+  author?: string;
+};
+export type SearchResponse = { results: SearchResult[]; pending: number; total: number };

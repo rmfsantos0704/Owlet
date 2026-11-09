@@ -19,7 +19,7 @@ export default function Briefs() {
   const { id: routeId } = useParams();
   const { collections, ready } = useCollections();
   const current = (collections ?? []).find((c) => c.id === routeId);
-  const { aiEnabled } = useAuth();
+  const { aiEnabled, aiOffByUser } = useAuth();
   const dialog = useDialog();
   const navigate = useNavigate();
   const collectionId = current?.id;
@@ -103,7 +103,7 @@ export default function Briefs() {
             type="button"
             onClick={() => setNewOpen(true)}
             disabled={!aiEnabled}
-            title={aiEnabled ? undefined : "AI isn't available right now"}
+            title={aiEnabled ? undefined : aiOffByUser ? "You turned AI off in your account" : "AI isn't available right now"}
             className="btn-primary"
           >
             <Plus className="size-4" /> New brief

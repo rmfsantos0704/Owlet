@@ -480,7 +480,11 @@ export default function Layout() {
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
             {/* the open page can put its own buttons here (Import PDF, Literature matrix, ...), right beside the AI usage */}
-            <div ref={setHeaderActions} className="flex shrink-0 items-center gap-1.5 empty:hidden" />
+            <div
+              ref={setHeaderActions}
+              id="owlet-tour-collection-tools"
+              className="flex shrink-0 items-center gap-1.5 empty:hidden"
+            />
             <AiUsageIndicator compact />
             <NotificationsBell />
           </div>

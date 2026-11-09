@@ -17,8 +17,13 @@ export type RegisterInput = {
 type AuthValue = {
   user: User | null;
   loading: boolean;
-  aiEnabled: boolean; // server feature flag and this account's daily allowance
+  // AI can be used right now: the server has it on, the daily allowance isn't used up, and the person hasn't turned it off
+  aiEnabled: boolean;
+  // the person turned AI features off in their account (so pages can say so instead of "unavailable")
+  aiOffByUser: boolean;
   aiUsage: AiDailyUsage | null;
+  // turns AI features on or off for this account; throws if the server refuses
+  setAiPreference: (enabled: boolean) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   // creating an account does NOT log you in: the user must confirm their email first
   register: (input: RegisterInput) => Promise<void>;
@@ -29,9 +34,18 @@ const AuthContext = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiAvailable, setAiAvailable] = useState(false); // what the server says
+  const [aiUserOn, setAiUserOn] = useState(true); // the person's own switch
   const [aiUsage, setAiUsage] = useState<AiDailyUsage | null>(null);
   const [loading, setLoading] = useState(!!localStorage.getItem("token"));
+
+  // the person's own switch comes from the account, not from /auth/me
+  const loadAiPreference = () =>
+    api<{ enabled: boolean }>("/account/ai")
+      .then((r) => setAiUserOn(r.enabled))
+      .catch(() => {
+        /* keep the last known value; the server enforces the setting either way */
+      });
 
   useEffect(() => {
     let cancelled = false;
@@ -42,15 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then((r) => {
           if (cancelled) return;
           setUser(r.user);
-          setAiEnabled(!!r.features?.ai);
+          setAiAvailable(!!r.features?.ai);
           setAiUsage(r.features?.aiUsage ?? null);
+          void loadAiPreference();
         })
         .catch((e) => {
           if (cancelled) return;
           // only a rejected login ends the session; a network hiccup or server error must not log anyone out
           if (e instanceof ApiError && (e.status === 401 || e.status === 403)) clearSessionToken();
           setUser(null);
-          setAiEnabled(false);
+          setAiAvailable(false);
           setAiUsage(null);
         })
         .finally(() => {
@@ -62,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       api<Session>("/auth/me")
         .then((r) => {
           if (!cancelled) {
-            setAiEnabled(!!r.features?.ai);
+            setAiAvailable(!!r.features?.ai);
             setAiUsage(r.features?.aiUsage ?? null);
           }
         })
@@ -71,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
             clearSessionToken();
             setUser(null);
-            setAiEnabled(false);
+            setAiAvailable(false);
             setAiUsage(null);
           } else {
             console.warn("Could not refresh AI availability.", e);
@@ -97,12 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (localStorage.getItem("token")) load();
       else {
         setUser(null);
-        setAiEnabled(false);
+        setAiAvailable(false);
         setAiUsage(null);
       }
     };
     const onAiQuotaExhausted = () => {
-      setAiEnabled(false);
+      setAiAvailable(false);
       refreshAiAvailability();
     };
     const onAiUsageUpdated = () => refreshAiAvailability();
@@ -117,13 +132,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener(AI_QUOTA_EXHAUSTED_EVENT, onAiQuotaExhausted);
       window.removeEventListener(AI_USAGE_UPDATED_EVENT, onAiUsageUpdated);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value: AuthValue = {
     user,
     loading,
-    aiEnabled,
-    aiUsage,
+    aiEnabled: aiAvailable && aiUserOn,
+    aiOffByUser: !aiUserOn,
+    aiUsage: aiUserOn ? aiUsage : null,
+    setAiPreference: async (enabled) => {
+      await api("/account/ai", { method: "PUT", body: { enabled } });
+      setAiUserOn(enabled);
+      // availability and the daily meter change with the switch: ask the server again
+      window.dispatchEvent(new Event(AI_USAGE_UPDATED_EVENT));
+    },
     login: async (email, password) => {
       const r = await api<Session & { token: string }>("/auth/login", {
         method: "POST",
@@ -131,8 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       setSessionToken(r.token);
       setUser(r.user);
-      setAiEnabled(!!r.features?.ai);
+      setAiAvailable(!!r.features?.ai);
       setAiUsage(r.features?.aiUsage ?? null);
+      void loadAiPreference();
     },
     register: async (input) => {
       await api("/auth/register", { method: "POST", body: input });
@@ -140,7 +164,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout: () => {
       clearSessionToken();
       setUser(null);
-      setAiEnabled(false);
+      setAiAvailable(false);
+      setAiUserOn(true);
       setAiUsage(null);
     },
   };

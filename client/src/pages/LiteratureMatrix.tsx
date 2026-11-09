@@ -1,9 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowLeft, Download, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api, download } from "../services/api";
 import { useCollections } from "../context/CollectionContext";
-import LoadingScreen from "../components/shared/LoadingScreen";
+
+// just a small spinning circle with a label, instead of the full owl loading screen
+function ColumnsLoader() {
+  return (
+    <div role="status" aria-live="polite" className="flex items-center justify-center gap-2.5 p-12 text-sm font-medium text-slate-500">
+      <Loader2 className="size-5 animate-spin text-brand" aria-hidden="true" />
+      Loading columns
+    </div>
+  );
+}
 
 type Column = { id: string; name: string };
 type ClipRow = { id: string; title: string; values: Record<string, string> };
@@ -55,7 +64,7 @@ export default function LiteratureMatrix() {
     return () => { cancelled = true; };
   }, [collectionId, page, requestKey]);
 
-  if (!ready) return <LoadingScreen label="Loading your collections…" fill="page" />;
+  if (!ready) return <ColumnsLoader />;
   if (!current) {
     return (
       <p className="text-sm text-slate-500">
@@ -211,7 +220,7 @@ export default function LiteratureMatrix() {
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       <section className="card overflow-hidden">
         {loading ? (
-          <LoadingScreen label="Loading the literature matrix…" fill="parent" />
+          <ColumnsLoader />
         ) : clips.length === 0 ? (
           <p className="p-12 text-center text-sm text-slate-500">No clips in this collection yet.</p>
         ) : (

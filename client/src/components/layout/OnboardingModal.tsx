@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, FolderKanban, Layers3, Puzzle, Sparkles, UserRound, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, FolderKanban, LayoutGrid, Layers3, Puzzle, Sparkles, UserRound, X, type LucideIcon } from "lucide-react";
 import { chromeExtensionUrl } from "../../utils/chromeExtension";
 import { useAuth } from "../../context/AuthContext";
 
@@ -12,6 +12,8 @@ type Step = {
 };
 
 const COLLECTION_LIST_TARGET = "owlet-tour-collection-list";
+// the area of the top bar where a collection's own tools appear (set in Layout)
+const COLLECTION_TOOLS_TARGET = "owlet-tour-collection-tools";
 
 type Props = { open: boolean; onClose: () => void; initialStep?: number };
 type Position = { top: number; left: number; width: number };
@@ -20,6 +22,23 @@ export default function OnboardingModal({ open, onClose, initialStep = 0 }: Prop
   const { user, aiUsage } = useAuth();
   const hasAiUsage = !!aiUsage;
   const email = user?.email;
+
+  // The collection tools only exist in the top bar while a collection is open, so that step is only
+  // included when those buttons are actually on screen (and it appears as soon as they are).
+  const [hasCollectionTools, setHasCollectionTools] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const el = document.getElementById(COLLECTION_TOOLS_TARGET);
+    if (!el) {
+      setHasCollectionTools(false);
+      return;
+    }
+    const check = () => setHasCollectionTools(el.childElementCount > 0);
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(el, { childList: true });
+    return () => observer.disconnect();
+  }, [open]);
 
   // Built once per sign-in / AI availability, so the step object stays stable between renders.
   // A step is left out when the thing it points at isn't on screen (the tour would wait forever for it).
@@ -33,8 +52,8 @@ export default function OnboardingModal({ open, onClose, initialStep = 0 }: Prop
         items: [
           ["All clips", "Search and browse clips across every Collection you can access."],
           ["Highlights & Comments", "Review passages you've marked and conversations on clips."],
-          ["Literature matrix", "Compare sources in a structured table."],
           ["AI workspace", "Run research analysis on selected sources when AI is available."],
+          ["Concept search", "Find clips by meaning, not just exact words, so related ideas turn up even when the wording differs."],
         ],
       },
       {
@@ -58,12 +77,28 @@ export default function OnboardingModal({ open, onClose, initialStep = 0 }: Prop
       },
     ];
 
+    if (hasCollectionTools) {
+      list.push({
+        target: COLLECTION_TOOLS_TARGET,
+        icon: LayoutGrid,
+        title: "Tools for the open Collection",
+        description: "When you open a Collection, its own tools appear in the top bar. Each one belongs to that Collection only, so every Collection has its own matrix, evidence board, and briefs.",
+        items: [
+          ["Import PDF", "Add PDFs to this Collection. You can also drop files anywhere on the page."],
+          ["Literature matrix", "Compare your sources in a table with columns you choose, and export it as CSV."],
+          ["Research briefs", "Write structured briefs from your sources. Every claim links back to the passage it came from."],
+          ["Evidence board", "Sort highlights and notes under what they support, challenge, or leave open for your research questions."],
+          ["Activity, Export & Settings", "See what's new, export the Collection, and change its settings."],
+        ],
+      });
+    }
+
     if (hasAiUsage) {
       list.push({
         target: "owlet-tour-ai-usage",
         icon: Sparkles,
         title: "Your daily AI allowance",
-        description: "This meter in the top bar counts the AI features you've used today, such as summaries and the AI workspace. Hover over it, or tab to it, to see how many uses you have left.",
+        description: "This meter in the top bar counts the AI features you've used today, such as summaries, research briefs, and the AI workspace. Hover over it, or tab to it, to see how many uses you have left.",
         items: [
           ["Used / limit", "The first number is what you've used today; the second is your daily limit."],
           ["Resets", "Your allowance resets at midnight UTC."],
@@ -77,17 +112,17 @@ export default function OnboardingModal({ open, onClose, initialStep = 0 }: Prop
         target: "owlet-tour-account",
         icon: UserRound,
         title: "Your account",
-        description: "Your initials and email in the top bar show which account you're signed in to. Click them to open your account page.",
+        description: "The Account link at the bottom of the sidebar shows your initials. Click it to open your account page.",
         items: [
           ["Signed in as", email],
-          ["Account settings", "Open your account page from here to manage your account."],
-          ["Log out", "The arrow icon beside your email signs you out."],
+          ["Account settings", "Manage your email, password, appearance, and data from the account page."],
+          ["Log out", "The arrow icon beside Account signs you out."],
         ],
       });
     }
 
     return list;
-  }, [hasAiUsage, email]);
+  }, [hasAiUsage, hasCollectionTools, email]);
 
   const [stepIndex, setStepIndex] = useState(() => Math.max(initialStep, 0));
   const [position, setPosition] = useState<Position | null>(null);

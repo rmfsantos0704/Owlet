@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Loader2, Sparkles } from "lucide-react";
 import { api } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
@@ -18,7 +19,7 @@ type Props = {
 };
 
 export default function NewBriefModal({ open, onClose, collectionId, onCreated }: Props) {
-  const { aiEnabled } = useAuth();
+  const { aiEnabled, aiOffByUser } = useAuth();
   const [template, setTemplate] = useState<BriefTemplateId>("literature_review");
   const [title, setTitle] = useState("");
   const [question, setQuestion] = useState("");
@@ -110,7 +111,14 @@ export default function NewBriefModal({ open, onClose, collectionId, onCreated }
     >
       {!aiEnabled && (
         <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          AI isn't available right now, so new briefs can't be written. You can still open and edit the ones you have.
+          {aiOffByUser ? (
+            <>
+              You turned AI features off, so new briefs can't be written. You can still open and edit the ones you have, or{" "}
+              <Link to="/account" onClick={onClose} className="font-semibold underline">turn AI back on</Link>.
+            </>
+          ) : (
+            "AI isn't available right now, so new briefs can't be written. You can still open and edit the ones you have."
+          )}
         </p>
       )}
 

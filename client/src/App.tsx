@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import Layout from "./components/Layout";
 import LoadingScreen from "./components/shared/LoadingScreen";
 import LoginPage from "./pages/auth/LoginPage";
@@ -22,6 +23,7 @@ import Comments from "./pages/Comments";
 import LiteratureMatrix from "./pages/LiteratureMatrix";
 import EvidenceBoard from "./pages/EvidenceBoard";
 import Briefs from "./pages/Briefs";
+import ConceptSearch from "./pages/ConceptSearch";
 import BriefView from "./pages/BriefView";
 import HelpSupport from "./pages/HelpSupport";
 import AboutPage from "./pages/AboutPage";
@@ -63,49 +65,60 @@ export default function App() {
 
   const guest = (page: ReactElement) => (user ? <Navigate to={peekReturnTo()} replace /> : page);
 
-  // ThemeProvider is mounted once, in main.tsx, so the dark class on <html> is managed in one place.
-  // Don't mount it again here or inside Layout.
-  return loading ? (
-    <LoadingScreen label="Loading Owlet…" />
-  ) : (
-    <DialogProvider>
-      <Routes>
-        <Route path="/login" element={guest(<LoginPage />)} />
-        <Route path="/register" element={guest(<RegisterPage />)} />
-        <Route path="/forgot-password" element={guest(<ForgotPasswordPage />)} />
+  // ThemeProvider wraps everything (including the PDF reader, which sits outside <Layout />),
+  // so the dark class on <html> is managed in one place. Don't mount it again inside Layout or main.tsx.
+  return (
+    <ThemeProvider>
+      {loading ? (
+        <LoadingScreen label="Loading Owlet…" />
+      ) : (
+        <DialogProvider>
+          <Routes>
+            <Route path="/login" element={guest(<LoginPage />)} />
+            <Route path="/register" element={guest(<RegisterPage />)} />
+            <Route path="/forgot-password" element={guest(<ForgotPasswordPage />)} />
 
-        {/* emailed links and legal pages must work whether or not someone is logged in */}
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
-        <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
-        <Route path="/terms" element={<TermsPage />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/extension" element={<ExtensionPage />} />
-        <Route path="/features" element={<FeaturesPage />} />
-        {/* the PDF reader needs a login, but sits outside <Layout /> so it can use the whole window */}
-        <Route path="/item/:id/pdf" element={user ? <PdfReader /> : <ToLogin />} />
+            {/* emailed links and legal pages must work whether or not someone is logged in */}
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/extension" element={<ExtensionPage />} />
+            <Route path="/features" element={<FeaturesPage />} />
+            {/* the PDF reader needs a login, but sits outside <Layout /> so it can use the whole window */}
+            <Route path="/item/:id/pdf" element={user ? <PdfReader /> : <ToLogin />} />
 
-<Route element={user ? <Layout /> : <ToLogin />}>
-  <Route path="/" element={<Library />} />
-  <Route path="/all" element={<Library all />} />
-  <Route path="/ai" element={<AiWorkspace />} />
-  <Route path="/highlights" element={<Highlights />} />
-  <Route path="/comments" element={<Comments />} />
-  <Route path="/help" element={<HelpSupport />} />
-  <Route path="/item/:id" element={<ItemDetail />} />
+            <Route element={user ? <Layout /> : <ToLogin />}>
+              <Route path="/" element={<Library />} />
+              <Route path="/all" element={<Library all />} />
+              <Route path="/ai" element={<AiWorkspace />} />
+              <Route path="/highlights" element={<Highlights />} />
+              <Route path="/comments" element={<Comments />} />
+              <Route path="/search" element={<ConceptSearch />} />
+              <Route path="/help" element={<HelpSupport />} />
+              <Route path="/item/:id" element={<ItemDetail />} />
 
-  {/* collection-scoped tools */}
-  <Route path="/Collection/:id/matrix" element={<LiteratureMatrix />} />
-  <Route path="/Collection/:id/board" element={<EvidenceBoard />} />
-  <Route path="/Collection/:id/briefs" element={<Briefs />} />
-  <Route path="/Collection/:id/briefs/:briefId" element={<BriefView />} />
-  <Route path="/Collection/:id/settings" element={<CollectionSettings />} />
+              {/* the matrix, the evidence board and the briefs each belong to one collection, so they live under it */}
+              <Route path="/Collection/:id/settings" element={<CollectionSettings />} />
+              <Route path="/Collection/:id/matrix" element={<LiteratureMatrix />} />
+              <Route path="/Collection/:id/board" element={<EvidenceBoard />} />
+              <Route path="/Collection/:id/briefs" element={<Briefs />} />
+              <Route path="/Collection/:id/briefs/:briefId" element={<BriefView />} />
 
-  <Route path="/join/:token" element={<JoinCollection />} />
-  <Route path="/account" element={<AccountPage />} />
-</Route>
-      </Routes>
-    </DialogProvider>
+              {/* the old, collection-less addresses: send people to the library, where the buttons are */}
+              <Route path="/matrix" element={<Navigate to="/" replace />} />
+              <Route path="/board" element={<Navigate to="/" replace />} />
+              <Route path="/briefs" element={<Navigate to="/" replace />} />
+              <Route path="/briefs/:id" element={<Navigate to="/" replace />} />
+
+              <Route path="/join/:token" element={<JoinCollection />} />
+              <Route path="/account" element={<AccountPage />} />
+            </Route>
+          </Routes>
+        </DialogProvider>
+      )}
+    </ThemeProvider>
   );
 }

@@ -18,6 +18,7 @@ const ICONS: Record<ActivityType, { icon: LucideIcon; tone: string }> = {
   question_added: { icon: CircleHelp, tone: "bg-blue-50 text-blue-600" },
   question_changed: { icon: Pencil, tone: "bg-blue-50 text-blue-600" },
   question_removed: { icon: Trash2, tone: "bg-slate-100 text-slate-500" },
+
 };
 
 export function timeAgo(iso: string) {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Archive, ChevronRight, CircleHelp, Highlighter, MessageSquareText, Sparkles } from "lucide-react";
+import { Archive, ChevronRight, CircleHelp, Highlighter, MessageSquareText, Search, Sparkles } from "lucide-react";
 import { openOnboardingAt } from "../../utils/onboarding";
 
 // The evidence board, the literature matrix and the research briefs are not listed here: each lives inside its
@@ -10,6 +10,7 @@ const WORKSPACE_LINKS = [
   { to: "/highlights", label: "Highlights", icon: Highlighter },
   { to: "/comments", label: "Comments", icon: MessageSquareText },
   { to: "/ai", label: "AI workspace", icon: Sparkles },
+  { to: "/search", label: "Concept search", icon: Search },
 ];
 
 const OPEN_KEY = "owlet.sidebar.workspaces";
