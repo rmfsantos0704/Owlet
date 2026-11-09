@@ -10,6 +10,7 @@ import {
   FileText,
   FileUp,
   Highlighter,
+  LayoutGrid,
   LifeBuoy,
   Link2,
   ListChecks,
@@ -40,6 +41,7 @@ const ACCENT = {
   cyan: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300",
   sky: "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
   indigo: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
+  rose: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
   slate: "bg-slate-100 text-slate-700",
 } as const;
 
@@ -53,7 +55,8 @@ type Topic = {
   color: string;
 };
 
-function guides(ai: boolean): Guide[] {
+// `ai`: AI can be used right now. `off`: the person turned AI features off in their account.
+function guides(ai: boolean, off: boolean): Guide[] {
   const list: Guide[] = [
     {
       topic: "getting-started",
@@ -68,7 +71,7 @@ function guides(ai: boolean): Guide[] {
       topic: "getting-started",
       icon: FileUp,
       title: "Import PDFs",
-      text: "In a Collection, press Import PDF or drag PDF files anywhere on the page. You can add up to 10 files at a time, 15 MB each.",
+      text: "In a Collection, press Import PDF or drag PDF files anywhere on the page. You can add up to 10 files at a time, 15 MB each. Owlet keeps the original file so you can read and highlight it on the page.",
       accent: ACCENT.violet,
     },
     {
@@ -79,22 +82,73 @@ function guides(ai: boolean): Guide[] {
       accent: ACCENT.amber,
     },
     {
+      topic: "notes",
+      icon: FileText,
+      title: "Highlight on the original PDF",
+      text: "Open a PDF clip and press the Original PDF card. The PDF opens on its own page: select text to highlight it, pick a color and add a note. The list on the right shows every highlight, and clicking one jumps to its page.",
+      accent: ACCENT.amber,
+    },
+    {
       topic: "extension",
       icon: Highlighter,
       title: "Highlight while you read",
       text: "Select text on any page and right-click Save selection to Owlet, or press Alt+Shift+S. It saves to the Collection selected in the extension and clips the page first if needed.",
       accent: ACCENT.amber,
     },
+    {
+      topic: "research",
+      icon: CircleHelp,
+      title: "Set your research questions",
+      text: "Open Evidence board from Workspaces. Under Research questions, write the main question this Collection is meant to answer, then add smaller supporting questions. Owners and editors can edit or delete them.",
+      accent: ACCENT.sky,
+    },
+    {
+      topic: "research",
+      icon: LayoutGrid,
+      title: "Arrange evidence on the board",
+      text: "Press Add evidence, or the + on a column, to add highlights, whole sources or notes. Choose which question each card belongs to. Drag cards between Supports, Challenges, Background, Methodology and Open questions, or use Edit, then Move to, on a card. Click a question to see only the evidence filed under it.",
+      accent: ACCENT.sky,
+    },
+    {
+      topic: "research",
+      icon: Gauge,
+      title: "Read coverage and gaps",
+      text: "Each question shows how many different sources support or challenge it: none, thin (1 source), moderate (2) or strong (3 or more). A question with both supporting and challenging evidence is flagged as conflicting. These are counts of what you filed, not AI judgments.",
+      accent: ACCENT.sky,
+    }
   ];
 
   if (ai) {
-    list.push({
-      topic: "ai",
-      icon: Sparkles,
-      title: "Use the AI workspace",
-      text: "Open it from the AI research assistant card on a Collection page. Pick up to 8 sources, choose a mode and run the analysis. Each run is saved under Recent sessions. AI use is limited to 10 generations per account each day.",
-      accent: ACCENT.emerald,
-    });
+    list.push(
+      {
+        topic: "ai",
+        icon: Sparkles,
+        title: "Use the AI workspace",
+        text: "Open it from the AI research assistant card on a Collection page. Pick up to 8 sources, choose a mode and run the analysis. Each run is saved under Recent sessions. AI use is limited to 10 generations per account each day.",
+        accent: ACCENT.emerald,
+      },
+      {
+        topic: "research-tools",
+        icon: FileText,
+        title: "Write a research brief",
+        text: "Open Research briefs from Workspaces and press New brief. Pick a template and up to 8 sources, add an optional question, and choose whether to use your evidence board. Owlet writes the brief from your passages, highlights and literature-matrix entries. Each brief uses one AI generation.",
+        accent: ACCENT.rose,
+      },
+      {
+        topic: "research-tools",
+        icon: ListChecks,
+        title: "Check a brief's evidence",
+        text: "Every paragraph has an Evidence list with the quotes it is based on. Verified means the quote was found word for word in your source. A warning appears when a paragraph has no verified quote. You can edit or remove paragraphs, mark a brief as ready, and export it as Markdown or PDF.",
+        accent: ACCENT.rose,
+      },
+      {
+        topic: "research-tools",
+        icon: Search,
+        title: "Search by meaning",
+        text: "Open Concept search from Workspaces and describe an idea in your own words, for example “sources discussing the risks of AI dependency”. Results include sources, highlights, comments and matrix entries, even when they use different words. The first time, Owlet prepares your library for searching, which can take a moment.",
+        accent: ACCENT.rose,
+      }
+    );
   } else {
     list.push(
       {
@@ -110,6 +164,15 @@ function guides(ai: boolean): Guide[] {
         title: "Build a brief",
         text: "On the Highlights page, press Build a brief, tick the highlights you want and group them by source or by color. Owlet compiles them with your notes and an APA reference list. Copy it as Markdown or download it as a .md file.",
         accent: ACCENT.emerald,
+      },
+      {
+        topic: "research-tools",
+        icon: Sparkles,
+        title: "AI research tools",
+        text: off
+          ? "Research briefs and concept search use AI, and you turned AI features off in your account. Open Account, find AI features and switch it back on to use them. Briefs you already have can still be opened, edited and exported."
+          : "Research briefs and concept search use AI, which is unavailable right now (your daily allowance may be used up, or the AI providers are busy). Briefs you already have can still be opened, edited and exported.",
+        accent: ACCENT.rose,
       }
     );
   }
@@ -128,6 +191,13 @@ function guides(ai: boolean): Guide[] {
     text: "Open Literature matrix from Workspaces. Add your own columns, fill in each clip's cells, and export the collection matrix as CSV.",
     accent: ACCENT.cyan,
   });
+  list.push({
+    topic: "limits",
+    icon: Sparkles,
+    title: "Turn AI features on or off",
+    text: "Open Account from the top bar, find AI features and use the switch. When AI is off, nothing you save is sent to an AI provider, new clips get the plain Quick summary, and the AI workspace, research briefs and concept search are unavailable to you. Summaries and briefs you already have stay.",
+    accent: ACCENT.slate,
+  });
   return list;
 }
 
@@ -138,7 +208,7 @@ function faq(ai: boolean): Faq[] {
     {
       topic: "limits",
       q: "How does the daily AI limit work?",
-      a: "Each account can use AI for up to 10 generations per day. Summaries, PDF summaries, tests, regenerations and AI workspace runs count. The allowance resets at 00:00 UTC. When you reach it, Owlet switches off AI-only tools for your account until the reset; your clips and built-in non-AI tools remain available.",
+      a: "Each account can use AI for up to 10 generations per day. Summaries, PDF summaries, tests, regenerations, AI workspace runs and research briefs count. Concept search does not use the allowance. The allowance resets at 00:00 UTC. When you reach it, Owlet switches off AI-only tools for your account until the reset; your clips and built-in non-AI tools remain available.",
     },
     {
       topic: "limits",
@@ -149,6 +219,16 @@ function faq(ai: boolean): Faq[] {
       topic: "limits",
       q: "Why might AI still be unavailable before I reach my limit?",
       a: "Owlet tries its configured providers (Groq, Gemini and OpenRouter) in sequence when one is unavailable. Their free-tier limits, model access and billing rules depend on each provider and can change. If none can serve the request, use Owlet's non-AI tools and try again later.",
+    },
+    {
+      topic: "limits",
+      q: "How do I turn AI features off?",
+      a: "Open Account from the top bar and use the AI features switch. While it is off, Owlet doesn't write AI summaries for your new clips, and the AI workspace, research briefs and concept search are unavailable to you. Your clips and comments are removed from the concept search index, and you can turn AI back on at any time. Summaries and briefs you already have are kept.",
+    },
+    {
+      topic: "limits",
+      q: "What is sent to AI providers when AI is on?",
+      a: "The text of clips you save, and the sources you pick for AI tools, are sent to AI providers to write summaries and briefs. Concept search also sends your clips, highlights, comments and matrix entries to Google to turn them into searchable vectors. With AI off, none of this happens for your account. Please don't upload confidential material while Owlet is in testing.",
     }
   );
 
@@ -185,6 +265,36 @@ function faq(ai: boolean): Faq[] {
       a: "That page (or an identical PDF) is already in the Collection, so Owlet didn't save a second copy. Tracking parameters and page fragments are ignored when detecting web duplicates. You can open the existing clip from the message.",
     },
     {
+      topic: "notes",
+      q: "Why can't I open the original PDF for an older clip?",
+      a: "Only PDFs imported after the PDF viewer was added keep their original file. For an older PDF, delete the clip and import the file again to get the Original PDF page. You can still read and highlight its extracted text.",
+    },
+    {
+      topic: "research",
+      q: 'What do "Thin", "Strong" and "Conflicting evidence" mean?',
+      a: "They describe how many different sources you filed as supporting or challenging a question: none, thin (1), moderate (2) or strong (3 or more). Conflicting evidence means a question has both supporting and challenging cards. Background, methodology and open-question cards don't count toward coverage.",
+    },
+    {
+      topic: "research",
+      q: "What happens to board cards when I delete a question or a source?",
+      a: "Deleting a question removes the cards filed under it from the board, but the highlights and sources stay in your library. If you delete a clip or a highlight, its card disappears from the board.",
+    },
+    {
+      topic: "research-tools",
+      q: "Can I trust the citations in a research brief?",
+      a: 'Verified means the quote was found word for word in your source, so it is real. It doesn\'t prove that the paragraph interprets the quote correctly. Paragraphs with no verified quote carry a warning. Always check the claims against the source before you rely on them.',
+    },
+    {
+      topic: "research-tools",
+      q: "Why can't I write a research brief?",
+      a: "Briefs need AI, an owner or editor role in the Collection, and at least one source. Check that AI features are on in your Account and that your daily allowance isn't used up. Viewers can read and export briefs but not create or edit them.",
+    },
+    {
+      topic: "research-tools",
+      q: "How is concept search different from the search box?",
+      a: "The search box at the top matches the words you type. Concept search matches meaning, so describing an idea finds sources, highlights, comments and matrix entries about it even when they use different words. New and changed clips are prepared for concept search automatically; if many are waiting, the page shows its progress and updates the results when it's done.",
+    },
+    {
       topic: "organize",
       q: "How do I export references for a bibliography?",
       a: "Select clips in the library, choose APA, MLA or Chicago, and copy the reference list. You can also export the selected clips as RIS for Zotero or EndNote.",
@@ -192,7 +302,7 @@ function faq(ai: boolean): Faq[] {
     {
       topic: "collaboration",
       q: "What's the difference between owner, editor and viewer?",
-      a: "Owners manage settings, members and join links. Editors can add clips, highlights and comments. Viewers can read everything but can't change anything.",
+      a: "Owners manage settings, members and join links. Editors can add clips, highlights, comments, board cards and briefs. Viewers can read everything but can't change anything.",
     },
     {
       topic: "collaboration",
@@ -236,9 +346,23 @@ function topics(ai: boolean): Topic[] {
     {
       id: "notes",
       title: "Highlights & notes",
-      description: "Capture important passages, add notes and leave comments.",
+      description: "Highlight text or the original PDF page, add notes and leave comments.",
       icon: Highlighter,
       color: ACCENT.amber,
+    },
+    {
+      id: "research",
+      title: "Research questions & evidence board",
+      description: "Define your questions and arrange evidence by what supports or challenges them.",
+      icon: LayoutGrid,
+      color: ACCENT.sky,
+    },
+    {
+      id: "research-tools",
+      title: "Briefs & concept search",
+      description: "Write cited research briefs and search your library by meaning.",
+      icon: FileText,
+      color: ACCENT.rose,
     },
   ];
 
@@ -277,8 +401,8 @@ function topics(ai: boolean): Topic[] {
     },
     {
       id: "limits",
-      title: "AI usage & limits",
-      description: "How the daily AI allowance and provider availability work.",
+      title: "AI usage & privacy",
+      description: "How the daily AI allowance works, what is sent to AI providers, and how to turn AI off.",
       icon: Gauge,
       color: ACCENT.slate,
     }
@@ -324,13 +448,13 @@ function FaqItem({
 }
 
 export default function HelpSupport() {
-  const { aiEnabled } = useAuth();
+  const { aiEnabled, aiOffByUser } = useAuth();
   const [query, setQuery] = useState("");
   const [openFaq, setOpenFaq] = useState<string | null>(null);
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
 
-  const GUIDES = useMemo(() => guides(aiEnabled), [aiEnabled]);
+  const GUIDES = useMemo(() => guides(aiEnabled, aiOffByUser), [aiEnabled, aiOffByUser]);
   const FAQ = useMemo(() => faq(aiEnabled), [aiEnabled]);
   const TOPICS = useMemo(() => topics(aiEnabled), [aiEnabled]);
 
@@ -396,7 +520,7 @@ export default function HelpSupport() {
           </div>
           <div className="mt-4 flex flex-wrap justify-center gap-2.5 text-xs text-blue-100/70 sm:text-sm">
             <span></span>
-            {["install extension", "import PDF", "share a collection"].map((term) => (
+            {["install extension", "import PDF", "evidence board", "turn off AI"].map((term) => (
               <button
                 key={term}
                 type="button"
@@ -632,6 +756,17 @@ export default function HelpSupport() {
                 Install extension
                 <ArrowUpRight className="size-3.5" />
               </button>
+            )}
+
+            {topic.id === "limits" && (
+              <Link
+                to="/account"
+                onClick={() => setActiveTopic(null)}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Open account settings
+                <ArrowUpRight className="size-3.5" />
+              </Link>
             )}
 
             {topicFaqs.length > 0 && (
