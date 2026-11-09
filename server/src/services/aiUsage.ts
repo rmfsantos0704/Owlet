@@ -1,4 +1,5 @@
 import { AiUsage } from "../models/AiUsage.js";
+import { User } from "../models/User.js";
 
 const DEFAULT_DAILY_LIMIT = 2;
 
@@ -24,11 +25,26 @@ export class AiQuotaExceededError extends Error {
   }
 }
 
+// thrown when the person turned AI features off in their account
+export class AiOptedOutError extends Error {
+  constructor() {
+    super("AI features are turned off for this account.");
+    this.name = "AiOptedOutError";
+  }
+}
+
 function isDuplicateKeyError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === 11000;
 }
 
+// true when this person turned AI features off in their account settings
+export async function aiOptedOut(userId: string): Promise<boolean> {
+  const user = await User.findById(userId).select("aiOptOut").lean();
+  return !!user?.aiOptOut;
+}
+
 export async function aiAvailableForUser(userId: string): Promise<boolean> {
+  if (await aiOptedOut(userId)) return false;
   const usage = await aiDailyUsageForUser(userId);
   return usage.remaining > 0;
 }
@@ -41,6 +57,9 @@ export async function aiDailyUsageForUser(userId: string): Promise<AiDailyUsage>
 }
 
 export async function reserveAiGeneration(userId: string): Promise<void> {
+  // every AI call passes through here, so this is where "AI off" is enforced for all of them
+  if (await aiOptedOut(userId)) throw new AiOptedOutError();
+
   const day = currentUtcDay();
   const query = { userId, day, generations: { $lt: aiDailyUserLimit() } };
   const updated = await AiUsage.findOneAndUpdate(query, { $inc: { generations: 1 } }, { returnDocument: "after" });

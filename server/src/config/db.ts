@@ -6,6 +6,8 @@ import { AiUsage } from "../models/AiUsage.js";
 import { ResearchQuestion } from "../models/ResearchQuestion.js";
 import { EvidenceLink } from "../models/EvidenceLink.js";
 import { Brief } from "../models/Brief.js";
+import { SearchChunk } from "../models/SearchChunk.js";
+import { SearchIndexState } from "../models/SearchIndexState.js";
 
 // Development workaround: some home networks fail the DNS lookup behind mongodb+srv:// addresses.
 // Never in production, where it would bypass the host's own DNS.
@@ -27,5 +29,7 @@ export async function connectDB() {
     ResearchQuestion.syncIndexes(),
     EvidenceLink.syncIndexes(),
     Brief.syncIndexes(),
+    SearchChunk.syncIndexes(),
+    SearchIndexState.syncIndexes(),
   ]);
 }

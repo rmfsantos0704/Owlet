@@ -27,6 +27,9 @@ const userSchema = new Schema(
 
     termsVersion: String, // which version of the Terms/Privacy Policy they agreed to
     termsAcceptedAt: Date,
+
+    // the person turned AI features off for their own account; missing or false = AI on
+    aiOptOut: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

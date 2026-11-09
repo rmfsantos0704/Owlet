@@ -17,7 +17,7 @@ import { toBibtex, toCsv, toRis } from "../services/export.js";
 import { normalizePageUrl } from "../services/pageUrl.js";
 import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../services/access.js";
 import { aiEnabled } from "../config/features.js";
-import { AiQuotaExceededError, aiAvailableForUser } from "../services/aiUsage.js";
+import { AiQuotaExceededError, aiAvailableForUser, aiOptedOut } from "../services/aiUsage.js";
 import { MAX_IMPORT_BYTES, deleteBlob, signedFileUrl } from "../middlewares/blobImport.js";
 
 const MAX_TITLE = 100;
@@ -211,8 +211,8 @@ async function runAi(
   title: string,
   text: string
 ) {
-  // AI off: the clip is saved as it is, and the AI provider is never called
-  if (!aiEnabled()) {
+  // AI off (for the server, or for this person): the clip is saved as it is, and the AI provider is never called
+  if (!aiEnabled() || (await aiOptedOut(userId))) {
     return { ai: { summary: "", paraphrase: "", tags: [] as string[] }, aiFailed: false, aiLimitReached: false };
   }
   try {

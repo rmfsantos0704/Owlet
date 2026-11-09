@@ -7,6 +7,7 @@ import accountRoutes from "./routes/accountRoutes.js";
 import researchRoutes from "./routes/researchRoutes.js";
 import boardRoutes from "./routes/boardRoutes.js";
 import briefRoutes from "./routes/briefRoutes.js";
+import searchRoutes from "./routes/searchRoutes.js";
 import collectionRoutes from "./routes/collectionRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js";
 import { initializeApplication } from "./config/startup.js";
@@ -91,6 +92,7 @@ app.use("/api/account", accountRoutes);
 app.use("/api/research", researchRoutes);
 app.use("/api/board", boardRoutes);
 app.use("/api/briefs", briefRoutes);
+app.use("/api/search", searchRoutes);
 app.use("/api/collections", collectionRoutes);
 app.use("/api/support", limiter(minutes(15), 5), supportRoutes); // it sends email, so spam would cost you
 
