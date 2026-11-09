@@ -15,6 +15,7 @@ import {
   aiDailyLimiter, aiMinuteLimiter, clipDailyLimiter, importDailyLimiter, writeLimiter,
 } from "../middlewares/rateLimits.js";
 import { trackActivity } from "../middlewares/trackActivity.js";
+import { suggestDetails } from "../controllers/citationController.js";
 
 const router = Router();
 router.use(requireAuth); // the per-account limiters below rely on this having run first
@@ -40,6 +41,7 @@ router.get("/:id/pdf", pdf);
 router.post("/:id/regenerate", requireAi, aiMinuteLimiter, aiDailyLimiter, regenerate);
 router.post("/:id/test-ai", requireAi, aiMinuteLimiter, aiDailyLimiter, testAi);
 router.patch("/:id/source", writeLimiter, updateSource);
+router.post("/:id/source/suggest", writeLimiter, suggestDetails);
 router.patch("/:id/workflow", writeLimiter, updateWorkflow);
 router.patch("/:id/matrix", writeLimiter, updateMatrixValue);
 router.post("/:id/highlights", writeLimiter, trackActivity("highlight_added"), addHighlight);

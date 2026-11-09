@@ -362,3 +362,54 @@ export async function composeBrief(userId: string, spec: BriefSpec, sources: Bri
 
   return { sections };
 }
+
+// ---------- citation details ----------
+
+export const SOURCE_DETAIL_FIELDS = ["author", "publishedDate", "journal", "volume", "issue", "pages", "doi"] as const;
+export type SourceDetailField = (typeof SOURCE_DETAIL_FIELDS)[number];
+export type SourceSuggestions = Partial<Record<SourceDetailField, string>>;
+
+// A suggestion is only kept when the passage the AI points to really is in the text and really contains the value.
+function detailSupported(field: SourceDetailField, value: string, quote: string, text: string): boolean {
+  const nq = norm(quote);
+  const nt = norm(text);
+  if (!nq || !nt.includes(nq)) return false;
+  if (field === "doi") return nt.includes(norm(value));
+  const tokens = value.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((t) => t.length > 1 || /\d/.test(t));
+  return tokens.length > 0 && tokens.every((t) => nq.includes(t));
+}
+
+// Reads the start of a clip and proposes the citation details it clearly states. Nothing is guessed:
+// every field must come with a passage copied from the text, and fields that fail that check are dropped.
+export async function suggestSourceDetails(
+  userId: string,
+  input: { title: string; text: string; missing: SourceDetailField[] }
+): Promise<SourceSuggestions> {
+  const text = input.text.slice(0, 6000);
+  const system =
+    `You read the start of a web page or paper and pull out its citation details. Respond ONLY with JSON: {"fields": {"<field>": {"value": string, "quote": string}}}.\n` +
+    `- Fill only these fields: ${input.missing.join(", ")}. Leave out any field the text does not clearly state. Never guess.\n` +
+    `- "quote" must be copied exactly, word for word, from the text (at most 30 words) and must contain the value.\n` +
+    `- author: the people who wrote it, as written, for example "Jane Smith" or "Jane Smith, John Lee". Never the website or publisher.\n` +
+    `- publishedDate: the publication date as written. journal: the journal or publication name. volume, issue, pages: as written. doi: only the DOI, like 10.1234/abcd.`;
+  const parsed = await completeJson(
+    userId,
+    [
+      { role: "system", content: system },
+      { role: "user", content: `Title: ${input.title}\n\n${text}` },
+    ],
+    1024,
+    0
+  );
+
+  const out: SourceSuggestions = {};
+  const fields = isRecord(parsed.fields) ? parsed.fields : {};
+  for (const field of input.missing) {
+    const entry = isRecord(fields[field]) ? (fields[field] as Record<string, unknown>) : null;
+    if (!entry) continue;
+    const value = String(entry.value ?? "").trim().slice(0, 200);
+    const quote = String(entry.quote ?? "").trim();
+    if (value && detailSupported(field, value, quote, text)) out[field] = value;
+  }
+  return out;
+}

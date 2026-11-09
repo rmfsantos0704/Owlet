@@ -79,3 +79,8 @@ export async function reserveAiGeneration(userId: string): Promise<void> {
   );
   if (!retried) throw new AiQuotaExceededError();
 }
+
+// Gives back a reservation when the providers failed, so a failed attempt doesn't use up the daily allowance.
+export async function refundAiGeneration(userId: string): Promise<void> {
+  await AiUsage.updateOne({ userId, day: currentUtcDay(), generations: { $gt: 0 } }, { $inc: { generations: -1 } });
+}

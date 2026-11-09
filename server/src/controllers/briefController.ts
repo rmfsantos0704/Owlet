@@ -6,12 +6,13 @@ import { ResearchItem } from "../models/ResearchItem.js";
 import { ResearchQuestion } from "../models/ResearchQuestion.js";
 import { EvidenceLink } from "../models/EvidenceLink.js";
 import { Brief } from "../models/Brief.js";
-import { composeBrief, type BriefSource } from "../services/ai.js";
+import { AiProvidersError, composeBrief, type BriefDraft, type BriefSource } from "../services/ai.js";
+import { composeBriefOutline, type OutlineLink, type OutlineSource } from "../services/briefOutline.js";
 import { pickPassages } from "../services/passages.js";
 import { BRIEF_TEMPLATES, BRIEF_TEMPLATE_IDS } from "../services/briefTemplates.js";
 import { streamBriefPdf } from "../services/briefPdf.js";
 import { atLeast, roleIn, type Role } from "../services/access.js";
-import { AiQuotaExceededError, aiAvailableForUser } from "../services/aiUsage.js";
+import { AiOptedOutError, AiQuotaExceededError, refundAiGeneration } from "../services/aiUsage.js";
 
 const MAX_SOURCES = 8;
 const TEXT_CHAR_BUDGET = 16000; // passage text from the sources' own words, shared between all sources
@@ -51,6 +52,7 @@ function serialize(b: any) {
     template: b.template,
     question: b.question ?? "",
     status: b.status,
+    generator: b.generator ?? "ai",
     wordCount: b.wordCount ?? 0,
     sources: (b.sources ?? []).map((s: any) => ({ itemId: String(s.itemId), title: s.title, reference: s.reference })),
     sections: (b.sections ?? []).map((s: any) => ({
@@ -82,7 +84,7 @@ export async function listBriefs(req: Request, res: Response) {
   if (!(await allow(res, cid, "viewer"))) return;
   const briefs: any[] = await Brief.find({ collectionId: cid })
     .sort({ updatedAt: -1 })
-    .select("title template question status sources.itemId wordCount updatedAt createdAt")
+    .select("title template question status generator sources.itemId wordCount updatedAt createdAt")
     .lean();
   res.json({
     briefs: briefs.map((b) => ({
@@ -91,6 +93,7 @@ export async function listBriefs(req: Request, res: Response) {
       template: b.template,
       question: b.question ?? "",
       status: b.status,
+      generator: b.generator ?? "ai",
       sourceCount: (b.sources ?? []).length,
       wordCount: b.wordCount ?? 0,
       updatedAt: b.updatedAt,
@@ -131,7 +134,8 @@ const createSchema = z.object({
   itemIds: z.array(z.string()).min(1).max(MAX_SOURCES),
   title: z.string().trim().max(120).optional(),
   question: z.string().trim().max(300).optional(),
-  useBoard: z.boolean().optional(), // let the AI see how the evidence board is organized
+  useBoard: z.boolean().optional(), // AI: show the writer how the board is organized. Outline: group the sections by the board
+  mode: z.enum(["ai", "outline"]).optional(), // "outline" = no AI: gather the researcher's material and let them write the text
 });
 
 const STANCE_LABEL: Record<string, string> = {
@@ -148,6 +152,7 @@ export async function createBrief(req: Request, res: Response) {
     return res.status(400).json({ error: `Pick a template and 1-${MAX_SOURCES} sources.` });
   }
   const cid = p.data.collectionId;
+  const wantOutline = p.data.mode === "outline";
   if (!(await allow(res, cid, "editor"))) return;
   if ((await Brief.countDocuments({ collectionId: cid })) >= MAX_BRIEFS_PER_COLLECTION) {
     return res.status(400).json({ error: `A collection can hold up to ${MAX_BRIEFS_PER_COLLECTION} briefs. Delete one first.` });
@@ -157,7 +162,7 @@ export async function createBrief(req: Request, res: Response) {
   const columns = ((ws?.get("matrixColumns") as { id: string; name: string }[] | undefined) ?? []).filter((c) => c.id && c.name);
 
   const found: any[] = await ResearchItem.find({ _id: { $in: p.data.itemIds }, collectionId: cid })
-    .select("source.title citations.apa highlights matrixValues content.rawText aiOutput.summary")
+    .select("source.title citations.apa highlights matrixValues content.rawText aiOutput.summary personalNote")
     .lean();
   // keep the order the person picked them in
   const items = p.data.itemIds.map((id) => found.find((i) => String(i._id) === id)).filter(Boolean);
@@ -196,12 +201,13 @@ export async function createBrief(req: Request, res: Response) {
     });
     return { title: item.source?.title ?? "Untitled", passages };
   });
-  if (sources.every((s) => s.passages.length === 0)) {
-    return res.status(422).json({ error: "These sources have no readable text to write from." });
+  if (sources.every((s) => s.passages.length === 0) && (!wantOutline || items.every((i: any) => !String(i.personalNote ?? "").trim()))) {
+    return res.status(422).json({ error: "These sources have no text, highlights or notes to build a brief from." });
   }
 
   // how the evidence board is organized, as plain context for the writer
   let context = "";
+  const boardLinks: OutlineLink[] = []; // the same board cards, for the no-AI outline
   if (p.data.useBoard) {
     const positionOf = new Map(items.map((item: any, i: number) => [String(item._id), i]));
     const [links, questions] = await Promise.all([
@@ -227,33 +233,77 @@ export async function createBrief(req: Request, res: Response) {
       );
     }
     context = clip(lines.join("\n"), 3500);
-  }
-
-  let draft;
-  try {
-    draft = await composeBrief(
-      String(res.locals.userId),
-      { label: template.label, instruction: template.instruction, sections: template.sections, question, context },
-      sources
-    );
-  } catch (err) {
-    if (err instanceof AiQuotaExceededError || !(await aiAvailableForUser(String(res.locals.userId)))) {
-      return res.status(429).json({
-        error: "Your daily AI allowance is used up. Owlet's non-AI features are still available until tomorrow.",
-        code: "AI_QUOTA_EXCEEDED",
+    for (const link of links) {
+      const isNote = link.kind === "note";
+      const at = isNote ? undefined : positionOf.get(String(link.itemId));
+      if (!isNote && at === undefined) continue;
+      boardLinks.push({
+        stance: String(link.stance),
+        kind: link.kind as OutlineLink["kind"],
+        note: String(link.note ?? ""),
+        source: at ?? null,
+        highlightId: link.highlightId ? String(link.highlightId) : null,
       });
     }
-    console.error("AI providers failed:", err);
-    return res.status(502).json({ error: "The AI service failed. Try again." });
-  }
-  if (!draft.sections.length) {
-    return res.status(502).json({ error: "The AI didn't return a usable brief. Try again, or pick different sources." });
   }
 
   const references = items.map((item: any) => item.citations?.apa || item.source?.title || "Untitled");
+
+  // "outline" mode skips the AI entirely. Otherwise try the AI first, and when it is off, used up or failing,
+  // build the outline instead, so the person always gets something they can finish.
+  const userId = String(res.locals.userId);
+  let draft: BriefDraft | null = null;
+  let generator: "ai" | "outline" = "ai";
+  let fellBack: "off" | "quota" | "providers" | null = null;
+
+  if (!wantOutline) {
+    try {
+      draft = await composeBrief(
+        userId,
+        { label: template.label, instruction: template.instruction, sections: template.sections, question, context },
+        sources
+      );
+      if (!draft.sections.length) {
+        // the AI answered but gave nothing usable: give the allowance back and use the outline
+        draft = null;
+        fellBack = "providers";
+        await refundAiGeneration(userId).catch(() => {});
+      }
+    } catch (err) {
+      if (err instanceof AiOptedOutError) fellBack = "off";
+      else if (err instanceof AiQuotaExceededError) fellBack = "quota";
+      else {
+        console.error("AI providers failed, building an outline instead:", err);
+        fellBack = "providers";
+        // the allowance was reserved before the providers were called; a failed attempt shouldn't cost it
+        if (err instanceof AiProvidersError) await refundAiGeneration(userId).catch(() => {});
+      }
+    }
+  }
+  if (!draft) {
+    const outlineSources: OutlineSource[] = items.map((item: any, i: number) => ({
+      title: item.source?.title ?? "Untitled",
+      reference: references[i],
+      personalNote: clip(String(item.personalNote ?? "").trim(), 600),
+      highlights: (item.highlights ?? []).slice(0, MAX_HIGHLIGHTS).map((h: any, j: number) => ({
+        n: HIGHLIGHT_BASE + j,
+        id: String(h._id),
+        text: clip(String(h.text), 500),
+        note: h.note ? clip(String(h.note), 300) : "",
+      })),
+      matrix: sources[i].passages.filter((ps) => ps.n >= MATRIX_BASE).map((ps) => ({ n: ps.n, text: ps.text })),
+    }));
+    draft = composeBriefOutline(outlineSources, {
+      links: boardLinks,
+      titleFrom: template.sections ? "title" : "reference",
+      perSource: template.sections === null,
+    });
+    generator = "outline";
+  }
+
   const sections = draft.sections.map((section, index) => ({
     // an annotated bibliography uses each source's reference as the section title
-    title: template.sections ? section.title : (references[index] ?? section.title),
+    title: generator === "outline" || template.sections ? section.title : (references[index] ?? section.title),
     blocks: section.blocks.map((block) => ({
       text: block.text,
       citations: block.evidence.map((e) => {
@@ -278,9 +328,10 @@ export async function createBrief(req: Request, res: Response) {
     question,
     sources: items.map((item: any, i: number) => ({ itemId: item._id, title: item.source?.title ?? "Untitled", reference: references[i] })),
     sections,
+    generator,
     wordCount: sections.reduce((n, s) => n + s.blocks.reduce((m, b) => m + words(b.text), 0), 0),
   });
-  res.status(201).json({ brief: serialize(brief) });
+  res.status(201).json({ brief: serialize(brief), fellBack });
 }
 
 // ---------- edit and delete ----------

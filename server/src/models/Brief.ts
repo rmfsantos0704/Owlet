@@ -43,6 +43,8 @@ const briefSchema = new Schema(
     ],
     sections: [sectionSchema],
     wordCount: { type: Number, default: 0 },
+    // "ai" = written by the AI; "outline" = built without AI from the researcher's own highlights, matrix and text
+    generator: { type: String, enum: ["ai", "outline"], default: "ai" },
   },
   { timestamps: true }
 );
