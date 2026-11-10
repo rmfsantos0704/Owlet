@@ -265,11 +265,6 @@ function faq(ai: boolean): Faq[] {
       a: "That page (or an identical PDF) is already in the Collection, so Owlet didn't save a second copy. Tracking parameters and page fragments are ignored when detecting web duplicates. You can open the existing clip from the message.",
     },
     {
-      topic: "notes",
-      q: "Why can't I open the original PDF for an older clip?",
-      a: "Only PDFs imported after the PDF viewer was added keep their original file. For an older PDF, delete the clip and import the file again to get the Original PDF page. You can still read and highlight its extracted text.",
-    },
-    {
       topic: "research",
       q: 'What do "Thin", "Strong" and "Conflicting evidence" mean?',
       a: "They describe how many different sources you filed as supporting or challenging a question: none, thin (1), moderate (2) or strong (3 or more). Conflicting evidence means a question has both supporting and challenging cards. Background, methodology and open-question cards don't count toward coverage.",

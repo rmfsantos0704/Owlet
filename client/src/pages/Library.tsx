@@ -446,7 +446,7 @@ export default function Library({ all = false }: { all?: boolean }) {
       )}
 
       {!all && current ? (
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             {clipsCard}
           </div>

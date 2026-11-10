@@ -93,8 +93,10 @@ export default function SelectableClips<T>({
 
   return (
     <>
-      <div className="card overflow-hidden">
-        <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+      {/* Wrapper takes the row height (set by the AI card beside it); the card is pinned inside so a long list scrolls instead of stretching the row. */}
+      <div className="relative lg:h-full lg:min-h-[20rem]">
+      <div className="card flex flex-col overflow-hidden max-h-[70vh] lg:absolute lg:inset-0 lg:max-h-none">
+        <div className="flex shrink-0 flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-semibold text-ink">{title}</h2>
             {subtitle && <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">{subtitle}</div>}
@@ -149,13 +151,13 @@ export default function SelectableClips<T>({
           )}
         </div>
 
-        {error && <p className="px-5 py-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="shrink-0 px-5 py-3 text-sm text-red-600">{error}</p>}
 
         {loading ? (
           <div
             role="status"
             aria-live="polite"
-            className="flex flex-col items-center justify-center gap-3 px-5 py-16 text-sm text-slate-400"
+            className="flex flex-1 flex-col items-center justify-center gap-3 px-5 py-16 text-sm text-slate-400"
           >
             <Spinner className="size-8" />
             <span>Loading clips…</span>
@@ -163,7 +165,7 @@ export default function SelectableClips<T>({
         ) : clips.length === 0 ? (
           empty
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
             {clips.map((clip) => {
               const id = getId(clip);
               const isSelected = selected.has(id);
@@ -197,6 +199,7 @@ export default function SelectableClips<T>({
             })}
           </div>
         )}
+      </div>
       </div>
 
       <Modal
