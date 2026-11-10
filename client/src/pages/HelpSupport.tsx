@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowUpRight,
   Bookmark,
@@ -448,6 +448,14 @@ export default function HelpSupport() {
   const [openFaq, setOpenFaq] = useState<string | null>(null);
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
+  const navigate = useNavigate();
+
+  // The tour is mounted in the layout, not on this page. Go to the home route first so the
+  // Collection tools are on screen for the tools step, then start the tour from step 1.
+  function startTour() {
+    navigate("/");
+    window.setTimeout(() => openOnboardingAt(0), 150);
+  }
 
   const GUIDES = useMemo(() => guides(aiEnabled, aiOffByUser), [aiEnabled, aiOffByUser]);
   const FAQ = useMemo(() => faq(aiEnabled), [aiEnabled]);
@@ -562,7 +570,7 @@ export default function HelpSupport() {
               Take a quick tour of clipping, organizing, and working with your research.
             </p>
           </div>
-          <button type="button" onClick={() => openOnboardingAt(0)} className="btn-secondary shrink-0">
+          <button type="button" onClick={startTour} className="btn-secondary shrink-0">
             <Play className="size-4" /> Show the introduction
           </button>
         </section>

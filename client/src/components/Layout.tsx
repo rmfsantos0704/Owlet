@@ -45,6 +45,10 @@ const COLLAPSE_AT = 150; // letting go with the edge dragged left of this x hide
 const WIDTH_KEY = "owlet.sidebar.width";
 const COLLAPSED_KEY = "owlet.sidebar.collapsed";
 
+// below this width the sidebar is a slide-in drawer (matches Tailwind's lg breakpoint)
+const DRAWER_QUERY = "(max-width: 1023px)";
+const isDrawerScreen = () => window.matchMedia(DRAWER_QUERY).matches;
+
 const clamp = (n: number) => Math.min(MAX_W, Math.max(MIN_W, n));
 const readStore = (key: string) => {
   try {
@@ -73,6 +77,8 @@ export default function Layout() {
   const [newName, setNewName] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [headerActions, setHeaderActions] = useState<HTMLElement | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false); // phone only: the search bar stays collapsed until tapped
+  const searchRef = useRef<HTMLInputElement>(null);
   const onboardingUser = user ? user.id ?? user.email.toLowerCase() : null;
   const onboardingKey = onboardingUser ? `owlet.onboarding.dismissed:${encodeURIComponent(onboardingUser)}` : null;
   const [onboardingOpen, setOnboardingOpen] = useState(
@@ -91,6 +97,11 @@ export default function Layout() {
     setOnboardingOpen(false);
   }
 
+  // the tour asks for the drawer to be open on sidebar steps and closed on top-bar steps
+  function handleSidebarNeeded(needed: boolean) {
+    if (isDrawerScreen()) setOpen(needed);
+  }
+
   useEffect(() => {
     const handleOpen = (event: Event) => {
       const requestedStep = (event as CustomEvent<number>).detail;
@@ -100,6 +111,10 @@ export default function Layout() {
     window.addEventListener(ONBOARDING_EVENT, handleOpen);
     return () => window.removeEventListener(ONBOARDING_EVENT, handleOpen);
   }, []);
+
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus();
+  }, [searchOpen]);
 
   // desktop sidebar: draggable width, can be hidden, and peeks out when you hover the Owlet icon
   const [width, setWidth] = useState(() => {
@@ -113,12 +128,14 @@ export default function Layout() {
   const peekTimer = useRef<number | undefined>(undefined);
   const draggingRef = useRef(false);
 
+  // while the tour runs, a hidden desktop sidebar peeks out; when the tour ends, the phone drawer closes again
+  // (the modal opens/closes the drawer per step while the tour is running)
   useEffect(() => {
     if (!onboardingOpen) return;
-    if (window.matchMedia("(max-width: 639px)").matches) setOpen(true);
     if (collapsed) setPeek(true);
     return () => {
       if (collapsed) setPeek(false);
+      if (isDrawerScreen()) setOpen(false);
     };
   }, [onboardingOpen, collapsed]);
 
@@ -217,6 +234,12 @@ export default function Layout() {
     if (value) next.set("q", value);
     else next.delete("q");
     navigate({ pathname: SEARCHABLE.includes(pathname) ? pathname : "/", search: next.toString() }, { replace: true });
+  }
+
+  // phone: collapse the search bar again (this also clears the filter)
+  function closeSearch() {
+    setSearchOpen(false);
+    if (q) onSearch("");
   }
 
   async function addCollection(e: FormEvent) {
@@ -456,7 +479,7 @@ export default function Layout() {
 
       <main className={`min-h-screen min-w-0 lg:pl-[var(--dock)] ${dragging ? "" : "transition-[padding-left] duration-200"}`}>
         <header
-          className={`app-header sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-2 border-b border-slate-200/80 bg-white/90 px-3 pb-2 pt-2 backdrop-blur-xl sm:h-16 sm:flex-nowrap sm:gap-4 sm:px-10 sm:py-0 ${
+          className={`app-header sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-x-2 gap-y-1 border-b border-slate-200/80 bg-white/90 px-3 py-2 backdrop-blur-xl sm:h-16 sm:flex-nowrap sm:gap-4 sm:px-10 sm:py-0 ${
             collapsed ? "lg:pl-20" : ""
           }`}
         >
@@ -469,22 +492,52 @@ export default function Layout() {
           >
             <Menu className="size-5" />
           </button>
-          <div className="relative order-last min-w-0 basis-full sm:order-none sm:max-w-md sm:flex-1">
+
+          {/* phone: search is just an icon until it's tapped (the dot shows a filter is active) */}
+          {!searchOpen && (
+            <button
+              type="button"
+              aria-label="Search"
+              onClick={() => setSearchOpen(true)}
+              className="relative flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 sm:hidden"
+            >
+              <Search className="size-5" />
+              {q && <span className="absolute right-2 top-2 size-2 rounded-full bg-blue-500" />}
+            </button>
+          )}
+
+          {/* desktop: always visible. phone: only while open, filling the row */}
+          <div className={`relative min-w-0 flex-1 sm:max-w-md ${searchOpen ? "" : "hidden sm:block"}`}>
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
+              ref={searchRef}
               value={q}
               onChange={(e) => onSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") closeSearch();
+              }}
               placeholder={searchPlaceholder}
-              className="field pl-10"
+              className="field pl-10 pr-10 sm:pr-4"
             />
+            <button
+              type="button"
+              aria-label="Close search"
+              onClick={closeSearch}
+              className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 sm:hidden"
+            >
+              <X className="size-4" />
+            </button>
           </div>
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-            {/* the open page can put its own buttons here (Import PDF, Literature matrix, ...), right beside the AI usage */}
-            <div
-              ref={setHeaderActions}
-              id="owlet-tour-collection-tools"
-              className="flex shrink-0 items-center gap-1.5 empty:hidden"
-            />
+
+          {/* the open page puts its own buttons here (Import PDF, Literature matrix, ...).
+              On phones they get their own row that scrolls sideways, so no icon is ever cut off. */}
+          <div
+            ref={setHeaderActions}
+            id="owlet-tour-collection-tools"
+            className="order-last flex basis-full items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 empty:hidden sm:order-none sm:ml-auto sm:basis-auto sm:overflow-visible sm:pb-0"
+          />
+
+          <div className={`ml-auto shrink-0 items-center gap-1.5 sm:ml-0 sm:flex sm:gap-2.5 ${searchOpen ? "hidden" : "flex"}`}>
             <AiUsageIndicator compact />
             <NotificationsBell />
           </div>
@@ -494,7 +547,13 @@ export default function Layout() {
           <Outlet context={{ headerActions } satisfies LayoutContext} />
         </div>
       </main>
-      <OnboardingModal key={onboardingStep} open={onboardingOpen} onClose={closeOnboarding} initialStep={onboardingStep} />
+      <OnboardingModal
+        key={onboardingStep}
+        open={onboardingOpen}
+        onClose={closeOnboarding}
+        initialStep={onboardingStep}
+        onSidebarNeeded={handleSidebarNeeded}
+      />
     </div>
   );
 }
