@@ -1,4 +1,3 @@
-import { parseHTML } from "linkedom";
 import { Readability } from "@mozilla/readability";
 
 // Turns a page's HTML into what a clip needs: the readable text and the details citations are made from.
@@ -15,6 +14,16 @@ export type Extracted = {
   pages?: string;
   doi?: string;
 };
+
+// linkedom is loaded on first use, not when the server starts, so a problem loading it can only break
+// page saving and never takes down login, health checks and every other route. The server is compiled
+// with module "nodenext", so tsc leaves this import() alone and Node loads linkedom's own ES module build.
+type ParseHTML = (html: string) => { document: any };
+let parseHTMLPromise: Promise<ParseHTML> | undefined;
+function loadParseHTML(): Promise<ParseHTML> {
+  parseHTMLPromise ??= import("linkedom").then((m) => m.parseHTML as unknown as ParseHTML);
+  return parseHTMLPromise;
+}
 
 const BLOCK = new Set([
   "P", "DIV", "SECTION", "ARTICLE", "H1", "H2", "H3", "H4", "H5", "H6", "LI", "UL", "OL", "BLOCKQUOTE", "PRE", "TR",
@@ -53,8 +62,9 @@ function nodeToText(root: any): string {
 
 const clip = (s: string | undefined, n: number) => (s ? s.trim().slice(0, n) : undefined) || undefined;
 
-export function extractPage(html: string): Extracted | null {
-  const { document } = parseHTML(html) as { document: any };
+export async function extractPage(html: string): Promise<Extracted | null> {
+  const parseHTML = await loadParseHTML();
+  const { document } = parseHTML(html);
 
   // details come from the page's <meta> tags, read before the reader mode below changes the document
   const metas = new Map<string, string[]>();
@@ -83,7 +93,7 @@ export function extractPage(html: string): Extracted | null {
   let rawText = article?.content ? nodeToText(parseHTML(`<body>${article.content}</body>`).document.body) : "";
   if (rawText.length < 200) {
     // reader mode found little: fall back to the page's main area, without menus and footers
-    const { document: plain } = parseHTML(html) as { document: any };
+    const { document: plain } = parseHTML(html);
     for (const el of Array.from(plain.querySelectorAll("script,style,noscript,nav,header,footer,aside,form,svg,iframe")) as any[]) {
       el.remove();
     }
