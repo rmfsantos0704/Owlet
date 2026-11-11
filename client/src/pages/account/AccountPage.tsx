@@ -9,6 +9,7 @@ import DataCard from "../../components/account/DataCard";
 import DeleteAccountCard from "../../components/account/DeleteAccountCard";
 import AppearanceCard from "../../components/account/AppearanceCard";
 import AiCard from "../../components/account/AiCard";
+import InstallCard from "../../components/account/InstallCard";
 import LoadingScreen from "../../components/shared/LoadingScreen";
 // Adjust the import path as needed
 
@@ -51,6 +52,7 @@ export default function AccountPage() {
 
       <AppearanceCard />
       <AiCard />
+      <InstallCard />
       <EmailCard account={account} onChanged={load} />
       <PasswordCard />
       <SessionsCard />

@@ -7,8 +7,11 @@ import { AuthProvider } from "./context/AuthContext";
 import { CollectionProvider } from "./context/CollectionContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { wakeServer } from "./services/api";
+import { initInstallPrompt, registerServiceWorker } from "./utils/pwa";
 
 wakeServer(); // free hosts sleep when idle: start waking the server before anyone clicks anything
+initInstallPrompt();
+registerServiceWorker();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

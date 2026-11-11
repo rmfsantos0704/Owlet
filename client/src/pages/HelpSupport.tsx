@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   ArrowUpRight,
   Bookmark,
@@ -94,6 +94,20 @@ function guides(ai: boolean, off: boolean): Guide[] {
       title: "Highlight while you read",
       text: "Select text on any page and right-click Save selection to Owlet, or press Alt+Shift+S. It saves to the Collection selected in the extension and clips the page first if needed.",
       accent: ACCENT.amber,
+    },
+    {
+      topic: "extension",
+      icon: Link2,
+      title: "Save a link from your phone",
+      text: "The extension is for computers. On a phone, open Owlet in your browser and paste a web page's address into Save a link on your library page. Owlet opens the page and saves its text and citations. If a page can't be read, you can paste its text instead.",
+      accent: ACCENT.violet,
+    },
+    {
+      topic: "extension",
+      icon: Share2,
+      title: "Send pages to Owlet from the Share menu",
+      text: "On Android, open your browser's menu, choose Install app, and open Owlet once. After that, Share, then Owlet, on any page saves it to Owlet. On iPhone, add Owlet to your Home Screen in Safari. iPhones don't add apps to the Share menu, so use a Shortcut that opens Owlet's /clip address with the shared link, or paste links into Save a link.",
+      accent: ACCENT.violet,
     },
     {
       topic: "research",
@@ -255,6 +269,16 @@ function faq(ai: boolean): Faq[] {
 
   list.push(
     {
+      topic: "extension",
+      q: "Can I save pages from my phone?",
+      a: "Yes. Open Owlet in your phone's browser and paste the page's address into Save a link on the library page. On Android you can also install Owlet from the browser menu and then use Share, then Owlet, on any page. Pages that need a login or block automatic readers can't be opened by Owlet, but you can paste their text instead.",
+    },
+    {
+      topic: "extension",
+      q: "Why isn't Owlet in my phone's Share menu?",
+      a: "Owlet appears in the Share menu only after it is installed as an app, and only on Android with Chrome. Open Chrome's menu and choose Install app, then open Owlet once. iPhones don't support this, so paste links into Save a link, or use a Shortcut that opens Owlet's /clip address.",
+    },
+    {
       topic: "getting-started",
       q: "Why can't I import a PDF?",
       a: "Owlet needs a PDF with selectable text. Scanned, image-only PDFs aren't supported yet. Also check that the file is under 15 MB and that you're an owner or editor of the Collection.",
@@ -263,6 +287,11 @@ function faq(ai: boolean): Faq[] {
       topic: "getting-started",
       q: 'What does "Already clipped" mean?',
       a: "That page (or an identical PDF) is already in the Collection, so Owlet didn't save a second copy. Tracking parameters and page fragments are ignored when detecting web duplicates. You can open the existing clip from the message.",
+    },
+    {
+      topic: "notes",
+      q: "Why can't I open the original PDF for an older clip?",
+      a: "Only PDFs imported after the PDF viewer was added keep their original file. For an older PDF, delete the clip and import the file again to get the Original PDF page. You can still read and highlight its extracted text.",
     },
     {
       topic: "research",
@@ -333,8 +362,8 @@ function topics(ai: boolean): Topic[] {
     },
     {
       id: "extension",
-      title: "Chrome extension",
-      description: "Install the clipper and save research from any webpage.",
+      title: "Extension & phone",
+      description: "Install the Chrome clipper, or save pages from your phone.",
       icon: Link2,
       color: ACCENT.violet,
     },
@@ -448,14 +477,6 @@ export default function HelpSupport() {
   const [openFaq, setOpenFaq] = useState<string | null>(null);
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
-  const navigate = useNavigate();
-
-  // The tour is mounted in the layout, not on this page. Go to the home route first so the
-  // Collection tools are on screen for the tools step, then start the tour from step 1.
-  function startTour() {
-    navigate("/");
-    window.setTimeout(() => openOnboardingAt(0), 150);
-  }
 
   const GUIDES = useMemo(() => guides(aiEnabled, aiOffByUser), [aiEnabled, aiOffByUser]);
   const FAQ = useMemo(() => faq(aiEnabled), [aiEnabled]);
@@ -570,7 +591,7 @@ export default function HelpSupport() {
               Take a quick tour of clipping, organizing, and working with your research.
             </p>
           </div>
-          <button type="button" onClick={startTour} className="btn-secondary shrink-0">
+          <button type="button" onClick={() => openOnboardingAt(0)} className="btn-secondary shrink-0">
             <Play className="size-4" /> Show the introduction
           </button>
         </section>
