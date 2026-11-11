@@ -3,6 +3,7 @@ import { ArrowLeft, Download, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api, download } from "../services/api";
 import { useCollections } from "../context/CollectionContext";
+import Toast, { type Notice } from "../components/shared/Toast";
 
 // just a small spinning circle with a label, instead of the full owl loading screen
 function ColumnsLoader() {
@@ -34,7 +35,7 @@ export default function LiteratureMatrix() {
   const [savingColumns, setSavingColumns] = useState(false);
   const [savingCell, setSavingCell] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<Notice | null>(null);
   const requestKey = collectionId ? `${collectionId}:${page}` : "";
   const loading = !!requestKey && loadedKey !== requestKey;
 
@@ -94,7 +95,7 @@ export default function LiteratureMatrix() {
   async function saveColumns() {
     setSavingColumns(true);
     setError("");
-    setNotice("");
+    setNotice(null);
     try {
       const response = await api<{ columns: Column[] }>(`/collections/${activeCollection.id}/matrix`, {
         method: "PUT",
@@ -102,7 +103,7 @@ export default function LiteratureMatrix() {
       });
       setColumns(response.columns);
       setColumnsDirty(false);
-      setNotice("Matrix columns saved.");
+      setNotice({ text: "Matrix columns saved.", error: false });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Couldn't save the matrix columns");
     } finally {
@@ -216,7 +217,6 @@ export default function LiteratureMatrix() {
             >
               <Save className="size-4" />
             </button>
-            {notice && <span role="status" className="text-xs text-emerald-700">{notice}</span>}
           </div>
         </section>
       )}
@@ -286,6 +286,8 @@ export default function LiteratureMatrix() {
           </div>
         )}
       </section>
+
+      <Toast notice={notice} onClose={() => setNotice(null)} />
     </div>
   );
 }
