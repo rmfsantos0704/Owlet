@@ -30,28 +30,34 @@ import ExtensionPage from "./pages/ExtensionPage";
 import { DialogProvider } from "./context/DialogContext";
 import PdfReader from "./pages/PdfReader";
 import FeaturesPage from "./pages/FeaturesPage";
+import ClipLink from "./pages/ClipLink";
 
-// A join link opened while logged out: remember it, send the person to log in, then bring them back.
-// Only join links are remembered, so this can't be used as an open redirect.
+// A join link or a "save this link" address opened while logged out: remember it, send the person to log in,
+// then bring them back. Only these two kinds of address are remembered, and they are paths inside Owlet,
+// so this can't be used as an open redirect.
 const RETURN_KEY = "owlet.returnTo";
 const JOIN_PATH = /^\/join\/[A-Za-z0-9_-]{43}$/;
+const isClipPath = (path: string) => path.startsWith("/clip?") && path.length < 3200;
 
 function peekReturnTo(): string {
   try {
     const raw = localStorage.getItem(RETURN_KEY);
     if (!raw) return "/";
     const { path, at } = JSON.parse(raw);
-    return typeof path === "string" && JOIN_PATH.test(path) && Date.now() - at < 30 * 60 * 1000 ? path : "/";
+    return typeof path === "string" && (JOIN_PATH.test(path) || isClipPath(path)) && Date.now() - at < 30 * 60 * 1000
+      ? path
+      : "/";
   } catch {
     return "/";
   }
 }
 
 function ToLogin() {
-  const { pathname } = useLocation();
-  if (JOIN_PATH.test(pathname)) {
+  const { pathname, search } = useLocation();
+  const target = pathname === "/clip" ? pathname + search : pathname;
+  if (JOIN_PATH.test(pathname) || (pathname === "/clip" && isClipPath(target))) {
     try {
-      localStorage.setItem(RETURN_KEY, JSON.stringify({ path: pathname, at: Date.now() }));
+      localStorage.setItem(RETURN_KEY, JSON.stringify({ path: target, at: Date.now() }));
     } catch {
       /* private mode: the person just lands on the library after login */
     }
@@ -95,6 +101,8 @@ export default function App() {
             <Route path="/search" element={<ConceptSearch />} />
             <Route path="/help" element={<HelpSupport />} />
             <Route path="/item/:id" element={<ItemDetail />} />
+            {/* save a page from its address: opened from a share link, a bookmarklet or a phone shortcut */}
+            <Route path="/clip" element={<ClipLink />} />
 
             {/* the matrix, the evidence board and the briefs each belong to one collection, so they live under it */}
             <Route path="/Collection/:id/settings" element={<CollectionSettings />} />

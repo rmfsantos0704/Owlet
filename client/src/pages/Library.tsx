@@ -15,6 +15,7 @@ import LoadingScreen from "../components/shared/LoadingScreen";
 import Toast, { type Notice } from "../components/shared/Toast";
 import { useAuth } from "../context/AuthContext";
 import RecentActivity from "../components/library/RecentActivity";
+import LinkClipper from "../components/library/LinkClipper";
 import type { LayoutContext } from "../components/Layout";
 
 const MAX_FILES = 10;
@@ -438,6 +439,24 @@ export default function Library({ all = false }: { all?: boolean }) {
           </>,
           headerActions
         )}
+
+      {!filtering && current && canImport && (
+        <section className="card mb-6 p-4">
+          <h2 className="text-sm font-semibold text-ink">Save a link</h2>
+          <p className="mt-1 text-xs text-slate-400">
+            Paste a web page's address and Owlet saves its text and citations. Handy on a phone.
+          </p>
+          <div className="mt-3">
+            <LinkClipper
+              collectionId={current.id}
+              onSaved={(r) => {
+                setNotice({ text: `Saved “${r.title}”.${r.aiFailed ? " The AI summary didn't finish." : ""}`, error: false });
+                setReloadKey((k) => k + 1);
+              }}
+            />
+          </div>
+        </section>
+      )}
 
       {!filtering && items.length > 0 && (
         <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
