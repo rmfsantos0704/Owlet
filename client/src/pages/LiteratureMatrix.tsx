@@ -153,19 +153,23 @@ export default function LiteratureMatrix() {
             <h2 className="font-semibold text-ink">Matrix columns</h2>
             <p className="mt-1 text-xs text-slate-400">Add or rename up to 12 columns. Removing a column clears its values across this collection.</p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto pr-1">
             {columns.map((column, index) => (
-              <div key={column.id} className="flex items-center gap-2">
+              <div
+                key={column.id}
+                className="flex items-center rounded-full border border-slate-200 bg-slate-50 pl-3 pr-1 focus-within:border-brand focus-within:bg-white"
+              >
                 <input
                   aria-label={`Column ${index + 1} name`}
                   value={column.name}
                   maxLength={50}
+                  size={Math.min(Math.max(column.name.length, 6), 24)}
                   onChange={(event) => {
                     const name = event.target.value;
                     setColumnsDirty(true);
                     setColumns((previous) => previous.map((entry) => entry.id === column.id ? { ...entry, name } : entry));
                   }}
-                  className="field"
+                  className="bg-transparent py-1 text-xs font-medium text-slate-700 outline-none"
                 />
                 <button
                   type="button"
@@ -175,9 +179,9 @@ export default function LiteratureMatrix() {
                     setColumnsDirty(true);
                     setColumns((previous) => previous.filter((entry) => entry.id !== column.id));
                   }}
-                  className="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                  className="rounded-full p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
                 >
-                  <Trash2 className="size-4" />
+                  <Trash2 className="size-3.5" />
                 </button>
               </div>
             ))}
