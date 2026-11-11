@@ -1,4 +1,7 @@
-export const HIGHLIGHT_COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green"] as const;
+export const HIGHLIGHT_COLORS = [
+  "yellow", "orange", "red", "pink", "purple", "blue", "teal", "green",
+  "lime", "cyan", "indigo", "fuchsia", "gray",
+] as const;
 export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number];
 
 type Style = {
@@ -77,6 +80,46 @@ export const COLOR_STYLES: Record<HighlightColor, Style> = {
     card: "border-green-300 bg-green-50 dark:border-green-500/50 dark:bg-green-500/15",
     bar: "border-l-emerald-500 bg-emerald-50/45 dark:bg-emerald-500/15",
     quote: "border-green-400 bg-green-50 dark:border-green-500/60 dark:bg-green-500/15",
+  },
+  lime: {
+    label: "Lime",
+    dot: "bg-lime-300 dark:bg-lime-400",
+    mark: "bg-lime-200 dark:bg-lime-500/40",
+    card: "border-lime-300 bg-lime-50 dark:border-lime-500/50 dark:bg-lime-500/15",
+    bar: "border-l-lime-500 bg-lime-50/45 dark:bg-lime-500/15",
+    quote: "border-lime-400 bg-lime-50 dark:border-lime-500/60 dark:bg-lime-500/15",
+  },
+  cyan: {
+    label: "Cyan",
+    dot: "bg-cyan-300 dark:bg-cyan-400",
+    mark: "bg-cyan-200 dark:bg-cyan-500/40",
+    card: "border-cyan-300 bg-cyan-50 dark:border-cyan-500/50 dark:bg-cyan-500/15",
+    bar: "border-l-cyan-500 bg-cyan-50/45 dark:bg-cyan-500/15",
+    quote: "border-cyan-400 bg-cyan-50 dark:border-cyan-500/60 dark:bg-cyan-500/15",
+  },
+  indigo: {
+    label: "Indigo",
+    dot: "bg-indigo-300 dark:bg-indigo-400",
+    mark: "bg-indigo-200 dark:bg-indigo-500/40",
+    card: "border-indigo-300 bg-indigo-50 dark:border-indigo-500/50 dark:bg-indigo-500/15",
+    bar: "border-l-indigo-500 bg-indigo-50/45 dark:bg-indigo-500/15",
+    quote: "border-indigo-400 bg-indigo-50 dark:border-indigo-500/60 dark:bg-indigo-500/15",
+  },
+  fuchsia: {
+    label: "Fuchsia",
+    dot: "bg-fuchsia-300 dark:bg-fuchsia-400",
+    mark: "bg-fuchsia-200 dark:bg-fuchsia-500/40",
+    card: "border-fuchsia-300 bg-fuchsia-50 dark:border-fuchsia-500/50 dark:bg-fuchsia-500/15",
+    bar: "border-l-fuchsia-500 bg-fuchsia-50/45 dark:bg-fuchsia-500/15",
+    quote: "border-fuchsia-400 bg-fuchsia-50 dark:border-fuchsia-500/60 dark:bg-fuchsia-500/15",
+  },
+  gray: {
+    label: "Gray",
+    dot: "bg-slate-300 dark:bg-slate-400",
+    mark: "bg-slate-200 dark:bg-slate-500/40",
+    card: "border-slate-300 bg-slate-50 dark:border-slate-500/50 dark:bg-slate-500/15",
+    bar: "border-l-slate-400 bg-slate-50/45 dark:bg-slate-500/15",
+    quote: "border-slate-400 bg-slate-50 dark:border-slate-500/60 dark:bg-slate-500/15",
   },
 };
 
