@@ -15,7 +15,7 @@ import LoadingScreen from "../components/shared/LoadingScreen";
 import Toast, { type Notice } from "../components/shared/Toast";
 import { useAuth } from "../context/AuthContext";
 import RecentActivity from "../components/library/RecentActivity";
-import LinkClipper from "../components/library/LinkClipper";
+import LinkClipButton from "../components/library/LinkClipButton";
 import type { LayoutContext } from "../components/Layout";
 
 const MAX_FILES = 10;
@@ -334,7 +334,7 @@ export default function Library({ all = false }: { all?: boolean }) {
             {filtering
               ? "Try another search or filter."
               : canImport
-                ? "Clip a page with the Owlet extension, or drop PDFs anywhere on this page."
+                ? "Clip a page with the Owlet extension, save a link, or drop PDFs anywhere on this page."
                 : "Clip a page with the Owlet extension."}
           </div>
         </div>
@@ -387,17 +387,26 @@ export default function Library({ all = false }: { all?: boolean }) {
         createPortal(
           <>
             {canImport && (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={!!importing}
-                title="Import PDF"
-                aria-label="Import PDF"
-                className="btn-primary !px-3 !py-2"
-              >
-                <Upload className="size-4" />
-                <span className={importing ? "" : "hidden 2xl:inline"}>{importing || "Import PDF"}</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={!!importing}
+                  title="Import PDF"
+                  aria-label="Import PDF"
+                  className="btn-primary !px-3 !py-2"
+                >
+                  <Upload className="size-4" />
+                  <span className={importing ? "" : "hidden 2xl:inline"}>{importing || "Import PDF"}</span>
+                </button>
+                <LinkClipButton
+                  collectionId={current.id}
+                  onSaved={(r) => {
+                    setNotice({ text: `Saved “${r.title}”.${r.aiFailed ? " The AI summary didn't finish." : ""}`, error: false });
+                    setReloadKey((k) => k + 1);
+                  }}
+                />
+              </>
             )}
             <Link
               to={`/Collection/${current.id}/matrix`}
@@ -439,24 +448,6 @@ export default function Library({ all = false }: { all?: boolean }) {
           </>,
           headerActions
         )}
-
-      {!filtering && current && canImport && (
-        <section className="card mb-6 p-4">
-          <h2 className="text-sm font-semibold text-ink">Save a link</h2>
-          <p className="mt-1 text-xs text-slate-400">
-            Paste a web page's address and Owlet saves its text and citations. Handy on a phone.
-          </p>
-          <div className="mt-3">
-            <LinkClipper
-              collectionId={current.id}
-              onSaved={(r) => {
-                setNotice({ text: `Saved “${r.title}”.${r.aiFailed ? " The AI summary didn't finish." : ""}`, error: false });
-                setReloadKey((k) => k + 1);
-              }}
-            />
-          </div>
-        </section>
-      )}
 
       {!filtering && items.length > 0 && (
         <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
