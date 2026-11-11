@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Owlet: Web Clipper, Research Highlighter & Citation Generator",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "minimum_chrome_version": "111",
   "description": "Clip web pages, highlight, and cite sources in APA, MLA & Chicago. Organize research, add notes, and share PDF briefs.",
   "icons": {

@@ -27,6 +27,7 @@ const LENGTHS: Record<string, string> = { short: "Short", medium: "Medium", deta
 const OFFLINE = "Can't reach Owlet. Is the server running?";
 const THEME_KEY = "popupTheme";
 const TOUR_KEY = "extensionOnboardingSeen";
+const COLOR_KEY = "highlightColor";
 const TOUR_STEPS = [
   {
     target: "tourCollection",
@@ -41,7 +42,7 @@ const TOUR_STEPS = [
   {
     target: "tourClipActions",
     title: "Clip and revisit highlights",
-    description: "Clip this page to your selected Collection. Select text on a page and use the context menu or Alt+Shift+S to save a passage; Show my highlights displays saved passages on the current page.",
+    description: "Pick a highlight color, then clip this page to your selected Collection. Select text on a page and use the context menu or Alt+Shift+S to save a passage in that color (the right-click menu also lets you pick a color for a single highlight); Show my highlights displays saved passages on the current page.",
   },
   {
     target: "settings",
@@ -180,6 +181,34 @@ function flashClipDone() {
     btn.classList.remove("done");
     if (!clipping) $("clipLabel").textContent = "Clip this page";
   }, 2200);
+}
+
+// ---------- highlight color picker ----------
+
+// The chosen color is kept in chrome.storage.local and read by the service worker
+// when Alt+Shift+S saves a selection.
+async function renderColorPicker() {
+  const { [COLOR_KEY]: stored } = await chrome.storage.local.get(COLOR_KEY);
+  const current =
+    typeof stored === "string" && Object.keys(HIGHLIGHT_COLORS).includes(stored) ? stored : "yellow";
+  const group = $("colorPicker");
+  group.replaceChildren();
+  for (const [name, hex] of Object.entries(HIGHLIGHT_COLORS)) {
+    const label = name[0].toUpperCase() + name.slice(1);
+    const swatch = document.createElement("button");
+    swatch.type = "button";
+    swatch.className = "color-swatch";
+    swatch.style.backgroundColor = hex;
+    swatch.title = label;
+    swatch.setAttribute("role", "radio");
+    swatch.setAttribute("aria-label", label);
+    swatch.setAttribute("aria-checked", String(name === current));
+    swatch.addEventListener("click", async () => {
+      await chrome.storage.local.set({ [COLOR_KEY]: name });
+      void renderColorPicker();
+    });
+    group.append(swatch);
+  }
 }
 
 // ---------- AI summary settings (per clip) ----------
@@ -541,7 +570,7 @@ async function render() {
   await applyTheme(loggedIn);
   if (!loggedIn) return;
   status("");
-  await Promise.all([loadPage(), loadCollections(), loadAi(), loadFeatures()]);
+  await Promise.all([loadPage(), loadCollections(), loadAi(), loadFeatures(), renderColorPicker()]);
   await showTourForFirstUse();
 }
 

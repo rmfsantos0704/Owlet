@@ -179,6 +179,15 @@
     .meta-row > div { min-width: 0; }
     .meta-row label { margin-bottom: 4px; }
 
+    /* highlight color picker: one row, swatches shrink to fit */
+    .color-picker { display: flex; flex-wrap: nowrap; gap: 4px; }
+    .color-swatch {
+      flex: 1 1 0; min-width: 0; max-width: 24px; aspect-ratio: 1 / 1;
+      padding: 0; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
+    }
+    .color-swatch:focus-visible { outline: 2px solid var(--outline); outline-offset: 2px; }
+    .color-swatch[aria-checked="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 2px var(--surface); }
+
     /* buttons */
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -381,6 +390,8 @@
       </div>
 
       <div id="tourClipActions" class="stack">
+        <div id="colorPicker" class="color-picker" role="radiogroup" aria-label="Highlight color"></div>
+
         <button id="clipBtn" class="btn btn-primary btn-lg" type="button" disabled>
           <span id="clipSpinner" class="spinner" hidden></span>
           <svg id="clipIcon" class="i" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>

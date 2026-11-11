@@ -2,6 +2,15 @@ import { api, clearToken, DASHBOARD_URL, getToken, wake } from "./api";
 import { HIGHLIGHT_COLORS } from "./highlightColors";
 import { normalizePageUrl } from "./pageUrl";
 
+type ColorName = keyof typeof HIGHLIGHT_COLORS;
+
+async function selectedHighlightColor(): Promise<ColorName> {
+  const { highlightColor } = await chrome.storage.local.get("highlightColor");
+  return typeof highlightColor === "string" && Object.keys(HIGHLIGHT_COLORS).includes(highlightColor)
+    ? (highlightColor as ColorName)
+    : "yellow";
+}
+
 type LookupResult = { id: string | null; collectionId: string | null };
 type SavedPage = {
   url: string;
@@ -62,14 +71,15 @@ async function injectFeedback(
   frameId: number,
   message: string,
   success: boolean,
-  itemId?: string
+  itemId?: string,
+  color: ColorName = "yellow"
 ): Promise<boolean> {
   if (tabId === undefined) return false;
   try {
     const [result] = await chrome.scripting.executeScript({
       target: { tabId, frameIds: [frameId] },
       func: showSelectionFeedback,
-      args: [message, success, itemId ?? "", DASHBOARD_URL, HIGHLIGHT_COLORS.yellow],
+      args: [message, success, itemId ?? "", DASHBOARD_URL, color, HIGHLIGHT_COLORS[color]],
     });
     return result?.result === true;
   } catch (error) {
@@ -97,14 +107,19 @@ async function report(
   frameId: number,
   message: string,
   success: boolean,
-  itemId?: string
+  itemId?: string,
+  color: ColorName = "yellow"
 ) {
-  if (!(await injectFeedback(tabId, frameId, message, success, itemId))) {
+  if (!(await injectFeedback(tabId, frameId, message, success, itemId, color))) {
     await showBadgeFallback(success);
   }
 }
 
-export async function saveSelection(info?: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab): Promise<void> {
+export async function saveSelection(
+  info?: chrome.contextMenus.OnClickData,
+  tab?: chrome.tabs.Tab,
+  colorOverride?: ColorName
+): Promise<void> {
   const tabId = tab?.id;
   const frameId = info?.frameId ?? 0;
   const tabUrl = tab?.url ?? "";
@@ -192,12 +207,13 @@ export async function saveSelection(info?: chrome.contextMenus.OnClickData, tab?
       }
 
       if (!itemId) throw new SaveError("Couldn't find the Owlet clip for this page.");
+      const color = colorOverride ?? (await selectedHighlightColor());
       const saved = await api(`/research/${encodeURIComponent(itemId)}/highlights`, {
         method: "POST",
-        body: { text, color: "yellow" },
+        body: { text, color },
       });
       if (!saved.ok) throw new SaveError(messageForStatus(saved.status), saved.status);
-      await report(tabId, frameId, "Saved to Owlet", true, itemId);
+      await report(tabId, frameId, "Saved to Owlet", true, itemId, color);
     } catch (error) {
       if (error instanceof SaveError) {
         if (error.status === 401) await clearToken();
@@ -213,12 +229,15 @@ export async function saveSelection(info?: chrome.contextMenus.OnClickData, tab?
   });
 }
 
+// Runs inside the page via chrome.scripting.executeScript: it must be self-contained.
+// Do not reference imports or module-level variables in here.
 export function showSelectionFeedback(
   message: string,
   success: boolean,
   itemId: string,
   dashboardUrl: string,
-  yellowColor: string
+  colorName: string,
+  colorHex: string
 ): boolean {
   if (success) {
     const pageWindow = window as Window & {
@@ -232,21 +251,22 @@ export function showSelectionFeedback(
     }
     if (ranges.length && pageWindow.CSS?.highlights && pageWindow.Highlight) {
       try {
+        const name = `owlet-${colorName}`;
         const registry = pageWindow.CSS.highlights;
-        const previous = registry.get("owlet-yellow");
+        const previous = registry.get(name);
         const combined = [...(previous ?? []), ...ranges];
-        registry.set("owlet-yellow", new pageWindow.Highlight(...combined));
+        registry.set(name, new pageWindow.Highlight(...combined));
 
         const hasStyle = document.adoptedStyleSheets.some((sheet) => {
           try {
-            return Array.from(sheet.cssRules).some((rule) => rule.cssText.includes("::highlight(owlet-yellow)"));
+            return Array.from(sheet.cssRules).some((rule) => rule.cssText.includes(`::highlight(${name})`));
           } catch {
             return false;
           }
         });
         if (!hasStyle) {
           const sheet = new CSSStyleSheet();
-          sheet.replaceSync(`::highlight(owlet-yellow) { background-color: ${yellowColor}; }`);
+          sheet.replaceSync(`::highlight(${name}) { background-color: ${colorHex}; }`);
           document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
         }
       } catch {

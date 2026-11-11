@@ -7,4 +7,9 @@ export const HIGHLIGHT_COLORS = {
   blue: "#bfdbfe",
   teal: "#99f6e4",
   green: "#bbf7d0",
+  lime: "#d9f99d",
+  cyan: "#a5f3fc",
+  indigo: "#c7d2fe",
+  fuchsia: "#f5d0fe",
+  gray: "#e2e8f0",
 } as const;
