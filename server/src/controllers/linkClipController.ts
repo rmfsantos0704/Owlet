@@ -34,7 +34,7 @@ export async function clipFromUrl(req: Request, res: Response) {
     throw error;
   }
 
-const extracted = await extractPage(page.html);
+  const extracted = extractPage(page.html);
   if (!extracted) {
     return res.status(422).json({
       error: "Owlet couldn't find readable text on that page. Some pages need a login, or only show their text in a browser.",

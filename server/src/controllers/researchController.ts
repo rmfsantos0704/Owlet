@@ -21,7 +21,11 @@ import { AiQuotaExceededError, aiAvailableForUser, aiOptedOut } from "../service
 import { MAX_IMPORT_BYTES, deleteBlob, signedFileUrl } from "../middlewares/blobImport.js";
 
 const MAX_TITLE = 100;
-const HIGHLIGHT_COLORS = ["yellow", "orange", "red", "pink", "purple", "blue", "teal", "green"] as const;
+// feeds both highlightSchema and highlightUpdateSchema; keep in sync with the extension's highlightColors.ts and the web app's utils/colors.ts
+const HIGHLIGHT_COLORS = [
+  "yellow", "orange", "red", "pink", "purple", "blue", "teal", "green",
+  "lime", "cyan", "indigo", "fuchsia", "gray",
+] as const;
 
 // MongoDB error code for a unique index violation (two quick clicks can both pass the "already clipped" check)
 const isDuplicateKey = (e: unknown) => (e as { code?: number })?.code === 11000;
