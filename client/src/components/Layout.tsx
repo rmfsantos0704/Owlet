@@ -553,11 +553,12 @@ export default function Layout() {
           </div>
 
           {/* the open page puts its own buttons here (Import PDF, Literature matrix, ...).
-              On phones they get their own row that scrolls sideways, so no icon is ever cut off. */}
+              On phones they get their own row that scrolls sideways, so no icon is ever cut off.
+              The top padding on phones leaves room for badges that overhang a button (e.g. Recent activity). */}
           <div
             ref={setHeaderActions}
             id="owlet-tour-collection-tools"
-            className="order-last flex basis-full items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 empty:hidden sm:order-none sm:ml-auto sm:basis-auto sm:overflow-visible sm:pb-0"
+            className="order-last flex basis-full items-center gap-1.5 overflow-x-auto pt-2 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 empty:hidden sm:order-none sm:ml-auto sm:basis-auto sm:overflow-visible sm:pt-0 sm:pb-0"
           />
 
           <div className={`ml-auto shrink-0 items-center gap-1.5 sm:ml-0 sm:flex sm:gap-2.5 ${searchOpen ? "hidden" : "flex"}`}>
