@@ -1,5 +1,6 @@
 import { saveSelection } from "./saveSelection";
 import { HIGHLIGHT_COLORS } from "./highlightColors";
+import { wake } from "./api";
 
 const MENU_ID = "owlet-save-selection";
 const COLOR_PREFIX = `${MENU_ID}:`;
@@ -43,6 +44,7 @@ function createColorItems() {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
+  wake();
   chrome.contextMenus.removeAll(() => {
     if (chrome.runtime.lastError) {
       console.error("Could not clear the Owlet selection menu:", chrome.runtime.lastError.message);
@@ -63,6 +65,11 @@ chrome.runtime.onInstalled.addListener(() => {
       }
     );
   });
+});
+
+// Browser just started: wake the free-tier server before the first highlight.
+chrome.runtime.onStartup.addListener(() => {
+  wake();
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {

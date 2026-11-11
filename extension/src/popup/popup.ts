@@ -1,6 +1,7 @@
 import { api, getToken, setToken, clearToken, DASHBOARD_URL, wake } from "../api";
 import { HIGHLIGHT_COLORS } from "../highlightColors";
 import { normalizePageUrl } from "../pageUrl";
+import { paintSavedHighlights } from "../highlightPaint";
 
 type Collection = {
   id: string;
@@ -723,117 +724,6 @@ $<HTMLButtonElement>("showHighlightsBtn").addEventListener("click", async () => 
     button.disabled = !clippable || !selected();
   }
 });
-
-function paintSavedHighlights(
-  highlights: { text: string; color: string }[],
-  palette: Record<string, string>
-): string {
-  const pageWindow = window as Window & {
-    Highlight?: new (...ranges: Range[]) => object;
-    CSS?: {
-      highlights?: {
-        delete(name: string): void;
-        set(name: string, value: object): void;
-      };
-    };
-  };
-  const registry = pageWindow.CSS?.highlights;
-  const HighlightConstructor = pageWindow.Highlight;
-  if (!registry || !HighlightConstructor) return `Showing 0 of ${highlights.length} highlights`;
-
-  const colors = Object.keys(palette);
-  for (const color of colors) registry.delete(`owlet-${color}`);
-
-  const root = document.body ?? document.documentElement;
-  if (!root) return `Showing 0 of ${highlights.length} highlights`;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const parent = node.parentElement;
-      return parent && !["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA"].includes(parent.tagName)
-        ? NodeFilter.FILTER_ACCEPT
-        : NodeFilter.FILTER_REJECT;
-    },
-  });
-  const nodes: Text[] = [];
-  let node: Node | null;
-  while ((node = walker.nextNode())) nodes.push(node as Text);
-
-  const offsets: { node: Text; offset: number }[] = [];
-  let text = "";
-  for (const textNode of nodes) {
-    for (let offset = 0; offset < textNode.length; offset += 1) {
-      const character = textNode.data[offset];
-      if (/\s/.test(character)) {
-        if (text && !text.endsWith(" ")) {
-          text += " ";
-          offsets.push({ node: textNode, offset });
-        }
-      } else {
-        text += character;
-        offsets.push({ node: textNode, offset });
-      }
-    }
-  }
-  if (text.endsWith(" ")) {
-    text = text.slice(0, -1);
-    offsets.pop();
-  }
-
-  const rangesByColor = new Map<string, Range[]>();
-  const usedRanges: { start: number; end: number }[] = [];
-  for (const highlight of highlights) {
-    const needle = highlight.text.replace(/\s+/g, " ").trim();
-    const color = colors.includes(highlight.color) ? highlight.color : "yellow";
-    if (!needle) continue;
-    let start = text.indexOf(needle);
-    while (
-      start >= 0 &&
-      usedRanges.some((range) => start < range.end && start + needle.length > range.start)
-    ) {
-      start = text.indexOf(needle, start + 1);
-    }
-    if (start < 0) continue;
-    const end = start + needle.length - 1;
-    const first = offsets[start];
-    const last = offsets[end];
-    if (!first || !last) continue;
-    const range = document.createRange();
-    range.setStart(first.node, first.offset);
-    range.setEnd(last.node, last.offset + 1);
-    usedRanges.push({ start, end: start + needle.length });
-    const ranges = rangesByColor.get(color) ?? [];
-    ranges.push(range);
-    rangesByColor.set(color, ranges);
-  }
-
-  for (const [color, ranges] of rangesByColor) {
-    registry.set(`owlet-${color}`, new HighlightConstructor(...ranges));
-  }
-
-  const styledColors = new Set<string>();
-  for (const sheet of document.adoptedStyleSheets) {
-    try {
-      for (const rule of Array.from(sheet.cssRules)) {
-        for (const color of colors) {
-          if (rule.cssText.includes(`::highlight(owlet-${color})`)) styledColors.add(color);
-        }
-      }
-    } catch {
-      continue;
-    }
-  }
-  const missingStyles = colors.filter((color) => !styledColors.has(color));
-  if (missingStyles.length) {
-    const sheet = new CSSStyleSheet();
-    sheet.replaceSync(
-      missingStyles.map((color) => `::highlight(owlet-${color}) { background-color: ${palette[color]}; }`).join("\n")
-    );
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
-  }
-
-  const count = Array.from(rangesByColor.values()).reduce((total, ranges) => total + ranges.length, 0);
-  return `Showing ${count} of ${highlights.length} highlights`;
-}
 
 $("clipBtn").addEventListener("click", async () => {
   if (clipping || !clippable) return;
