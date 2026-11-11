@@ -8,6 +8,7 @@ import {
   ask, listSessions, removeSession, renameSession,
   testAi, setAiSettings,
 } from "../controllers/researchController.js";
+import { clipFromUrl } from "../controllers/linkClipController.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { requireAi } from "../middlewares/requireAi.js";
 import { fetchImportBlob, startImportUpload } from "../middlewares/blobImport.js";
@@ -15,13 +16,14 @@ import {
   aiDailyLimiter, aiMinuteLimiter, clipDailyLimiter, importDailyLimiter, writeLimiter,
 } from "../middlewares/rateLimits.js";
 import { trackActivity } from "../middlewares/trackActivity.js";
-import { suggestDetails } from "../controllers/citationController.js";
 
 const router = Router();
 router.use(requireAuth); // the per-account limiters below rely on this having run first
 
 // per-minute IP limits for clip/import are in app.ts; these add a daily cap per account
 router.post("/clip", clipDailyLimiter, trackActivity("clip_added"), clip);
+// a page saved from its address alone (phones, shared links): the server downloads and reads it
+router.post("/clip-url", clipDailyLimiter, trackActivity("clip_added"), clipFromUrl);
 // PDFs go browser -> Vercel Blob (the daily cap counts at the token step), then /import reads them from there
 router.post("/import/token", importDailyLimiter, startImportUpload);
 router.post("/import", fetchImportBlob, trackActivity("pdf_imported"), importPdf);
@@ -41,7 +43,6 @@ router.get("/:id/pdf", pdf);
 router.post("/:id/regenerate", requireAi, aiMinuteLimiter, aiDailyLimiter, regenerate);
 router.post("/:id/test-ai", requireAi, aiMinuteLimiter, aiDailyLimiter, testAi);
 router.patch("/:id/source", writeLimiter, updateSource);
-router.post("/:id/source/suggest", writeLimiter, suggestDetails);
 router.patch("/:id/workflow", writeLimiter, updateWorkflow);
 router.patch("/:id/matrix", writeLimiter, updateMatrixValue);
 router.post("/:id/highlights", writeLimiter, trackActivity("highlight_added"), addHighlight);

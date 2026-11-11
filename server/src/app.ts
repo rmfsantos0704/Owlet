@@ -85,6 +85,7 @@ app.use("/api/account", limiter(minutes(15), 100));
 app.use(["/api/account/password", "/api/account/email", "/api/account/delete"], limiter(minutes(15), 10));
 app.use("/api/account/export", limiter(minutes(60), 5));
 app.use("/api/research/clip", limiter(minutes(1), 10));
+app.use("/api/research/clip-url", limiter(minutes(1), 10)); // downloads a page, so it is capped like a clip
 app.use("/api/research/import", limiter(minutes(1), 6));
 
 app.use("/api/auth", authRoutes);
