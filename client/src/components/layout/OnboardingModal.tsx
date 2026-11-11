@@ -116,6 +116,7 @@ export default function OnboardingModal({ open, onClose, initialStep = 0, onSide
         description: "When you open a Collection, its own tools appear in the top bar. Each one belongs to that Collection only, so every Collection has its own matrix, evidence board, and briefs.",
         items: [
           ["Import PDF", "Add PDFs to this Collection. You can also drop files anywhere on the page."],
+          ["Save link", "Paste a web page's address and Owlet saves its text and citations. If a page can't be opened automatically, you can paste its text instead. Handy on a phone."],
           ["Literature matrix", "Compare your sources in a table with columns you choose, and export it as CSV."],
           ["Research briefs", "Write structured briefs from your sources. Every claim links back to the passage it came from."],
           ["Evidence board", "Sort highlights and notes under what they support, challenge, or leave open for your research questions."],

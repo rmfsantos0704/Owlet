@@ -70,7 +70,7 @@ export default function Layout() {
   const { collections = [], current, select, create, pinned, archived } = useCollections();
   const navigate = useNavigate();
   const dialog = useDialog();
-  const { pathname } = useLocation();
+  const { pathname, search: locationSearch } = useLocation();
   const [params] = useSearchParams();
   const [open, setOpen] = useState(false); // mobile drawer
   const [adding, setAdding] = useState(false);
@@ -85,6 +85,29 @@ export default function Layout() {
     () => Boolean(onboardingKey && readStore(onboardingKey) !== "1")
   );
   const [onboardingStep, setOnboardingStep] = useState(0);
+
+  // The tour points at the home page's top-bar tools, so opening it goes to "/" and closing it goes back
+  // to the page the person was on. The latest location is kept in refs so the effect below only runs
+  // when the tour opens or closes.
+  const pathRef = useRef(pathname);
+  const hereRef = useRef(pathname + locationSearch);
+  pathRef.current = pathname;
+  hereRef.current = pathname + locationSearch;
+  const returnTo = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (onboardingOpen) {
+      if (returnTo.current === null && pathRef.current !== "/") {
+        returnTo.current = hereRef.current;
+        navigate("/");
+      }
+    } else if (returnTo.current !== null) {
+      const back = returnTo.current;
+      returnTo.current = null;
+      // if they went somewhere else on purpose during the tour, leave them there
+      if (pathRef.current === "/") navigate(back);
+    }
+  }, [onboardingOpen, navigate]);
 
   function closeOnboarding() {
     if (onboardingKey) {
