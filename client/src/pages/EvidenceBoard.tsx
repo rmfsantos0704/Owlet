@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { api } from "../services/api";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
@@ -9,6 +9,7 @@ import EvidenceCard from "../components/evidenceboard/EvidenceCard";
 import AddEvidenceModal from "../components/evidenceboard/AddEvidenceModal";
 import { COLUMNS } from "../components/evidenceboard/Columns";
 import LoadingScreen from "../components/shared/LoadingScreen";
+import CollectionTools from "../components/library/CollectionTools";
 import type { BoardResponse, Stance } from "../types";
 
 // Research questions on top, then the evidence board: cards arranged under what they support, challenge, and more.
@@ -104,15 +105,9 @@ export default function EvidenceBoard() {
 
   return (
     <div className="space-y-6">
+      <CollectionTools collection={current} canExport={canEdit} />
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link
-            to="/"
-            className="btn-secondary mb-4 inline-flex items-center gap-2"
-          >
-            <ArrowLeft className="size-4" />
-            Back to {current.name}
-          </Link>
           <div className="eyebrow mb-2 text-blue-600">Research</div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Evidence board</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-500">

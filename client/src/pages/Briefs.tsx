@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, Clock3, FileText, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Clock3, FileText, Plus, Trash2 } from "lucide-react";
 import { api } from "../services/api";
 import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
 import NewBriefModal from "../components/briefs/NewBriefModal";
 import LoadingScreen from "../components/shared/LoadingScreen";
+import CollectionTools from "../components/library/CollectionTools";
 import { templateLabel } from "../components/briefs/Templates";
 import { timeAgo } from "../utils/time";
 import type { BriefSummary } from "../types";
@@ -84,12 +85,9 @@ export default function Briefs() {
 
   return (
     <div className="space-y-6">
+      <CollectionTools collection={current} canExport={canEdit} />
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link to="/" className="btn-secondary mb-4 inline-flex items-center gap-2">
-            <ArrowLeft className="size-4" />
-            Back to {current.name}
-          </Link>
           <div className="eyebrow mb-2 text-blue-600">Research</div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Research briefs</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-500">

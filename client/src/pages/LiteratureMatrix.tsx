@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowLeft, Download, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Download, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api, download } from "../services/api";
 import { useCollections } from "../context/CollectionContext";
 import Toast, { type Notice } from "../components/shared/Toast";
+import CollectionTools from "../components/library/CollectionTools";
 
 // just a small spinning circle with a label, instead of the full owl loading screen
 function ColumnsLoader() {
@@ -130,12 +131,9 @@ export default function LiteratureMatrix() {
 
   return (
     <div className="space-y-6">
+      <CollectionTools collection={activeCollection} canExport={canEdit} />
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link to="/" className="btn-secondary mb-4 inline-flex items-center gap-2">
-            <ArrowLeft className="size-4" />
-            Back to {activeCollection.name}
-          </Link>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Literature matrix</h1>
           <p className="mt-1 text-sm text-slate-500">Organize clips from {activeCollection.name} by research question, method, sample, findings, or your own columns.</p>
         </div>
