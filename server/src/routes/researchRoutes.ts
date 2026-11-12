@@ -6,7 +6,7 @@ import {
   setTags, updateSource, regenerate, pdf, exportItems, setAiOutput,
   updateWorkflow, updateMatrixValue, related,
   ask, listSessions, removeSession, renameSession,
-  testAi, setAiSettings,
+  testAi, setAiSettings, explainSelection,
 } from "../controllers/researchController.js";
 import { clipFromUrl } from "../controllers/linkClipController.js";
 import { requireAuth } from "../middlewares/auth.js";
@@ -41,6 +41,8 @@ router.delete("/:id", writeLimiter, remove);
 router.get("/:id/pdf", pdf);
 
 router.post("/:id/regenerate", requireAi, aiMinuteLimiter, aiDailyLimiter, regenerate);
+// explains or summarizes a passage selected in the PDF reader; saves nothing
+router.post("/:id/explain", requireAi, aiMinuteLimiter, aiDailyLimiter, explainSelection);
 router.post("/:id/test-ai", requireAi, aiMinuteLimiter, aiDailyLimiter, testAi);
 router.patch("/:id/source", writeLimiter, updateSource);
 router.patch("/:id/workflow", writeLimiter, updateWorkflow);

@@ -413,3 +413,34 @@ export async function suggestSourceDetails(
   }
   return out;
 }
+
+export async function explainPassage(
+  userId: string,
+  input: { mode: "explain" | "summarize"; title: string; passage: string; context: string }
+): Promise<string> {
+  const task =
+    input.mode === "explain"
+      ? "Explain the selected passage in plain language: what it says, and what any technical terms or abbreviations in it mean. 3-5 sentences."
+      : "Summarize the selected passage in 1-2 sentences.";
+  const system =
+    `You are a research assistant helping someone read a paper. Respond ONLY with JSON: {"answer": string}.\n` +
+    `- ${task}\n` +
+    `- Use only the selected passage and the text around it. Never invent facts; if the text does not say something, say so.\n` +
+    `- Plain text only: no markdown, no bullet symbols.`;
+  const parsed = await completeJson(
+    userId,
+    [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content:
+          `Title: ${input.title}\n\n` +
+          (input.context ? `Text around the selection:\n"""${input.context}"""\n\n` : "") +
+          `Selected passage:\n"""${input.passage}"""`,
+      },
+    ],
+    1024,
+    0.2
+  );
+  return String(parsed.answer ?? "").trim().slice(0, 3000);
+}

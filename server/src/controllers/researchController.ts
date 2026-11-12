@@ -7,7 +7,6 @@ import { ResearchItem } from "../models/ResearchItem.js";
 import { collection } from "../models/Collection.js";
 import { User } from "../models/User.js";
 import { AiSession } from "../models/AiSession.js";
-import { analyzeText, askSources } from "../services/ai.js";
 import { keyTerms, pickPassages } from "../services/passages.js";
 import { buildCitations } from "../services/citations.js";
 import { lookupCrossref } from "../services/crossref.js";
@@ -19,6 +18,7 @@ import { atLeast, ensureDefaultcollection, roleIn, collectionIds } from "../serv
 import { aiEnabled } from "../config/features.js";
 import { AiQuotaExceededError, aiAvailableForUser, aiOptedOut } from "../services/aiUsage.js";
 import { MAX_IMPORT_BYTES, deleteBlob, signedFileUrl } from "../middlewares/blobImport.js";
+import { analyzeText, askSources, explainPassage } from "../services/ai.js";
 
 const MAX_TITLE = 100;
 // feeds both highlightSchema and highlightUpdateSchema; keep in sync with the extension's highlightColors.ts and the web app's utils/colors.ts
@@ -1013,6 +1013,52 @@ export async function testAi(req: Request, res: Response) {
       err instanceof AiQuotaExceededError ||
       !(await aiAvailableForUser(String(res.locals.userId)))
     ) {
+      return res.status(429).json({
+        error: "Your daily AI allowance is used up. Owlet's non-AI features are still available until tomorrow.",
+        code: "AI_QUOTA_EXCEEDED",
+      });
+    }
+    console.error("AI providers failed:", err);
+    res.status(502).json({ error: "The AI service failed. Try again." });
+  }
+}
+
+const explainSchema = z.object({
+  text: z.string().trim().min(10).max(2000),
+  mode: z.enum(["explain", "summarize"]),
+});
+ 
+// POST /research/:id/explain: explains or summarizes a passage the person selected in the reader. Saves nothing.
+export async function explainSelection(req: Request, res: Response) {
+  const p = explainSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: "Select between 10 and 2,000 characters of text." });
+  const id = String(req.params.id);
+  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
+  const ids = await collectionIds(res.locals.userId, "viewer");
+  const item = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } })
+    .select("source.title content.rawText")
+    .lean();
+  if (!item) return res.status(404).json({ error: "Not found" });
+ 
+  // a little of the text around the selection helps the AI read it correctly. The selection arrives with its
+  // whitespace squashed, so it is found by its first words with any whitespace between them.
+  const raw = item.content?.rawText ?? "";
+  const words = p.data.text.split(/\s+/).slice(0, 8).map(escapeRegex);
+  const at = raw.match(new RegExp(words.join("\\s+")))?.index ?? -1;
+  const context = at >= 0 ? raw.slice(Math.max(0, at - 800), at + p.data.text.length + 800) : "";
+ 
+  const userId = String(res.locals.userId);
+  try {
+    const answer = await explainPassage(userId, {
+      mode: p.data.mode,
+      title: item.source?.title ?? "Untitled",
+      passage: p.data.text,
+      context,
+    });
+    if (!answer) return res.status(502).json({ error: "The AI returned an empty answer. Try again." });
+    res.json({ answer, aiEnabled: aiEnabled() && (await aiAvailableForUser(userId)) });
+  } catch (err) {
+    if (err instanceof AiQuotaExceededError || !(await aiAvailableForUser(userId))) {
       return res.status(429).json({
         error: "Your daily AI allowance is used up. Owlet's non-AI features are still available until tomorrow.",
         code: "AI_QUOTA_EXCEEDED",
