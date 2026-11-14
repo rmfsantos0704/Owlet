@@ -90,8 +90,11 @@ const clipSchema = z.object({
   issue: z.string().trim().max(50).optional(),
   pages: z.string().trim().max(80).optional(),
   doi: z.string().trim().max(200).optional(),
-  rawText: z.string().min(50).max(200000),
+  // the extension checks for 50+ characters on whole-page clips; a highlight-only clip holds just the highlighted text
+  rawText: z.string().min(1).max(200000),
   collectionId: z.string().optional(),
+  // false = save the clip without an AI summary (the AI provider is never called); omitted = AI as before
+  useAi: z.boolean().optional(),
   aiSettings: aiSettingsSchema.optional(),
   tags: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(20).optional(),
   personalNote: z.string().trim().max(280).transform((note) => note.replace(/\s+/g, " ")).optional(),
@@ -208,6 +211,13 @@ function settingsFrom(ws: { aiSettings?: any }) {
   };
 }
 
+// What a clip gets when no AI summary is made: empty fields, and the AI provider is never called.
+const NO_AI = {
+  ai: { summary: "", paraphrase: "", tags: [] as string[] },
+  aiFailed: false,
+  aiLimitReached: false,
+};
+
 // Runs the AI summary with the given settings; a failure never blocks saving.
 async function runAi(
   userId: string,
@@ -240,6 +250,8 @@ export async function clip(req: Request, res: Response) {
   const d = parsed.data;
   const normalizedUrl = normalizePageUrl(d.url);
   const userId = res.locals.userId;
+  // the extension and the web app send useAi: false when the person turned the AI summary off for this clip
+  const wantsAi = d.useAi !== false;
 
   const ws = await targetcollection(res, userId, d.collectionId);
   if (!ws) return;
@@ -257,7 +269,7 @@ export async function clip(req: Request, res: Response) {
           return null;
         })
       : Promise.resolve(null),
-    runAi(userId, aiSettings, d.title, d.rawText),
+    wantsAi ? runAi(userId, aiSettings, d.title, d.rawText) : Promise.resolve(NO_AI),
   ]);
   const source = {
     title: crossref?.title ?? d.title,
@@ -298,7 +310,8 @@ export async function clip(req: Request, res: Response) {
       item,
       aiFailed,
       aiLimitReached,
-      aiEnabled: aiEnabled() && !aiLimitReached && (await aiAvailableForUser(userId)),
+      // false when the person turned AI off for this clip, so the client just says "Saved."
+      aiEnabled: wantsAi && aiEnabled() && !aiLimitReached && (await aiAvailableForUser(userId)),
     });
   } catch (e) {
     // two quick clicks can both pass the check above; the unique index stops the second one
@@ -348,6 +361,8 @@ export async function importPdf(req: Request, res: Response) {
   }
 
   const userId = res.locals.userId;
+  // the web app sends useAi: false when the person turned the AI summary off for this import
+  const wantsAi = req.body?.useAi !== false;
   const ws = await targetcollection(res, userId, typeof req.body?.collectionId === "string" ? req.body.collectionId : undefined);
   if (!ws) return;
 
@@ -373,7 +388,9 @@ export async function importPdf(req: Request, res: Response) {
   const author = pdf.author ? String(pdf.author).slice(0, 200) : undefined;
   const aiSettings = settingsFrom(ws);
   // long documents: give the AI the start (abstract/intro) and the end (conclusions)
-  const { ai, aiFailed, aiLimitReached } = await runAi(userId, aiSettings, title, forAi(rawText));
+  const { ai, aiFailed, aiLimitReached } = wantsAi
+    ? await runAi(userId, aiSettings, title, forAi(rawText))
+    : NO_AI;
 
   try {
     const item = await ResearchItem.create({
@@ -400,7 +417,7 @@ export async function importPdf(req: Request, res: Response) {
       aiFailed,
       aiLimitReached,
       truncated: pdf.text.length > rawText.length,
-      aiEnabled: aiEnabled() && !aiLimitReached && (await aiAvailableForUser(userId)),
+      aiEnabled: wantsAi && aiEnabled() && !aiLimitReached && (await aiAvailableForUser(userId)),
     });
   } catch (e) {
     if (isDuplicateKey(e)) return res.status(409).json({ error: "This PDF is already in the collection" });
@@ -563,6 +580,47 @@ async function mutate(req: Request, res: Response, update: UpdateQuery<any>, sta
   res.status(status).json({ highlights: item.highlights, comments: item.comments, tags: item.tags });
 }
 
+// Highlights made from the browser extension are picked on the live page, which can hold text the clip never captured
+// (a second paragraph, say). Returns the clip's text with the missing part added next to the sentences around it,
+// or null when the highlighted text is already in the clip (or can't be added).
+function addMissingText(raw: string, highlighted: string): string | null {
+  const find = (haystack: string, s: string, from: number) => {
+    const rx = new RegExp(s.split(/\s+/).map(escapeRegex).join("\\s+"), "g");
+    rx.lastIndex = from;
+    const m = rx.exec(haystack);
+    return m ? { start: m.index, end: m.index + m[0].length } : null;
+  };
+  const whole = highlighted.trim();
+  if (!whole || find(raw, whole, 0)) return null;
+
+  const sentences = whole.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+  let out = raw;
+  let pos = -1; // where the last sentence already in the clip ends
+  let missing: string[] = [];
+  for (const sentence of sentences) {
+    const hit = find(out, sentence, Math.max(pos, 0));
+    if (!hit) {
+      missing.push(sentence);
+      continue;
+    }
+    let { end } = hit;
+    if (missing.length) {
+      // missing sentences that come before one the clip has go right in front of it
+      const added = missing.join(" ") + " ";
+      out = out.slice(0, hit.start) + added + out.slice(hit.start);
+      end += added.length;
+      missing = [];
+    }
+    pos = end;
+  }
+  if (missing.length) {
+    const added = missing.join(" ");
+    if (pos < 0 || pos >= out.length) out = out ? `${out}\n\n${added}` : added;
+    else out = `${out.slice(0, pos)} ${added}${out.slice(pos)}`;
+  }
+  return out === raw || out.length > 200000 ? null : out;
+}
+
 export async function addHighlight(req: Request, res: Response) {
   const p = highlightSchema.safeParse(req.body);
   if (!p.success) return res.status(400).json({ error: "Invalid highlight" });
@@ -572,7 +630,7 @@ export async function addHighlight(req: Request, res: Response) {
   const id = String(req.params.id);
   if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Bad id" });
   const ids = await collectionIds(res.locals.userId, "editor");
-  const clip = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("content.rawText content.pageOffsets");
+  const clip = await ResearchItem.findOne({ _id: id, collectionId: { $in: ids } }).select("content.rawText content.pageOffsets source.kind highlights");
   if (!clip) return res.status(404).json({ error: "Not found" });
 
   // a highlight made on the PDF page keeps the page it was made on; otherwise the page is worked out from the offsets
@@ -598,7 +656,38 @@ export async function addHighlight(req: Request, res: Response) {
       }
     }
   }
-  return mutate(req, res, { $push: { highlights: highlight } }, 201);
+  // The same text highlighted again from the extension (in a different color, say) updates that highlight
+  // instead of adding a second one on top of it.
+  if (p.data.startOffset === undefined && !placedOnPage) {
+    const squash = (s: string) => s.replace(/\s+/g, " ").trim();
+    const wanted = squash(p.data.text);
+    const same = ((clip.highlights ?? []) as any[]).find((h) => squash(String(h.text ?? "")) === wanted);
+    if (same) {
+      const $set: Record<string, string> = { "highlights.$.color": p.data.color };
+      if (p.data.note !== undefined) $set["highlights.$.note"] = p.data.note;
+      const updated = await ResearchItem.findOneAndUpdate(
+        { _id: id, collectionId: { $in: ids }, "highlights._id": same._id },
+        { $set },
+        { returnDocument: "after" }
+      );
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      return res.json({
+        highlights: updated.highlights,
+        comments: updated.comments,
+        tags: updated.tags,
+        highlightUpdated: true,
+      });
+    }
+  }
+
+  const update: UpdateQuery<any> = { $push: { highlights: highlight } };
+  // A highlight from the extension has no offsets. If part of it isn't in the clip's text yet, add that part to the
+  // clip so it shows in the clipped text and the quick summary. PDFs keep their text as it is.
+  if (p.data.startOffset === undefined && !placedOnPage && clip.source?.kind !== "pdf") {
+    const merged = addMissingText(clip.content?.rawText ?? "", p.data.text);
+    if (merged) update.$set = { "content.rawText": merged, "content.wordCount": merged.split(/\s+/).length };
+  }
+  return mutate(req, res, update, 201);
 }
 
 // PATCH /research/:id/highlights/:highlightId: changes a highlight's color and note.
@@ -667,7 +756,7 @@ export async function addComment(req: Request, res: Response) {
   if (highlightId && !mongoose.isValidObjectId(highlightId)) {
     return res.status(400).json({ error: "Bad highlight id" });
   }
-    if (await isFull(req, res, "comments", MAX_COMMENTS)) {
+  if (await isFull(req, res, "comments", MAX_COMMENTS)) {
     return res.status(409).json({ error: `A clip can have up to ${MAX_COMMENTS} comments.` });
   }
   if (parentId) {
@@ -1027,7 +1116,7 @@ const explainSchema = z.object({
   text: z.string().trim().min(10).max(2000),
   mode: z.enum(["explain", "summarize"]),
 });
- 
+
 // POST /research/:id/explain: explains or summarizes a passage the person selected in the reader. Saves nothing.
 export async function explainSelection(req: Request, res: Response) {
   const p = explainSchema.safeParse(req.body);
@@ -1039,14 +1128,14 @@ export async function explainSelection(req: Request, res: Response) {
     .select("source.title content.rawText")
     .lean();
   if (!item) return res.status(404).json({ error: "Not found" });
- 
+
   // a little of the text around the selection helps the AI read it correctly. The selection arrives with its
   // whitespace squashed, so it is found by its first words with any whitespace between them.
   const raw = item.content?.rawText ?? "";
   const words = p.data.text.split(/\s+/).slice(0, 8).map(escapeRegex);
   const at = raw.match(new RegExp(words.join("\\s+")))?.index ?? -1;
   const context = at >= 0 ? raw.slice(Math.max(0, at - 800), at + p.data.text.length + 800) : "";
- 
+
   const userId = String(res.locals.userId);
   try {
     const answer = await explainPassage(userId, {
