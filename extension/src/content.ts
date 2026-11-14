@@ -22,7 +22,12 @@ if (!w.__owletReady) {
 
     const meta = (names: string[]) => metaValues(names)[0];
     const clean = (s: string) => s.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+    const scope = msg.scope === "selection" ? "selection" : "page";
     const selection = window.getSelection()?.toString().trim() ?? "";
+    if (scope === "selection" && selection.length < 50) {
+      sendResponse({ error: "no-selection" });
+      return;
+    }
     const article = new Readability(document.cloneNode(true) as Document).parse();
     const structuredArticles: Record<string, unknown>[] = [];
     const collectStructured = (value: unknown) => {
@@ -93,7 +98,7 @@ if (!w.__owletReady) {
     const doiValue = doiCandidates.find((value) =>
       /^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)?10\.\d{4,9}\//i.test(value.trim())
     )?.trim().replace(/^doi:\s*/i, "").replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "");
-    const body = selection.length >= 50 ? selection : article?.textContent || document.body.innerText;
+    const body = scope === "selection" ? selection : article?.textContent || document.body.innerText;
 
     sendResponse({
       url: normalizePageUrl(location.href),

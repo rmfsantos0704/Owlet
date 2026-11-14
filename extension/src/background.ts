@@ -1,6 +1,10 @@
 import { saveSelection } from "./saveSelection";
 import { HIGHLIGHT_COLORS } from "./highlightColors";
 import { wake } from "./api";
+import { applyOpenMode } from "./openMode";
+
+// runs every time the service worker starts, so the icon always opens the popup or the side panel as chosen
+void applyOpenMode();
 
 const MENU_ID = "owlet-save-selection";
 const COLOR_PREFIX = `${MENU_ID}:`;

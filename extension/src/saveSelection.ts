@@ -184,10 +184,46 @@ async function extractPage(tabId: number, frameId: number): Promise<SavedPage> {
     console.error("Could not extract the page for the Owlet clip:", error);
     throw new SaveError("Couldn't read this page to clip it.");
   }
-  if (!page || typeof page.rawText !== "string" || page.rawText.length < 50) {
-    throw new SaveError("Not enough readable text on this page to clip it.");
+  if (!page || typeof page.rawText !== "string") {
+    throw new SaveError("Couldn't read this page to clip it.");
   }
+  // how much text is enough depends on what the person chooses to save, so the caller checks that
   return page;
+}
+
+type ClipChoice = "highlight" | "page" | "cancel" | "timeout";
+
+// Shows "Clip highlight only / Clip whole page" in the page and waits for the person's answer.
+function askClipChoice(tabId: number, frameId: number): Promise<ClipChoice> {
+  const askId = Math.random().toString(36).slice(2);
+  return new Promise<ClipChoice>((resolve) => {
+    let finished = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (choice: ClipChoice) => {
+      if (finished) return;
+      finished = true;
+      if (timer) clearTimeout(timer);
+      chrome.runtime.onMessage.removeListener(listener);
+      resolve(choice);
+    };
+    const listener = (message: unknown, sender: chrome.runtime.MessageSender) => {
+      const msg = message as { type?: string; askId?: string; choice?: string } | undefined;
+      if (msg?.type !== "OWLET_CLIP_CHOICE" || msg.askId !== askId || sender.tab?.id !== tabId) return;
+      finish(msg.choice === "highlight" || msg.choice === "page" ? msg.choice : "cancel");
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    timer = setTimeout(() => finish("timeout"), 60_000);
+
+    chrome.scripting
+      .executeScript({ target: { tabId, frameIds: [frameId] }, func: showClipChoice, args: [askId] })
+      .then(([result]) => {
+        if (result?.result !== true) finish("timeout");
+      })
+      .catch((error) => {
+        console.error("Could not ask how to save the Owlet highlight:", error);
+        finish("timeout");
+      });
+  });
 }
 
 export async function saveSelection(
@@ -263,8 +299,26 @@ export async function saveSelection(
         itemId = (found.data as LookupResult).id;
 
         if (!itemId) {
-          const { page, error } = await extraction;
-          if (!page) throw error;
+          // The page isn't clipped yet. The highlight is already painted, so ask what to save.
+          const choice = await askClipChoice(tabId, frameId);
+          if (choice !== "highlight" && choice !== "page") {
+            // cancelled, or no answer: take back the painted highlight and save nothing
+            if (paintId) await removePaint(tabId, frameId, paintId);
+            paintId = null;
+            if (choice === "timeout") await report(tabId, frameId, "Highlight not saved", false);
+            return;
+          }
+          await injectFeedback(tabId, frameId, "Saving…", true, undefined, true);
+
+          const { page: extracted, error } = await extraction;
+          if (choice === "page" && (!extracted || extracted.rawText.length < 50)) {
+            throw extracted ? new SaveError("Not enough readable text on this page to clip it.") : error;
+          }
+          // a highlight-only clip holds just the highlighted text; if the page couldn't be read, use the tab's own details
+          const page: SavedPage =
+            choice === "highlight"
+              ? { ...(extracted ?? { url: pageUrl, title: tab?.title?.trim() || pageUrl }), rawText: text }
+              : extracted!;
 
           const stored = await chrome.storage.local.get("aiSettings");
           const aiSettings = stored.aiSettings as Record<string, unknown> | undefined;
@@ -272,12 +326,16 @@ export async function saveSelection(
             ["paragraph", "bullets", "academic", "simple"].includes(String(aiSettings?.format)) &&
             ["short", "medium", "detailed"].includes(String(aiSettings?.length)) &&
             typeof aiSettings?.instructions === "string";
+          const { useAi } = await chrome.storage.local.get("useAi");
+          // a highlight-only clip has nothing worth summarizing, so AI is only used for whole-page clips
+          const aiOn = choice === "page" && useAi !== false;
           const clipped = await api("/research/clip", {
             method: "POST",
             body: {
               ...page,
               collectionId,
-              ...(validAiSettings ? { aiSettings } : {}),
+              useAi: aiOn,
+              ...(aiOn && validAiSettings ? { aiSettings } : {}),
             },
           });
           if (clipped.status === 409 && typeof clipped.data.id === "string") {
@@ -303,7 +361,7 @@ export async function saveSelection(
         throw new SaveError(messageForStatus(saved.status), saved.status);
       }
       await setCachedItem(cacheKey, itemId);
-      await report(tabId, frameId, "Saved to Owlet", true, itemId);
+      await report(tabId, frameId, saved.data.highlightUpdated ? "Highlight color updated" : "Saved to Owlet", true, itemId);
       await repaintSaved(tabId, frameId, itemId);
     } catch (error) {
       // The save failed, so take back the highlight we painted early.
@@ -431,5 +489,64 @@ export function showSelectionFeedback(
   root.append(host);
   // A "Saving…" toast stays until the result replaces it (the long timeout is only a safety net).
   setTimeout(() => host.remove(), pending ? 180_000 : 4000);
+  return true;
+}
+
+// Asks, in the page, how to save a highlight on a page that isn't clipped yet. The answer goes back to the
+// service worker as an OWLET_CLIP_CHOICE message.
+export function showClipChoice(askId: string): boolean {
+  document.querySelector("[data-owlet-toast]")?.remove();
+  const root = document.body ?? document.documentElement;
+  if (!root) return false;
+
+  const host = document.createElement("div");
+  host.setAttribute("data-owlet-toast", "");
+  host.setAttribute("role", "dialog");
+  host.setAttribute("aria-label", "Save your highlight");
+  host.style.cssText = "all:initial;position:fixed;top:16px;right:16px;z-index:2147483647;max-width:360px;";
+  const shadow = host.attachShadow({ mode: "closed" });
+  const box = document.createElement("div");
+  box.style.cssText =
+    "box-sizing:border-box;display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:10px;" +
+    "background:#102b5c;color:#fff;font:600 14px/1.4 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.24);";
+  const text = document.createElement("span");
+  text.textContent = "This page isn't clipped yet. What should Owlet save?";
+
+  const send = (choice: string) => {
+    host.remove();
+    try {
+      void chrome.runtime.sendMessage({ type: "OWLET_CLIP_CHOICE", askId, choice }).catch(() => {});
+    } catch {
+      /* the extension was reloaded; nothing to answer */
+    }
+  };
+  const makeButton = (label: string, choice: string, primary: boolean) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.style.cssText =
+      "cursor:pointer;padding:7px 12px;border-radius:8px;font:600 13px/1.2 system-ui,sans-serif;" +
+      (primary
+        ? "border:1px solid #fff;background:#fff;color:#102b5c;"
+        : "border:1px solid rgba(255,255,255,.55);background:transparent;color:#fff;");
+    button.addEventListener("click", () => send(choice));
+    return button;
+  };
+
+  const row = document.createElement("div");
+  row.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:8px;";
+  const first = makeButton("Clip highlight only", "highlight", true);
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.textContent = "Cancel";
+  cancel.style.cssText =
+    "cursor:pointer;padding:4px 2px;border:0;background:none;color:#a5f3fc;font:600 13px/1.2 system-ui,sans-serif;text-decoration:underline;";
+  cancel.addEventListener("click", () => send("cancel"));
+  row.append(first, makeButton("Clip whole page", "page", false), cancel);
+
+  box.append(text, row);
+  shadow.append(box);
+  root.append(host);
+  first.focus();
   return true;
 }

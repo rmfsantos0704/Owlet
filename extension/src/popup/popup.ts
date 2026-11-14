@@ -2,6 +2,7 @@ import { api, getToken, setToken, clearToken, DASHBOARD_URL, wake } from "../api
 import { HIGHLIGHT_COLORS } from "../highlightColors";
 import { normalizePageUrl } from "../pageUrl";
 import { paintSavedHighlights } from "../highlightPaint";
+import { OPEN_MODE_KEY, applyOpenMode } from "../openMode";
 
 type Collection = {
   id: string;
@@ -29,6 +30,8 @@ const OFFLINE = "Can't reach Owlet. Is the server running?";
 const THEME_KEY = "popupTheme";
 const TOUR_KEY = "extensionOnboardingSeen";
 const COLOR_KEY = "highlightColor";
+const USE_AI_KEY = "useAi";
+const SCOPE_KEY = "clipScope";
 const TOUR_STEPS = [
   {
     target: "tourCollection",
@@ -164,13 +167,21 @@ function updateClipEnabled() {
   $<HTMLButtonElement>("showHighlightsBtn").disabled = !clippable || !selected();
 }
 
+// the button's resting text follows the "Clip" option
+const idleClipLabel = () => (clipScope() === "selection" ? "Clip the selected text" : "Clip this page");
+
+function refreshClipLabel() {
+  if (clipping || $("clipBtn").classList.contains("done")) return;
+  $("clipLabel").textContent = idleClipLabel();
+}
+
 function setClipBusy(busy: boolean) {
   clipping = busy;
   const btn = $("clipBtn");
   if (busy) btn.classList.remove("done");
   $("clipSpinner").hidden = !busy;
   $("clipIcon").hidden = busy;
-  $("clipLabel").textContent = busy ? "Clipping…" : btn.classList.contains("done") ? "Saved" : "Clip this page";
+  $("clipLabel").textContent = busy ? "Clipping…" : btn.classList.contains("done") ? "Saved" : idleClipLabel();
   updateClipEnabled();
 }
 
@@ -180,7 +191,7 @@ function flashClipDone() {
   $("clipLabel").textContent = "Saved";
   setTimeout(() => {
     btn.classList.remove("done");
-    if (!clipping) $("clipLabel").textContent = "Clip this page";
+    if (!clipping) $("clipLabel").textContent = idleClipLabel();
   }, 2200);
 }
 
@@ -223,9 +234,27 @@ function readAi(): AiSettings {
   };
 }
 
+const aiOn = () => $("useAi").getAttribute("aria-checked") !== "false";
+function setAiOn(on: boolean) {
+  $("useAi").setAttribute("aria-checked", String(on));
+  $("useAiLabel").textContent = on ? "On" : "Off";
+}
+const clipScope = (): "page" | "selection" =>
+  $<HTMLSelectElement>("clipScope").value === "selection" ? "selection" : "page";
+
 function updateAiHint() {
   const s = readAi();
-  $("aiHint").textContent = `AI summary: ${FORMATS[s.format] ?? "Paragraph"} \u00B7 ${LENGTHS[s.length] ?? "Medium"}`;
+  $("aiHint").textContent = aiOn()
+    ? `AI summary: ${FORMATS[s.format] ?? "Paragraph"} \u00B7 ${LENGTHS[s.length] ?? "Medium"}`
+    : "AI summary: off";
+}
+
+async function loadClipOptions() {
+  const { [USE_AI_KEY]: useAi, [SCOPE_KEY]: scope } = await chrome.storage.local.get([USE_AI_KEY, SCOPE_KEY]);
+  setAiOn(useAi !== false);
+  $<HTMLSelectElement>("clipScope").value = scope === "selection" ? "selection" : "page";
+  refreshClipLabel();
+  updateAiHint();
 }
 
 function renderClipTags() {
@@ -294,6 +323,7 @@ async function loadFeatures() {
   try {
     const r = await api("/auth/me");
     const on = !!r.data?.features?.ai;
+    $("aiToggleRow").hidden = !on;
     $("aiSettings").hidden = !on;
     $("aiHintRow").hidden = !on;
     const usage = r.data?.features?.aiUsage as AiDailyUsage | undefined;
@@ -331,6 +361,16 @@ for (const id of ["format", "length", "instructions"]) {
   $(id).addEventListener("input", onAiChange);
   $(id).addEventListener("change", onAiChange);
 }
+
+$("useAi").addEventListener("click", () => {
+  setAiOn(!aiOn());
+  void chrome.storage.local.set({ [USE_AI_KEY]: aiOn() });
+  updateAiHint();
+});
+$("clipScope").addEventListener("change", () => {
+  void chrome.storage.local.set({ [SCOPE_KEY]: clipScope() });
+  refreshClipLabel();
+});
 
 // ---------- data ----------
 
@@ -571,7 +611,7 @@ async function render() {
   await applyTheme(loggedIn);
   if (!loggedIn) return;
   status("");
-  await Promise.all([loadPage(), loadCollections(), loadAi(), loadFeatures(), renderColorPicker()]);
+  await Promise.all([loadPage(), loadCollections(), loadAi(), loadClipOptions(), loadFeatures(), renderColorPicker()]);
   await showTourForFirstUse();
 }
 
@@ -658,6 +698,43 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !$("tourOverlay").hidden) closeTour();
 });
 $("openDash").addEventListener("click", () => open(DASHBOARD_URL));
+
+// ---------- popup / side panel ----------
+
+// the side panel loads this same page with ?panel=1
+const inPanel = new URLSearchParams(location.search).has("panel");
+document.body.classList.toggle("panel", inPanel);
+{
+  const toggle = $("panelToggle");
+  toggle.title = inPanel ? "Switch back to popup" : "Open in side panel";
+  toggle.setAttribute("aria-label", toggle.title);
+}
+
+$("panelToggle").addEventListener("click", async () => {
+  const toPanel = !inPanel;
+  try {
+    await chrome.storage.local.set({ [OPEN_MODE_KEY]: toPanel ? "panel" : "popup" });
+    await applyOpenMode(toPanel ? "panel" : "popup");
+    if (toPanel) {
+      const win = await chrome.windows.getCurrent();
+      if (win.id !== undefined) await chrome.sidePanel.open({ windowId: win.id });
+    }
+    window.close();
+  } catch {
+    status("err", "Couldn't switch views. Reload the extension and try again.");
+  }
+});
+
+// A side panel stays open while you browse, so follow the active tab.
+if (inPanel) {
+  const refreshPage = () => {
+    if (!$("viewMain").hidden) void loadPage();
+  };
+  chrome.tabs.onActivated.addListener(refreshPage);
+  chrome.tabs.onUpdated.addListener((_tabId, info, tab) => {
+    if (tab.active && (info.url || info.title || info.status === "complete")) refreshPage();
+  });
+}
 $("openSettings").addEventListener("click", () => {
   const ws = selected();
   open(ws ? `${DASHBOARD_URL}/collection/${ws.id}/settings` : DASHBOARD_URL);
@@ -725,6 +802,54 @@ $<HTMLButtonElement>("showHighlightsBtn").addEventListener("click", async () => 
   }
 });
 
+// The page is already in the collection, so the selection can't be a new clip. Add it to the existing clip as a
+// highlight in the chosen color; the server also adds the text to the clip if it doesn't have it yet.
+async function addSelectionToClip(
+  itemId: string,
+  selectedText: string,
+  tabId: number,
+  link?: { label: string; url: string }
+) {
+  const text = selectedText.replace(/\s+/g, " ").trim();
+  if (text.length > 2000) {
+    return status("info", "This page is already clipped. Select 2,000 characters or fewer to add text to it.", link);
+  }
+  const { [COLOR_KEY]: stored } = await chrome.storage.local.get(COLOR_KEY);
+  const color = typeof stored === "string" && stored in HIGHLIGHT_COLORS ? stored : "yellow";
+
+  const saved = await api(`/research/${encodeURIComponent(itemId)}/highlights`, {
+    method: "POST",
+    body: { text, color },
+  });
+  if (saved.status === 401) {
+    await clearToken();
+    await render();
+    return loginMsg("Session expired. Please log in again.");
+  }
+  if (!saved.ok) return status("err", saved.data.error ?? "Couldn't add the text to the clip.", link);
+  status(
+    "ok",
+    saved.data.highlightUpdated
+      ? "That text was already highlighted. Its color was updated."
+      : "This page was already clipped. Your selection was added to it.",
+    link
+  );
+
+  // show the new highlight on the page; purely visual
+  try {
+    const response = await api(`/research/${encodeURIComponent(itemId)}/highlights`);
+    if (response.ok && Array.isArray(response.data.highlights)) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: paintSavedHighlights,
+        args: [response.data.highlights as { text: string; color: string }[], HIGHLIGHT_COLORS],
+      });
+    }
+  } catch {
+    /* the highlight is saved either way */
+  }
+}
+
 $("clipBtn").addEventListener("click", async () => {
   if (clipping || !clippable) return;
   setClipBusy(true);
@@ -734,9 +859,11 @@ $("clipBtn").addEventListener("click", async () => {
     if (!tab?.id) return status("err", "No active tab");
 
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
-    const page = await chrome.tabs.sendMessage(tab.id, { type: "OWLET_EXTRACT" });
+    const page = await chrome.tabs.sendMessage(tab.id, { type: "OWLET_EXTRACT", scope: clipScope() });
+    if (page?.error === "no-selection") return status("err", "Select at least 50 characters on the page first.");
     if (!page || page.rawText.length < 50) return status("err", "Not enough readable text on this page.");
 
+    const useAi = aiOn();
     const r = await api("/research/clip", {
       method: "POST",
       body: {
@@ -744,7 +871,8 @@ $("clipBtn").addEventListener("click", async () => {
         collectionId: $<HTMLSelectElement>("collection").value || undefined,
         tags: [...clipTags],
         personalNote: $<HTMLInputElement>("personalNote").value.trim(),
-        aiSettings: readAi(), // this clip's own AI settings
+        useAi,
+        ...(useAi ? { aiSettings: readAi() } : {}), // this clip's own AI settings
       },
     });
 
@@ -754,7 +882,10 @@ $("clipBtn").addEventListener("click", async () => {
       return loginMsg("Session expired. Please log in again.");
     }
     if (r.status === 409) {
-      const link = r.data.id ? { label: "View it", url: `${DASHBOARD_URL}/item/${r.data.id}` } : undefined;
+      const existingId = typeof r.data.id === "string" ? r.data.id : "";
+      const link = existingId ? { label: "View it", url: `${DASHBOARD_URL}/item/${existingId}` } : undefined;
+      // the page is already clipped: "selected text only" adds the selection to that clip instead of stopping
+      if (clipScope() === "selection" && existingId) return addSelectionToClip(existingId, page.rawText, tab.id, link);
       return status("info", "Already in this collection.", link);
     }
     if (!r.ok) return status("err", r.data.error ?? "Clip failed");
