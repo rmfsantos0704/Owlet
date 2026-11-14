@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ListChecks, ListX, Trash2 } from "lucide-react";
+import { ListChecks, ListX, Trash2, X } from "lucide-react";
 import { api } from "../../services/api";
 import Modal from "../shared/Modal";
 import { Spinner } from "../shared/LoadingScreen";
@@ -96,14 +96,14 @@ export default function SelectableClips<T>({
       {/* Wrapper takes the row height (set by the AI card beside it); the card is pinned inside so a long list scrolls instead of stretching the row. */}
       <div className="relative lg:h-full lg:min-h-[20rem]">
       <div className="card flex flex-col overflow-hidden max-h-[70vh] lg:absolute lg:inset-0 lg:max-h-none">
-        <div className="flex shrink-0 flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex shrink-0 flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-5">
           <div>
             <h2 className="font-semibold text-ink">{title}</h2>
             {subtitle && <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">{subtitle}</div>}
           </div>
 
           {(clips.length > 0 || actions) && (
-            <div className={`flex items-center gap-1.5 ${selectMode ? "min-w-0 max-w-full flex-nowrap overflow-x-auto" : "flex-wrap"}`}>
+            <div className={`flex items-center gap-1 sm:gap-2 ${selectMode ? "w-full min-w-0 flex-nowrap justify-between sm:w-auto sm:flex-wrap sm:justify-start" : "flex-wrap"}`}>
               {selectMode && clips.length > 0 ? (
                 <>
                   <button
@@ -112,22 +112,33 @@ export default function SelectableClips<T>({
                     disabled={deleting}
                     title={allSelected ? "Clear selection" : "Select all clips"}
                     aria-label={allSelected ? "Clear selection" : "Select all clips"}
-                    className="btn-secondary size-9 !rounded-lg !p-0"
+                    className="btn-secondary shrink-0 whitespace-nowrap !rounded-lg !px-2 !py-1.5 !text-[11px] sm:!px-3 sm:!py-2 sm:!text-xs"
                   >
-                    {allSelected ? <ListX className="size-4" /> : <ListChecks className="size-4" />}
+                    {allSelected ? <ListX className="hidden size-4 sm:block" /> : <ListChecks className="hidden size-4 sm:block" />}
+                    {allSelected ? "Clear all" : "Select all"}
                   </button>
                   {selectionActions?.(selectedClips)}
                   <button
                     type="button"
                     onClick={() => setConfirmOpen(true)}
                     disabled={count === 0 || deleting}
-                    className="btn-danger whitespace-nowrap !rounded-lg !px-3 !py-2 !text-xs disabled:opacity-50"
+                    className="btn-danger shrink-0 whitespace-nowrap !rounded-lg !px-2 !py-1.5 !text-[11px] disabled:opacity-50 sm:!px-3 sm:!py-2 sm:!text-xs"
+                    aria-label={`Delete ${count} selected`}
                   >
-                    <Trash2 className="size-4" />
-                    Delete ({count})
+                    <Trash2 className="size-3.5 sm:size-4" />
+                    <span>
+                      <span className="hidden sm:inline">Delete </span>({count})
+                    </span>
                   </button>
-                  <button type="button" onClick={exitSelect} disabled={deleting} className="btn-secondary whitespace-nowrap !rounded-lg !px-3 !py-2 !text-xs">
-                    Cancel
+                  <button
+                    type="button"
+                    onClick={exitSelect}
+                    disabled={deleting}
+                    title="Exit selection"
+                    aria-label="Exit selection"
+                    className="btn-secondary size-8 shrink-0 !rounded-lg !p-0 sm:size-9"
+                  >
+                    <X aria-hidden="true" className="size-4" />
                   </button>
                 </>
               ) : (

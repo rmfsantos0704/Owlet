@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Archive, Bot, Copy, FileDown, Highlighter, MessageSquareText, Quote, Search, Tag, Upload, X, type LucideIcon,
+  Archive, Bot, Copy, FileDown, Highlighter, MessageSquareText, Quote, Search, Sparkles, Tag, Upload, X, type LucideIcon,
 } from "lucide-react";
 import { api, download } from "../services/api";
 import type { ResearchItem } from "../types";
@@ -14,6 +14,7 @@ import Toast, { type Notice } from "../components/shared/Toast";
 import { useAuth } from "../context/AuthContext";
 import CollectionTools from "../components/library/CollectionTools";
 import LinkClipButton from "../components/library/LinkClipButton";
+import { useAiPreference } from "../hooks/useAiPreference";
 
 const MAX_FILES = 10;
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -21,20 +22,21 @@ const isPdf = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name
 
 function StatCard({ label, value, icon: Icon, accent }: { label: string; value: number; icon: LucideIcon; accent: string }) {
   return (
-    <div className="card p-3 sm:p-5">
-      <div className="mb-3 flex items-start justify-between sm:mb-5">
-        <span className="text-xs font-medium text-slate-500 sm:text-sm">{label}</span>
-        <span className={`flex size-9 items-center justify-center rounded-xl ${accent}`}>
-          <Icon className="size-4.5" strokeWidth={1.9} />
+    <div className="card p-2.5 sm:p-5">
+      <div className="mb-0.5 flex items-center justify-between gap-2 sm:mb-5 sm:items-start">
+        <span className="truncate text-[11px] font-medium text-slate-500 sm:text-sm">{label}</span>
+        <span className={`flex size-6 shrink-0 items-center justify-center rounded-lg sm:size-9 sm:rounded-xl ${accent}`}>
+          <Icon className="size-3.5 sm:size-4.5" strokeWidth={1.9} />
         </span>
       </div>
-      <span className="text-3xl font-semibold tracking-tight text-ink">{value}</span>
+      <span className="text-lg font-semibold tracking-tight text-ink sm:text-3xl">{value}</span>
     </div>
   );
 }
 
 export default function Library({ all = false }: { all?: boolean }) {
   const { aiEnabled } = useAuth();
+  const [useAi, setUseAi] = useAiPreference(); // whether new PDF imports and saved links get an AI summary
   const { current, ready, collections } = useCollections();
   const wid = all ? undefined : current?.id;
   const wsName = (id: string) => collections.find((w) => w.id === id)?.name;
@@ -168,7 +170,7 @@ export default function Library({ all = false }: { all?: boolean }) {
           if (!up.ok) throw new Error("Couldn't upload the PDF. Try again.");
           const r = await api<{ aiFailed: boolean }>("/research/import", {
             method: "POST",
-            body: { collectionId: wid, pathname, fileName: f.name },
+            body: { collectionId: wid, pathname, fileName: f.name, ...(aiEnabled && !useAi ? { useAi: false } : {}) },
           });
           ok++;
           if (r.aiFailed) problems.push(`${f.name}: saved, but the AI summary failed`);
@@ -293,28 +295,28 @@ export default function Library({ all = false }: { all?: boolean }) {
         </div>
       }
       selectionActions={(selected) => (
-        <>
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <label className="sr-only" htmlFor="bibliography-style">Citation style</label>
           <div className="relative">
-            <Quote aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" />
+            <Quote aria-hidden="true" className="pointer-events-none absolute left-2 top-1/2 size-3 sm:left-2.5 sm:size-3.5 -translate-y-1/2 text-slate-500" />
             <select
               id="bibliography-style"
               value={citationStyle}
               onChange={(event) => setCitationStyle(event.target.value as "apa" | "mla" | "chicago")}
-              className="btn-secondary whitespace-nowrap !rounded-lg !py-2 !pl-7 !pr-2 !text-xs"
+              className="btn-secondary !w-auto whitespace-nowrap !rounded-lg !py-1.5 !pl-6 !pr-1 !text-[11px] sm:!py-2 sm:!pl-7 sm:!pr-1.5 sm:!text-xs"
             >
               <option value="apa">APA</option>
               <option value="mla">MLA</option>
               <option value="chicago">Chicago</option>
             </select>
           </div>
-          <button type="button" onClick={() => void copyBibliography(selected)} disabled={!selected.length} title="Copy references" aria-label="Copy references" className="btn-secondary size-9 !rounded-lg !p-0">
+          <button type="button" onClick={() => void copyBibliography(selected)} disabled={!selected.length} title="Copy references" aria-label="Copy references" className="btn-secondary size-8 shrink-0 !rounded-lg !p-0 sm:size-9">
             <Copy aria-hidden="true" className="size-3.5" />
           </button>
-          <button type="button" onClick={() => exportSelectedRis(selected)} disabled={!selected.length} title="Export RIS" aria-label="Export RIS" className="btn-secondary size-9 !rounded-lg !p-0">
+          <button type="button" onClick={() => exportSelectedRis(selected)} disabled={!selected.length} title="Export RIS" aria-label="Export RIS" className="btn-secondary size-8 shrink-0 !rounded-lg !p-0 sm:size-9">
             <FileDown aria-hidden="true" className="size-3.5" />
           </button>
-        </>
+        </div>
       )}
       // viewers can't delete; in "All clips" the role differs per clip, so the server decides
       canSelect={all || (!!current && current.role !== "viewer")}
@@ -351,8 +353,8 @@ export default function Library({ all = false }: { all?: boolean }) {
         </div>
       )}
 
-      <section className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row">
-        <div>
+      <section className="mb-6 flex items-start justify-between gap-3 sm:mb-8 sm:gap-4">
+        <div className="min-w-0 flex-1">
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">
             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </div>
@@ -366,7 +368,25 @@ export default function Library({ all = false }: { all?: boolean }) {
 
         {/* Import PDF and Save link sit on the same row as the collection's title */}
         {canImport && current && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
+            {aiEnabled && (
+              <button
+                type="button"
+                onClick={() => setUseAi(!useAi)}
+                aria-pressed={useAi}
+                aria-label={useAi ? "AI summary is on for new clips. Turn off." : "AI summary is off for new clips. Turn on."}
+                title={useAi ? "AI summary on for new PDFs and links. Click to turn off." : "AI summary off for new PDFs and links. Click to turn on."}
+                className={`btn-secondary relative !px-3 !py-2 ${
+                  useAi
+                    ? "!border-violet-200 !bg-violet-50 !text-violet-700 dark:!border-violet-500/30 dark:!bg-violet-500/15 dark:!text-violet-300"
+                    : "!text-slate-500"
+                }`}
+              >
+                <Sparkles className="size-4" />
+                <span className="hidden sm:inline">{useAi ? "AI on" : "AI off"}</span>
+                {!useAi && <span aria-hidden="true" className="pointer-events-none absolute inset-x-2.5 top-1/2 h-0.5 -rotate-45 rounded bg-current sm:hidden" />}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -376,7 +396,7 @@ export default function Library({ all = false }: { all?: boolean }) {
               className="btn-primary !px-3 !py-2"
             >
               <Upload className="size-4" />
-              <span>{importing || "Import PDF"}</span>
+              <span className={importing ? "" : "hidden sm:inline"}>{importing || "Import PDF"}</span>
             </button>
             <LinkClipButton
               collectionId={current.id}
@@ -405,7 +425,7 @@ export default function Library({ all = false }: { all?: boolean }) {
       {!all && current && <CollectionTools collection={current} canExport={canImport} reloadKey={reloadKey} />}
 
       {!filtering && items.length > 0 && (
-        <section className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+        <section className="mb-6 grid grid-cols-2 gap-2 sm:mb-8 sm:gap-4 xl:grid-cols-4">
           {stats.map((s) => <StatCard key={s.label} {...s} />)}
         </section>
       )}

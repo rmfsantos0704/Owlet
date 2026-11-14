@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Highlighter, ListFilter, MessageSquareText, StickyNote, FileText, Pencil } from "lucide-react";
 import { api } from "../services/api";
 import { useCollectionScope } from "../hooks/useCollectionScope";
 import ColorPicker from "../components/shared/ColorPicker";
 import FilterBar, { type FilterSelect } from "../components/shared/FilterBar";
+import MobileFilterSelects, { useIsMobile } from "../components/shared/MobileFilterSelects";
 import HighlightsAnalysis, { MAX_ANALYSIS_SOURCES } from "../components/highlights/HighlightsAnalysis";
 import { styleFor } from "../utils/colors";
 import type { Highlight, ResearchItem } from "../types";
@@ -29,6 +30,8 @@ export default function Highlights() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All highlights");
   const [pagination, setPagination] = useState({ key: "", page: 1 });
+  const listRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   const [clipId, setClipId] = useState("");
   const [color, setColor] = useState("");
@@ -148,6 +151,7 @@ export default function Highlights() {
 
   function changePage(nextPage: number) {
     setPagination({ key: paginationKey, page: nextPage });
+    listRef.current?.scrollTo({ top: 0 });
   }
 
   const filtersActive = !!(q || clipId || color || userEmail);
@@ -162,13 +166,13 @@ export default function Highlights() {
   }
 
   const selects: FilterSelect[] = [
-    { id: "collection", label: "Collection", value: scope, onChange: setScope, options: collectionOptions },
+    { id: "collection", label: "Collection", value: scope, onChange: setScope, className: "min-w-0 flex-1 basis-0 sm:flex-none sm:basis-auto", options: collectionOptions },
     {
       id: "clip",
       label: "Clip",
       value: clipId,
       onChange: setClipId,
-      className: "w-52",
+      className: "min-w-0 flex-1 basis-0 sm:flex-none sm:basis-auto sm:w-52",
       options: [{ value: "", label: "All clips" }, ...clipOptions.map(([id, title]) => ({ value: id, label: title }))],
     },
   ];
@@ -178,7 +182,7 @@ export default function Highlights() {
       label: "User",
       value: userEmail,
       onChange: setUserEmail,
-      className: "w-36",
+      className: "min-w-0 flex-1 basis-0 sm:flex-none sm:basis-auto sm:w-36",
       options: [{ value: "", label: "All users" }, ...authors.map((a) => ({ value: a, label: a }))],
     });
   }
@@ -277,11 +281,11 @@ function toggleSelect(h: (typeof all)[number]) {
         </p>
       </section>
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-3">
+      <section className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
         {stats.map(([label, value]) => (
-          <div key={label} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-            <div className="text-xs font-medium text-slate-500">{label}</div>
-            <div className="mt-3 text-2xl font-semibold text-ink">{value}</div>
+          <div key={label} className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm sm:rounded-2xl sm:p-5">
+            <div className="truncate text-[11px] font-medium text-slate-500 sm:text-xs">{label}</div>
+            <div className="mt-1 text-lg font-semibold text-ink sm:mt-3 sm:text-2xl">{value}</div>
           </div>
         ))}
       </section>
@@ -289,8 +293,10 @@ function toggleSelect(h: (typeof all)[number]) {
       <section className={aiEnabled ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]" : ""}>
         <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
           <div className="border-b border-slate-100 p-4">
+            {/* phones get their own one-row dropdowns with titles; FilterBar shows them on wider screens */}
+            {isMobile && <MobileFilterSelects selects={selects} />}
             <FilterBar
-              selects={selects}
+              selects={isMobile ? [] : selects}
               topActions={!aiEnabled && (
                 <div className="ml-auto flex flex-wrap items-center gap-2">
                   <button
@@ -377,7 +383,7 @@ function toggleSelect(h: (typeof all)[number]) {
               </div>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div ref={listRef} className="max-h-[70vh] divide-y divide-slate-100 overflow-y-auto overscroll-contain sm:max-h-none sm:overflow-visible">
               {pageItems.map((h) => {
                 const editing = editingId === h._id;
                 return (
@@ -491,7 +497,7 @@ function toggleSelect(h: (typeof all)[number]) {
           )}
 
           {!loading && !error && pageCount > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
               <span>
                 Showing {pageStart}–{pageEnd} of {shown.length} highlights · page {page} of {pageCount}
               </span>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Highlighter, ListFilter, MessageSquareText, Trash2, UsersRound } from "lucide-react";
 import { api } from "../services/api";
@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCollectionScope } from "../hooks/useCollectionScope";
 import { useDialog } from "../context/DialogContext";
 import FilterBar, { type FilterSelect } from "../components/shared/FilterBar";
+import MobileFilterSelects, { useIsMobile } from "../components/shared/MobileFilterSelects";
 import Modal from "../components/shared/Modal";
 import type { ResearchItem } from "../types";
 
@@ -31,6 +32,8 @@ export default function Comments() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
   const [pagination, setPagination] = useState({ key: "", page: 1 });
   const [collaboratorsOpen, setCollaboratorsOpen] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   const [clipId, setClipId] = useState("");
   const [userEmail, setUserEmail] = useState("");
@@ -103,6 +106,7 @@ export default function Comments() {
 
   function changePage(nextPage: number) {
     setPagination({ key: paginationKey, page: nextPage });
+    listRef.current?.scrollTo({ top: 0 });
   }
 
   const filtersActive = !!(q || clipId || userEmail);
@@ -116,13 +120,13 @@ export default function Comments() {
   }
 
   const selects: FilterSelect[] = [
-    { id: "collection", label: "Collection", value: scope, onChange: setScope, options: collectionOptions },
+    { id: "collection", label: "Collection", value: scope, onChange: setScope, className: "min-w-0 flex-1 basis-0 sm:flex-none sm:basis-auto", options: collectionOptions },
     {
       id: "clip",
       label: "Clip",
       value: clipId,
       onChange: setClipId,
-      className: "w-52",
+      className: "min-w-0 flex-1 basis-0 sm:flex-none sm:basis-auto sm:w-52",
       options: [{ value: "", label: "All clips" }, ...clipOptions.map(([id, title]) => ({ value: id, label: title }))],
     },
     {
@@ -130,7 +134,7 @@ export default function Comments() {
       label: "User",
       value: userEmail,
       onChange: setUserEmail,
-      className: "w-36",
+      className: "min-w-0 flex-1 basis-0 sm:flex-none sm:basis-auto sm:w-36",
       options: [{ value: "", label: "All users" }, ...authors.map((a) => ({ value: a, label: a }))],
     },
   ];
@@ -174,8 +178,10 @@ export default function Comments() {
       <section>
         <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
           <div className="border-b border-slate-100 p-4">
+            {/* phones get their own one-row dropdowns with titles; FilterBar shows them on wider screens */}
+            {isMobile && <MobileFilterSelects selects={selects} />}
             <FilterBar
-              selects={selects}
+              selects={isMobile ? [] : selects}
               filterControls={
                 <fieldset className="flex shrink-0 items-center gap-3 rounded-lg bg-slate-100 px-3 py-2">
                   <legend className="sr-only">Comment type</legend>
@@ -224,7 +230,7 @@ export default function Comments() {
               </div>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div ref={listRef} className="max-h-[70vh] divide-y divide-slate-100 overflow-y-auto overscroll-contain sm:max-h-none sm:overflow-visible">
               {pageItems.map((c) => {
                 const mine = c.authorEmail && c.authorEmail === user?.email;
                 return (
@@ -274,7 +280,7 @@ export default function Comments() {
           )}
 
           {!loading && !error && pageCount > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
               <span>
                 Showing {pageStart}–{pageEnd} of {shown.length} comments · page {page} of {pageCount}
               </span>
