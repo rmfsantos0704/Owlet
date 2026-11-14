@@ -7,7 +7,6 @@ import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import "pdfjs-dist/web/pdf_viewer.css";
 import { ChevronDown, ChevronUp, ListPlus, Minus, Plus, Search, Sparkles, StickyNote, X } from "lucide-react";
-import ColorPicker from "../shared/ColorPicker";
 import DraggableModal from "../shared/DraggableModal";
 import { styleFor } from "../../utils/colors";
 import LoadingScreen from "../shared/LoadingScreen";
@@ -20,6 +19,11 @@ const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4;
 const ZOOM_STEP = 1.25;
 const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 1000) / 1000));
+// keep in sync with HIGHLIGHT_COLORS on the server and utils/colors.ts
+const COLORS = [
+  "yellow", "orange", "red", "pink", "purple", "blue", "teal", "green",
+  "lime", "cyan", "indigo", "fuchsia", "gray",
+] as const;
 const MENU_ITEM = "block w-full rounded-lg px-3 py-1.5 text-left text-xs hover:bg-slate-100";
 
 // where the person stopped reading, kept per clip in this browser
@@ -920,6 +924,16 @@ export default function PdfViewer({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      {/*
+        The PDF's words are drawn on the canvas; the text layer on top is invisible and only there so text can be
+        selected. If a global ::selection rule (or the theme) gives selected text a visible color, the invisible
+        words show up on top of the canvas and the text looks doubled. These rules keep them invisible.
+      */}
+      <style>{`
+        .textLayer :is(span, br) { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; }
+        .textLayer ::selection { color: transparent !important; -webkit-text-fill-color: transparent !important; background: rgba(37, 99, 235, 0.3) !important; }
+        .textLayer ::-moz-selection { color: transparent !important; background: rgba(37, 99, 235, 0.3) !important; }
+      `}</style>
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-500">
         <form
           onSubmit={(e) => {
@@ -1070,7 +1084,24 @@ export default function PdfViewer({
         <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-3">
           {pending ? (
             <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-700 shadow-xl">
-              <ColorPicker value={color} onChange={setColor} disabled={saving} />
+              {/* one scrollable row of colors, so they don't take a second and third line on a phone */}
+              <div className="flex w-full items-center gap-1.5 overflow-x-auto px-0.5 py-1 sm:w-auto" role="radiogroup" aria-label="Highlight color">
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    role="radio"
+                    aria-checked={color === c}
+                    aria-label={c}
+                    title={c}
+                    disabled={saving}
+                    onClick={() => setColor(c)}
+                    className={`size-6 shrink-0 rounded-full ${styleFor(c).dot} ${
+                      color === c ? "ring-2 ring-slate-700 ring-offset-2" : "ring-1 ring-black/10"
+                    }`}
+                  />
+                ))}
+              </div>
               <button type="button" onClick={save} disabled={saving} className="btn-primary !px-3 !py-1.5 !text-xs">
                 {saving ? "Saving…" : "Highlight"}
               </button>
@@ -1103,17 +1134,21 @@ export default function PdfViewer({
                     type="button"
                     onClick={() => ask("explain")}
                     disabled={saving || ai?.status === "loading"}
+                    aria-label="Explain the selection"
+                    title="Explain"
                     className="btn-secondary !px-2.5 !py-1.5 !text-xs"
                   >
-                    <Sparkles className="size-3.5" /> Explain
+                    <Sparkles className="size-3.5" /> <span className="hidden sm:inline">Explain</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => ask("summarize")}
                     disabled={saving || ai?.status === "loading"}
+                    aria-label="Summarize the selection"
+                    title="Summarize"
                     className="btn-secondary !px-2.5 !py-1.5 !text-xs"
                   >
-                    <Sparkles className="size-3.5" /> Summarize
+                    <Sparkles className="size-3.5" /> <span className="hidden sm:inline">Summarize</span>
                   </button>
                 </>
               )}
@@ -1124,10 +1159,12 @@ export default function PdfViewer({
                     type="button"
                     onClick={() => setFiling((open) => !open)}
                     aria-expanded={filing}
+                    aria-label="Add to a research question"
+                    title="Add to a research question"
                     disabled={saving}
                     className="btn-secondary !px-2.5 !py-1.5 !text-xs"
                   >
-                    <ListPlus className="size-3.5" /> To question
+                    <ListPlus className="size-3.5" /> <span className="hidden sm:inline">To question</span>
                   </button>
                   {filing && (
                     <>
