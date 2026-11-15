@@ -26,7 +26,8 @@ type Segment = { text: string; h?: Highlight };
 // Prefer stored positions to disambiguate repeated phrases; legacy and extension highlights fall back to text.
 function buildSegments(text: string, highlights: Highlight[]): Segment[] {
   const ranges: { start: number; end: number; h: Highlight }[] = [];
-  for (const h of highlights) {
+  // newest first, so when highlights overlap the most recent one (and its color) wins, like on the page itself
+  for (const h of [...highlights].reverse()) {
     const hasValidPosition =
       Number.isInteger(h.startOffset) &&
       Number.isInteger(h.endOffset) &&

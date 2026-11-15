@@ -58,6 +58,7 @@ const TOUR_STEPS = [
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 let collections: Collection[] = [];
+const inPanel = new URLSearchParams(location.search).has("panel");
 let clippable = false;
 let clipping = false;
 let lastCollectionId = ""; // last real selection, so Cancel can go back to it
@@ -374,10 +375,18 @@ $("clipScope").addEventListener("change", () => {
 
 // ---------- data ----------
 
+// Site access is optional. The popup, shortcut and right-click menu work through activeTab; the side panel stays open
+// while you switch tabs, so it needs the user to allow access to all sites once.
+const ALL_SITES = { origins: ["<all_urls>"] };
+const hasSiteAccess = () => chrome.permissions.contains(ALL_SITES).catch(() => false);
+let needsAccess = false;
+
 async function loadPage() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const url = tab?.url ?? "";
-  clippable = /^https?:\/\//i.test(url);
+  const webPage = /^https?:\/\//i.test(url);
+  needsAccess = inPanel && webPage && !(await hasSiteAccess());
+  clippable = webPage && !needsAccess;
 
   let host = "";
   try {
@@ -385,8 +394,17 @@ async function loadPage() {
   } catch {
     /* not a normal URL */
   }
-  $("pageTitle").textContent = clippable ? tab?.title?.trim() || url : "This page can't be clipped";
-  $("pageHost").textContent = clippable ? host : "Open an article or website, then try again.";
+  $("pageTitle").textContent = clippable
+    ? tab?.title?.trim() || url
+    : needsAccess
+      ? "Allow site access to clip here"
+      : "This page can't be clipped";
+  $("pageHost").textContent = clippable
+    ? host
+    : needsAccess
+      ? "Click here to let the side panel clip pages you open."
+      : "Open an article or website, then try again.";
+  $("pageHost").style.cursor = needsAccess ? "pointer" : "";
 
   const fav = tab?.favIconUrl ?? "";
   const showFav = clippable && /^https?:\/\//i.test(fav);
@@ -702,7 +720,6 @@ $("openDash").addEventListener("click", () => open(DASHBOARD_URL));
 // ---------- popup / side panel ----------
 
 // the side panel loads this same page with ?panel=1
-const inPanel = new URLSearchParams(location.search).has("panel");
 document.body.classList.toggle("panel", inPanel);
 {
   const toggle = $("panelToggle");
@@ -710,9 +727,19 @@ document.body.classList.toggle("panel", inPanel);
   toggle.setAttribute("aria-label", toggle.title);
 }
 
+$("pageHost").addEventListener("click", async () => {
+  if (!needsAccess) return;
+  if (await chrome.permissions.request(ALL_SITES).catch(() => false)) await loadPage();
+});
+
 $("panelToggle").addEventListener("click", async () => {
   const toPanel = !inPanel;
   try {
+    if (toPanel && !(await chrome.permissions.request(ALL_SITES).catch(() => false))) {
+      // declined: stay in the popup, which works without extra access
+      status("err", "Side panel needs access to all sites so it can clip as you switch tabs. The popup works without it.");
+      return;
+    }
     await chrome.storage.local.set({ [OPEN_MODE_KEY]: toPanel ? "panel" : "popup" });
     await applyOpenMode(toPanel ? "panel" : "popup");
     if (toPanel) {
