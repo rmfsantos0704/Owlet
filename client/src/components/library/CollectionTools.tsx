@@ -1,6 +1,8 @@
 import { createPortal } from "react-dom";
 import { NavLink, useOutletContext } from "react-router-dom";
-import { FileText, LayoutGrid, Library as LibraryIcon, Settings, Table, type LucideIcon } from "lucide-react";
+import {
+  FileText, Highlighter, LayoutGrid, Library as LibraryIcon, MessageSquareText, Settings, Table, type LucideIcon,
+} from "lucide-react";
 import { useCollections } from "../../context/CollectionContext";
 import type { LayoutContext } from "../Layout";
 import RecentActivity from "./RecentActivity";
@@ -38,9 +40,9 @@ function ToolLink({
 }
 
 // The open collection's buttons in the top bar: Collection overview, Literature matrix, Research briefs, Evidence board,
-// Recent activity, Export and Settings. Library, Literature matrix, Research briefs and Evidence board all render this,
-// so the bar looks the same on each and the current page's button is highlighted. Renders into the layout's top-bar
-// slot with a portal.
+// Highlights, Comments, Recent activity, Export and Settings. Library and every page that belongs to a collection
+// render this, so the bar looks the same on each and the current page's button is highlighted. Renders into the
+// layout's top-bar slot with a portal.
 export default function CollectionTools({
   collection,
   canExport,
@@ -63,6 +65,8 @@ export default function CollectionTools({
       <ToolLink to={`${base}/matrix`} label="Literature matrix" icon={Table} />
       <ToolLink to={`${base}/briefs`} label="Research briefs" icon={FileText} />
       <ToolLink to={`${base}/board`} label="Evidence board" icon={LayoutGrid} />
+      <ToolLink to={`${base}/highlights`} label="Highlights" icon={Highlighter} />
+      <ToolLink to={`${base}/comments`} label="Comments" icon={MessageSquareText} />
       <RecentActivity collectionId={collection.id} reloadKey={reloadKey} />
       {canExport && <CollectionExportMenu collectionId={collection.id} collectionName={collection.name} />}
       <ToolLink to={`${base}/settings`} label="Collection settings" icon={Settings} showLabel={false} />

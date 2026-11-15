@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Highlighter, ListFilter, MessageSquareText, StickyNote, FileText, Pencil } from "lucide-react";
 import { api } from "../services/api";
-import { useCollectionScope } from "../hooks/useCollectionScope";
+import { useCollections } from "../context/CollectionContext";
 import ColorPicker from "../components/shared/ColorPicker";
 import FilterBar, { type FilterSelect } from "../components/shared/FilterBar";
 import MobileFilterSelects, { useIsMobile } from "../components/shared/MobileFilterSelects";
+import LoadingScreen from "../components/shared/LoadingScreen";
+import CollectionTools from "../components/library/CollectionTools";
 import HighlightsAnalysis, { MAX_ANALYSIS_SOURCES } from "../components/highlights/HighlightsAnalysis";
 import { styleFor } from "../utils/colors";
 import type { Highlight, ResearchItem } from "../types";
@@ -21,8 +23,15 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 // one highlight can be told apart across clips by its clip id plus its own id
 const keyOf = (h: { _id: string; item: { _id: string } }) => `${h.item._id}:${h._id}`;
 
+// Every highlight in one collection (/Collection/:id/highlights).
 export default function Highlights() {
-  const { ready, scope, setScope, scopeCollection, qs, options: collectionOptions } = useCollectionScope();
+  // these pages belong to the collection in the URL
+  const { id: routeId } = useParams();
+  const { collections, ready } = useCollections();
+  const scopeCollection = (collections ?? []).find((c) => c.id === routeId);
+  const scope = scopeCollection?.id ?? "";
+  const qs = scope ? `?collectionId=${scope}` : "";
+
   const [params, setParams] = useSearchParams();
   const q = (params.get("q") ?? "").toLowerCase();
   const [items, setItems] = useState<ResearchItem[]>([]);
@@ -50,16 +59,16 @@ export default function Highlights() {
 
   const { aiEnabled } = useAuth();
 
-    // the AI analysis reads at most this many sources; a brief has no such limit
+  // the AI analysis reads at most this many sources; a brief has no such limit
   const sourceLimit = aiEnabled ? MAX_ANALYSIS_SOURCES : Infinity;
-  
+
   const [briefOpen, setBriefOpen] = useState(false);
 
-  // the list is limited to the chosen collection, so its role decides who sees Edit (the server checks too)
+  // the list is limited to this collection, so its role decides who sees Edit (the server checks too)
   const canEdit = scopeCollection ? scopeCollection.role !== "viewer" : true;
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !scope) return;
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -70,7 +79,7 @@ export default function Highlights() {
     return () => {
       cancelled = true;
     };
-  }, [ready, qs]);
+  }, [ready, scope, qs]);
 
   // the clip and user filters only make sense inside the collection they were picked in
   useEffect(() => {
@@ -166,7 +175,6 @@ export default function Highlights() {
   }
 
   const selects: FilterSelect[] = [
-    { id: "collection", label: "Collection", value: scope, onChange: setScope, className: "min-w-0 flex-1 basis-0 sm:flex-none sm:basis-auto", options: collectionOptions },
     {
       id: "clip",
       label: "Clip",
@@ -191,7 +199,7 @@ export default function Highlights() {
   const selected = all.filter((h) => selectedKeys.has(keyOf(h)));
   const selectedSources = new Set(selected.map((h) => h.item._id));
 
-function toggleSelect(h: (typeof all)[number]) {
+  function toggleSelect(h: (typeof all)[number]) {
     const k = keyOf(h);
     const next = new Set(selectedKeys);
     if (next.has(k)) {
@@ -201,7 +209,7 @@ function toggleSelect(h: (typeof all)[number]) {
       return;
     } else {
       setSelectionNote("");
-      next.add(k); // Also ensure you were adding the key to 'next' here!
+      next.add(k);
     }
     setSelectedKeys(next);
   }
@@ -270,14 +278,24 @@ function toggleSelect(h: (typeof all)[number]) {
     }
   }
 
+  if (!ready) return <LoadingScreen label="Loading your collections…" fill="page" />;
+  if (!scopeCollection) {
+    return (
+      <p className="text-sm text-slate-500">
+        This collection doesn't exist or you don't have access to it.{" "}
+        <Link to="/" className="font-semibold text-blue-700 hover:underline">Back to your library</Link>
+      </p>
+    );
+  }
+
   return (
     <div>
+      <CollectionTools collection={scopeCollection} canExport={scopeCollection.role !== "viewer"} />
       <section className="mb-8">
         <div className="eyebrow mb-2 text-amber-600">Knowledge library</div>
         <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Highlights</h1>
         <p className="mt-2 text-sm text-slate-500">
-          {all.length} passages collected from {new Set(all.map((h) => h.item._id)).size} sources
-          {scopeCollection ? ` in ${scopeCollection.name}` : " across all collections"}.
+          {all.length} passages collected from {new Set(all.map((h) => h.item._id)).size} sources in {scopeCollection.name}.
         </p>
       </section>
 

@@ -85,7 +85,6 @@ export default function OnboardingModal({ open, onClose, initialStep = 0, onSide
         description: "These links are different ways to work with your saved research. They don't move or copy clips between Collections.",
         items: [
           ["All clips", "Search and browse clips across every Collection you can access."],
-          ["Highlights & Comments", "Review passages you've marked and conversations on clips."],
           ["AI workspace", "Run research analysis on selected sources when AI is available."],
           ["Concept search", "Find clips by meaning, not just exact words, so related ideas turn up even when the wording differs."],
         ],
@@ -113,13 +112,14 @@ export default function OnboardingModal({ open, onClose, initialStep = 0, onSide
         target: COLLECTION_TOOLS_TARGET,
         icon: LayoutGrid,
         title: "Tools for the open Collection",
-        description: "When you open a Collection, its own tools appear in the top bar. Each one belongs to that Collection only, so every Collection has its own matrix, evidence board, and briefs.",
+        description: "When you open a Collection, its own tools appear in the top bar. Each one belongs to that Collection only, so every Collection has its own matrix, evidence board, briefs, highlights, and comments.",
         items: [
           ["Import PDF", "Add PDFs to this Collection. You can also drop files anywhere on the page."],
           ["Save link", "Paste a web page's address and Owlet saves its text and citations. If a page can't be opened automatically, you can paste its text instead. Handy on a phone."],
           ["Literature matrix", "Compare your sources in a table with columns you choose, and export it as CSV."],
           ["Research briefs", "Write structured briefs from your sources. Every claim links back to the passage it came from."],
           ["Evidence board", "Sort highlights and notes under what they support, challenge, or leave open for your research questions."],
+          ["Highlights & Comments", "Review every passage you've marked and every conversation on the clips in this Collection."],
           ["Activity, Export & Settings", "See what's new, export the Collection, and change its settings."],
         ],
       },

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Highlighter, ListFilter, MessageSquareText, Trash2, UsersRound } from "lucide-react";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { useCollectionScope } from "../hooks/useCollectionScope";
+import { useCollections } from "../context/CollectionContext";
 import { useDialog } from "../context/DialogContext";
 import FilterBar, { type FilterSelect } from "../components/shared/FilterBar";
 import MobileFilterSelects, { useIsMobile } from "../components/shared/MobileFilterSelects";
+import LoadingScreen from "../components/shared/LoadingScreen";
+import CollectionTools from "../components/library/CollectionTools";
 import Modal from "../components/shared/Modal";
 import type { ResearchItem } from "../types";
 
@@ -20,10 +22,17 @@ function tint(email = "") {
   return TINTS[n % TINTS.length];
 }
 
+// Every comment in one collection (/Collection/:id/comments).
 export default function Comments() {
   const { user } = useAuth();
   const dialog = useDialog();
-  const { ready, scope, setScope, scopeCollection, qs, options: collectionOptions } = useCollectionScope();
+  // these pages belong to the collection in the URL
+  const { id: routeId } = useParams();
+  const { collections, ready } = useCollections();
+  const scopeCollection = (collections ?? []).find((c) => c.id === routeId);
+  const scope = scopeCollection?.id ?? "";
+  const qs = scope ? `?collectionId=${scope}` : "";
+
   const [params, setParams] = useSearchParams();
   const q = (params.get("q") ?? "").toLowerCase();
   const [items, setItems] = useState<ResearchItem[]>([]);
@@ -39,7 +48,7 @@ export default function Comments() {
   const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !scope) return;
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -50,7 +59,7 @@ export default function Comments() {
     return () => {
       cancelled = true;
     };
-  }, [ready, qs]);
+  }, [ready, scope, qs]);
 
   // the clip and user filters only make sense inside the collection they were picked in
   useEffect(() => {
@@ -120,7 +129,6 @@ export default function Comments() {
   }
 
   const selects: FilterSelect[] = [
-    { id: "collection", label: "Collection", value: scope, onChange: setScope, className: "min-w-0 flex-1 basis-0 sm:flex-none sm:basis-auto", options: collectionOptions },
     {
       id: "clip",
       label: "Clip",
@@ -156,15 +164,26 @@ export default function Comments() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [threads]);
 
+  if (!ready) return <LoadingScreen label="Loading your collections…" fill="page" />;
+  if (!scopeCollection) {
+    return (
+      <p className="text-sm text-slate-500">
+        This collection doesn't exist or you don't have access to it.{" "}
+        <Link to="/" className="font-semibold text-blue-700 hover:underline">Back to your library</Link>
+      </p>
+    );
+  }
+
   return (
     <div>
+      <CollectionTools collection={scopeCollection} canExport={scopeCollection.role !== "viewer"} />
       <section className="mb-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="eyebrow mb-2 text-blue-600">Team collaboration</div>
             <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Comments</h1>
             <p className="mt-2 text-sm text-slate-500">
-              Questions, feedback, and decisions across {scopeCollection ? scopeCollection.name : "all your collections"}.
+              Questions, feedback, and decisions in {scopeCollection.name}.
             </p>
           </div>
           <button type="button" onClick={() => setCollaboratorsOpen(true)} className="btn-secondary">

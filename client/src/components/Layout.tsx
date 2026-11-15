@@ -34,8 +34,10 @@ import { ONBOARDING_EVENT } from "../utils/onboarding";
 // (a page renders into it with a portal).
 export type LayoutContext = { headerActions: HTMLElement | null };
 
-// pages where the header search filters what's shown (everywhere else it jumps to the collection page)
-const SEARCHABLE = ["/all", "/highlights", "/comments"];
+// Pages where the header search filters what's shown (everywhere else it jumps to the library):
+// All clips, and each collection's Highlights and Comments pages.
+const COLLECTION_SECTION = /^\/Collection\/[^/]+\/(highlights|comments)$/i;
+const isSearchable = (path: string) => path === "/all" || COLLECTION_SECTION.test(path);
 
 // sidebar sizing + persistence
 const MIN_W = 224;
@@ -246,17 +248,32 @@ export default function Layout() {
   const q = params.get("q") ?? "";
   const initials = (user?.email ?? "?").slice(0, 2).toUpperCase();
   const onCollectionPage = pathname === "/";
-  const searchPlaceholder = pathname === "/highlights"
-    ? "Search highlights, notes, or sources..."
-    : pathname === "/comments"
-      ? "Search comments, people, or sources..."
-      : "Search clips, tags, or sources...";
+
+  // The matrix, board, briefs, highlights, comments and settings live under /Collection/:id/..., so the URL says
+  // which collection is open
+  const routeCollectionId = pathname.match(/^\/Collection\/([^/]+)/i)?.[1];
+  const activeCollectionId = routeCollectionId ?? (onCollectionPage ? current?.id : undefined);
+
+  // opening one of a collection's pages makes it the current collection, so the sidebar and the library agree
+  useEffect(() => {
+    if (routeCollectionId && routeCollectionId !== current?.id && collections.some((c: any) => c.id === routeCollectionId)) {
+      select(routeCollectionId);
+    }
+  }, [routeCollectionId, current?.id, collections, select]);
+
+  const section = pathname.match(COLLECTION_SECTION)?.[1]?.toLowerCase();
+  const searchPlaceholder =
+    section === "highlights"
+      ? "Search highlights, notes, or sources..."
+      : section === "comments"
+        ? "Search comments, people, or sources..."
+        : "Search clips, tags, or sources...";
 
   function onSearch(value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set("q", value);
     else next.delete("q");
-    navigate({ pathname: SEARCHABLE.includes(pathname) ? pathname : "/", search: next.toString() }, { replace: true });
+    navigate({ pathname: isSearchable(pathname) ? pathname : "/", search: next.toString() }, { replace: true });
   }
 
   // phone: collapse the search bar again (this also clears the filter)
@@ -288,7 +305,7 @@ export default function Layout() {
 
   const row = (w: any) => {
     const collectionId = w?.id || w?._id;
-    const active = onCollectionPage && current?.id && current.id === collectionId;
+    const active = !!activeCollectionId && activeCollectionId === collectionId;
     const isArchived = archived.includes(collectionId);
     return (
       <div key={collectionId ?? Math.random()} className="group relative">

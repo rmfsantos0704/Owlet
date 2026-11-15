@@ -96,18 +96,19 @@ export default function App() {
             <Route path="/" element={<Library />} />
             <Route path="/all" element={<Library all />} />
             <Route path="/ai" element={<AiWorkspace />} />
-            <Route path="/highlights" element={<Highlights />} />
-            <Route path="/comments" element={<Comments />} />
             <Route path="/search" element={<ConceptSearch />} />
             <Route path="/help" element={<HelpSupport />} />
             <Route path="/item/:id" element={<ItemDetail />} />
             {/* save a page from its address: opened from a share link, a bookmarklet or a phone shortcut */}
             <Route path="/clip" element={<ClipLink />} />
 
-            {/* the matrix, the evidence board and the briefs each belong to one collection, so they live under it */}
+            {/* the matrix, the evidence board, the briefs, the highlights and the comments each belong to one
+                collection, so they live under it */}
             <Route path="/Collection/:id/settings" element={<CollectionSettings />} />
             <Route path="/Collection/:id/matrix" element={<LiteratureMatrix />} />
             <Route path="/Collection/:id/board" element={<EvidenceBoard />} />
+            <Route path="/Collection/:id/highlights" element={<Highlights />} />
+            <Route path="/Collection/:id/comments" element={<Comments />} />
             <Route path="/Collection/:id/briefs" element={<Briefs />} />
             <Route path="/Collection/:id/briefs/:briefId" element={<BriefView />} />
 
@@ -116,6 +117,8 @@ export default function App() {
             <Route path="/board" element={<Navigate to="/" replace />} />
             <Route path="/briefs" element={<Navigate to="/" replace />} />
             <Route path="/briefs/:id" element={<Navigate to="/" replace />} />
+            <Route path="/highlights" element={<Navigate to="/" replace />} />
+            <Route path="/comments" element={<Navigate to="/" replace />} />
 
             <Route path="/join/:token" element={<JoinCollection />} />
             <Route path="/account" element={<AccountPage />} />
