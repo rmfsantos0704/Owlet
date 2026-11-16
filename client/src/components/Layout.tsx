@@ -39,6 +39,9 @@ export type LayoutContext = { headerActions: HTMLElement | null };
 const COLLECTION_SECTION = /^\/Collection\/[^/]+\/(highlights|comments)$/i;
 const isSearchable = (path: string) => path === "/all" || COLLECTION_SECTION.test(path);
 
+// The pages that live under a collection. Switching to another collection from one of them opens the same page there.
+const COLLECTION_PAGE = /^\/Collection\/[^/]+\/(matrix|board|briefs|highlights|comments|settings)(?:\/|$)/i;
+
 // sidebar sizing + persistence
 const MIN_W = 224;
 const MAX_W = 420;
@@ -261,6 +264,9 @@ export default function Layout() {
     }
   }, [routeCollectionId, current?.id, collections, select]);
 
+  // which of those pages is open (the matrix, the board, ...), so another collection can be opened on the same one
+  const openPage = pathname.match(COLLECTION_PAGE)?.[1]?.toLowerCase();
+
   const section = pathname.match(COLLECTION_SECTION)?.[1]?.toLowerCase();
   const searchPlaceholder =
     section === "highlights"
@@ -313,7 +319,8 @@ export default function Layout() {
           onClick={() => {
             if (collectionId) {
               select(collectionId);
-              navigate("/");
+              // on a collection's matrix, board, briefs, highlights, comments or settings page: stay on that page
+              navigate(openPage ? `/Collection/${collectionId}/${openPage}` : "/");
               setOpen(false);
             }
           }}

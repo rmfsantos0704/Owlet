@@ -329,7 +329,7 @@ export default function Highlights() {
                 </div>
               )}
               filterControls={
-                <>
+                <div className="flex w-full flex-nowrap items-center gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 sm:w-auto sm:flex-wrap sm:overflow-visible">
                   <fieldset className="flex shrink-0 items-center gap-3 rounded-lg bg-slate-100 px-3 py-2">
                     <legend className="sr-only">Highlight type</legend>
                     {FILTERS.map((f) => (
@@ -352,7 +352,7 @@ export default function Highlights() {
                     ))}
                   </fieldset>
                   {colorCounts.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-nowrap items-center gap-1.5 sm:flex-wrap">
                       <span className="mr-1 text-[11px] font-semibold text-slate-400">Color</span>
                       {colorCounts.map(([c, n]) => {
                         const on = color === c;
@@ -364,7 +364,7 @@ export default function Highlights() {
                             aria-label={`${cap(c)} highlights${on ? ", selected" : ""}`}
                             aria-pressed={on}
                             title={`${cap(c)} (${n})`}
-                            className={`inline-flex size-8 items-center justify-center rounded-full border transition ${
+                            className={`inline-flex size-7 shrink-0 items-center justify-center rounded-full border transition sm:size-8 ${
                               on
                                 ? "border-blue-300 bg-blue-50 text-blue-700"
                                 : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
@@ -376,7 +376,7 @@ export default function Highlights() {
                       })}
                     </div>
                   )}
-                </>
+                </div>
               }
               active={filtersActive}
               onClear={clearFilters}

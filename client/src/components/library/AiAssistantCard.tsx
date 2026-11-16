@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight, Bot, Check, Highlighter, MessageSquareText, Sparkles, Tag } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import type { ResearchItem } from "../../types";
+import { useCollections } from "../../context/CollectionContext";
 
 // Dark card for the Library sidebar; the numbers come from the clips on screen.
 export default function AiAssistantCard({ items }: { items: ResearchItem[] }) {
@@ -16,6 +17,7 @@ export default function AiAssistantCard({ items }: { items: ResearchItem[] }) {
     const comments = items.reduce((n, i) => n + (i.comments?.length ?? 0), 0);
     const allTagged = total > 0 && tagged === total;
 
+const { current } = useCollections();
     return (
       <div className="rounded-2xl bg-brand p-5 text-white shadow-lg shadow-blue-950/10">
         <div className="flex items-start justify-between">
@@ -89,7 +91,7 @@ export default function AiAssistantCard({ items }: { items: ResearchItem[] }) {
         </div>
 
         <Link
-          to="/highlights"
+to={current ? `/Collection/${current.id}/highlights` : "/"}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-xs font-semibold text-brand hover:bg-blue-50"
         >
           Build a brief <ArrowUpRight className="size-3.5" />

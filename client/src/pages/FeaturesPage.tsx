@@ -64,7 +64,7 @@ const GROUPS: Group[] = [
       {
         icon: Highlighter,
         title: "Highlights in eight colors",
-        text: "Select a passage, pick a color and add a note. Highlights are marked in the clip's text and collected on one Highlights page.",
+        text: "Select a passage, pick a color and add a note. Highlights are marked in the clip's text and collected on a Highlights page inside each collection.",
       },
       {
         icon: Tag,
@@ -88,7 +88,7 @@ const GROUPS: Group[] = [
       {
         icon: MessageSquareText,
         title: "Comments and replies",
-        text: "Comment on a clip or on a specific highlight, reply in threads, and edit or delete your own comments.",
+        text: "Comment on a clip or on a specific highlight, reply in threads, and edit or delete your own comments. Each collection has a Comments page that gathers every discussion in one place.",
       },
       {
         icon: Users,

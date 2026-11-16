@@ -15,6 +15,7 @@ import {
   Link2,
   ListChecks,
   Mail,
+  MessageSquareText,
   Play,
   Search,
   Share2,
@@ -83,6 +84,13 @@ function guides(ai: boolean, off: boolean): Guide[] {
     },
     {
       topic: "notes",
+      icon: MessageSquareText,
+      title: "Review a Collection's highlights and comments",
+      text: "Open a Collection and press Highlights or Comments in the top bar. Each page lists everything in that Collection. Search from the top bar, filter by clip, color or person, and edit your own highlights without opening the clip.",
+      accent: ACCENT.amber,
+    },
+    {
+      topic: "notes",
       icon: FileText,
       title: "Highlight on the original PDF",
       text: "Open a PDF clip and press the Original PDF card. The PDF opens on its own page: select text to highlight it, pick a color and add a note. The list on the right shows every highlight, and clicking one jumps to its page.",
@@ -113,7 +121,7 @@ function guides(ai: boolean, off: boolean): Guide[] {
       topic: "research",
       icon: CircleHelp,
       title: "Set your research questions",
-      text: "Open Evidence board from Workspaces. Under Research questions, write the main question this Collection is meant to answer, then add smaller supporting questions. Owners and editors can edit or delete them.",
+      text: "Open Evidence board from a Collection's top bar. Under Research questions, write the main question this Collection is meant to answer, then add smaller supporting questions. Owners and editors can edit or delete them.",
       accent: ACCENT.sky,
     },
     {
@@ -145,7 +153,7 @@ function guides(ai: boolean, off: boolean): Guide[] {
         topic: "research-tools",
         icon: FileText,
         title: "Write a research brief",
-        text: "Open Research briefs from Workspaces and press New brief. Pick a template and up to 8 sources, add an optional question, and choose whether to use your evidence board. Owlet writes the brief from your passages, highlights and literature-matrix entries. Each brief uses one AI generation.",
+        text: "Open Research briefs from a Collection's top bar and press New brief. Pick a template and up to 8 sources, add an optional question, and choose whether to use your evidence board. Owlet writes the brief from your passages, highlights and literature-matrix entries. Each brief uses one AI generation.",
         accent: ACCENT.rose,
       },
       {
@@ -176,7 +184,7 @@ function guides(ai: boolean, off: boolean): Guide[] {
         topic: "summaries",
         icon: FileText,
         title: "Build a brief",
-        text: "On the Highlights page, press Build a brief, tick the highlights you want and group them by source or by color. Owlet compiles them with your notes and an APA reference list. Copy it as Markdown or download it as a .md file.",
+        text: "Open Highlights from a Collection's top bar and press Build a brief, tick the highlights you want and group them by source or by color. Owlet compiles them with your notes and an APA reference list. Copy it as Markdown or download it as a .md file.",
         accent: ACCENT.emerald,
       },
       {
@@ -202,7 +210,7 @@ function guides(ai: boolean, off: boolean): Guide[] {
     topic: "organize",
     icon: FileText,
     title: "Build a literature matrix",
-    text: "Open Literature matrix from Workspaces. Add your own columns, fill in each clip's cells, and export the collection matrix as CSV.",
+    text: "Open Literature matrix from a Collection's top bar. Add your own columns, fill in each clip's cells, and export the collection matrix as CSV.",
     accent: ACCENT.cyan,
   });
   list.push({
@@ -290,6 +298,11 @@ function faq(ai: boolean): Faq[] {
     },
     {
       topic: "notes",
+      q: "Where did the Highlights and Comments pages go?",
+      a: "They moved inside each Collection. Open a Collection, then press Highlights or Comments in the top bar. Each page shows only that Collection's highlights or comments, and the search box at the top searches them.",
+    },
+    {
+      topic: "notes",
       q: "Why can't I open the original PDF for an older clip?",
       a: "Only PDFs imported after the PDF viewer was added keep their original file. For an older PDF, delete the clip and import the file again to get the Original PDF page. You can still read and highlight its extracted text.",
     },
@@ -370,7 +383,7 @@ function topics(ai: boolean): Topic[] {
     {
       id: "notes",
       title: "Highlights & notes",
-      description: "Highlight text or the original PDF page, add notes and leave comments.",
+      description: "Highlight text or the original PDF page, add notes, leave comments and review them per Collection.",
       icon: Highlighter,
       color: ACCENT.amber,
     },
